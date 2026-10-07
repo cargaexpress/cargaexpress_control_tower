@@ -1,4 +1,4 @@
-﻿# CargaExpress Supply Chain — Backend
+# CargaExpress Supply Chain — Backend
 
 API del backend de CargaExpress para la torre de control del negocio.
 
@@ -113,3 +113,15 @@ backend/
 
 - Este repositorio no requiere pasos extra para funcionar en un entorno local estándar.
 - El endpoint de salud es la primera verificación para confirmar que el backend está levantado y que la conexión a la base de datos responde.
+
+## Ejecutar con Docker
+
+Sin instalar Python, uv ni PostgreSQL:
+
+```bash
+cp .env.example .env    # completar POSTGRES_PASSWORD
+docker compose up --build
+curl http://localhost:8000/api/v1/health
+```
+
+Documentación completa (archivos, variables, criterios de aceptación de US-07 y solución de problemas): [DOCKER.md](DOCKER.md).
