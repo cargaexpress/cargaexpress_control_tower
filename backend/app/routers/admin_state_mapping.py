@@ -30,7 +30,7 @@ async def list_mappings(
     db: AsyncSession = Depends(get_db),
 ) -> list[StateMapping]:
     """Lista los mapeos tal como están en la base de datos (no usa la caché)."""
-    query = select(StateMapping).order_by(StateMapping.carrier_id, StateMapping.source_status)
+    query = select(StateMapping).order_by(StateMapping.carrier_id, StateMapping.raw_status)
     if carrier_id is not None:
         query = query.where(StateMapping.carrier_id == carrier_id)
     return list((await db.scalars(query)).all())
@@ -39,14 +39,14 @@ async def list_mappings(
 # Declarado antes de /{mapping_id} para que "resolve" no se confunda con un id.
 @router.get("/resolve", response_model=StateMappingResolved)
 async def resolve_mapping(
-    carrier_id: int = Query(gt=0), source_status: str = Query(min_length=1)
+    carrier_id: int = Query(gt=0), raw_status: str = Query(min_length=1)
 ) -> StateMappingResolved:
     """Traduce un estado de transportadora usando la caché en memoria."""
-    canonical = await state_mapping_cache.translate(carrier_id, source_status)
+    canonical = await state_mapping_cache.translate(carrier_id, raw_status)
     if canonical is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay mapeo para ese estado.")
     return StateMappingResolved(
-        carrier_id=carrier_id, source_status=source_status.strip(), canonical_status=canonical
+        carrier_id=carrier_id, raw_status=raw_status.strip(), canonical_status=canonical
     )
 
 

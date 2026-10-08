@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -13,12 +21,13 @@ CANONICAL_STATUSES: tuple[str, ...] = (
     "PICKED_UP",
     "IN_TRANSIT",
     "OUT_FOR_DELIVERY",
-    "DELIVERED",
-    "DELIVERY_FAILED",
-    "RETURNED",
-    "CANCELLED",
     "EXCEPTION",
+    "DELIVERED",
+    "RETURNED",
+    "LOST_OR_DAMAGED",
 )
+
+_CANONICAL_STATUS_VALUES = ", ".join(f"'{status}'" for status in CANONICAL_STATUSES)
 
 
 class StateMapping(Base):
@@ -26,14 +35,18 @@ class StateMapping(Base):
 
     __tablename__ = "state_mapping"
     __table_args__ = (
-        UniqueConstraint("carrier_id", "source_status", name="uq_state_mapping_carrier_source"),
+        UniqueConstraint("carrier_id", "raw_status", name="uq_state_mapping_carrier_raw_status"),
+        CheckConstraint(
+            f"canonical_status IN ({_CANONICAL_STATUS_VALUES})",
+            name="ck_state_mapping_canonical_status",
+        ),
     )
 
-    mapping_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     carrier_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("carriers.carrier_id"), nullable=False
     )
-    source_status: Mapped[str] = mapped_column(String, nullable=False)
+    raw_status: Mapped[str] = mapped_column(String, nullable=False)
     canonical_status: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

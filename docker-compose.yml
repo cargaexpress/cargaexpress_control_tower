@@ -37,10 +37,31 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       SQL_ECHO: ${SQL_ECHO:-false}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
       # El host es "db" (nombre del servicio en la red de Docker), no "localhost"
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Falta POSTGRES_USER}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cargaexpress}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cargaexpress
+
+  test:
+    profiles: ["test"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: test
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      SQL_ECHO: ${SQL_ECHO:-false}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Falta POSTGRES_USER}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cargaexpress}
+    command: ["sh", "-c", "alembic upgrade head && python -m pytest -v"]
     depends_on:
       db:
         condition: service_healthy

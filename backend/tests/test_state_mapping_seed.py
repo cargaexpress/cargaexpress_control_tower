@@ -5,8 +5,11 @@ from pathlib import Path
 
 from app.models.state_mapping import CANONICAL_STATUSES
 
-SEED_FILE = next(
-    (Path(__file__).resolve().parent.parent / "alembic" / "versions").glob("*_seed_state_mapping_*.py")
+SEED_FILE = (
+    Path(__file__).resolve().parent.parent
+    / "alembic"
+    / "versions"
+    / "c4a1209b7e6f_hu12_canonical_state_mapping.py"
 )
 
 
@@ -22,6 +25,16 @@ def test_seed_only_uses_valid_canonical_statuses():
 
     used = {canonical for mappings in seed.values() for canonical in mappings.values()}
 
+    assert _load_seed_module().CANONICAL_STATUSES == (
+        "CREATED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "OUT_FOR_DELIVERY",
+        "EXCEPTION",
+        "DELIVERED",
+        "RETURNED",
+        "LOST_OR_DAMAGED",
+    )
     assert used <= set(CANONICAL_STATUSES)
 
 
@@ -29,4 +42,7 @@ def test_seed_defines_several_simulated_carriers_with_mappings():
     seed = _load_seed_module().SEED
 
     assert len(seed) >= 3
-    assert all(len(mappings) > 0 for mappings in seed.values())
+    assert all(len(mappings) >= 6 for mappings in seed.values())
+    assert set(_load_seed_module().CANONICAL_STATUSES) <= {
+        canonical for mappings in seed.values() for canonical in mappings.values()
+    }

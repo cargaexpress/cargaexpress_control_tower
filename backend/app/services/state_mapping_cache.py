@@ -20,7 +20,7 @@ from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models.state_mapping import StateMapping
 
-MappingKey = tuple[int, str]  # (carrier_id, source_status)
+MappingKey = tuple[int, str]  # (carrier_id, raw_status)
 Loader = Callable[[], Awaitable[dict[MappingKey, str]]]
 
 
@@ -28,9 +28,9 @@ async def load_mappings_from_db() -> dict[MappingKey, str]:
     # Sesión propia (no la de la petición) para leer siempre datos ya confirmados.
     async with AsyncSessionLocal() as session:
         rows = await session.execute(
-            select(StateMapping.carrier_id, StateMapping.source_status, StateMapping.canonical_status)
+            select(StateMapping.carrier_id, StateMapping.raw_status, StateMapping.canonical_status)
         )
-        return {(carrier_id, source): canonical for carrier_id, source, canonical in rows}
+        return {(carrier_id, raw_status): canonical for carrier_id, raw_status, canonical in rows}
 
 
 class StateMappingCache:
@@ -71,9 +71,9 @@ class StateMappingCache:
                 self._loaded_at = self._clock()
             return data
 
-    async def translate(self, carrier_id: int, source_status: str) -> str | None:
+    async def translate(self, carrier_id: int, raw_status: str) -> str | None:
         """Estado canónico para el estado de la transportadora, o None si no hay mapeo."""
-        return (await self._snapshot()).get((carrier_id, source_status.strip()))
+        return (await self._snapshot()).get((carrier_id, raw_status.strip()))
 
 
 state_mapping_cache = StateMappingCache(

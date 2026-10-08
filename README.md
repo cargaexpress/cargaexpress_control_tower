@@ -8,9 +8,13 @@ Alembic y PostgreSQL.
 - API disponible en `http://localhost:8000`.
 - Documentación interactiva de la API en `http://localhost:8000/docs`.
 - Health check en `GET /api/v1/health`.
-- Modelos y migración inicial para 11 tablas WMS.
-- Revisión Alembic actual: `dee4876a63bd`.
-- No hay datos de ejemplo (seed): las tablas comienzan vacías.
+- Modelos y migraciones para 11 tablas WMS más `state_mapping`.
+- Revisión Alembic actual: `c4a1209b7e6f`.
+- Seed inicial de tres transportadoras simuladas y sus mapeos canónicos; no hay
+  órdenes de ejemplo.
+- API admin de mapeo de estados editable sin reiniciar. Ver [HU-12](./STATE_MAPPING.md).
+- Las reglas para impedir retrocesos desde estados terminales y registrar
+  anomalías (RN-02) todavía no están implementadas.
 
 ## Requisitos
 
@@ -56,12 +60,16 @@ BACKEND_PORT=8000
 DB_PORT=5432
 APP_ENV=development
 SQL_ECHO=false
+ADMIN_API_KEY=
+STATE_MAPPING_CACHE_TTL_SECONDS=300
 ```
 
 Reemplaza `change_me_local_only` por una contraseña propia. No guardes
 credenciales reales en el repositorio; `.env` está ignorado por Git.
 `POSTGRES_USER` y `POSTGRES_PASSWORD` son obligatorias. Las demás variables son
 opcionales y tienen valores predeterminados en `docker-compose.yml`.
+Configura `ADMIN_API_KEY` con una clave propia para habilitar los endpoints
+administrativos; si está vacía, estos responden `503`.
 
 ### 2. Levantar todo con un comando
 
@@ -91,7 +99,7 @@ docker compose exec backend alembic current
 Debe mostrar:
 
 ```text
-dee4876a63bd (head)
+c4a1209b7e6f (head)
 ```
 
 Comprobar el estado del API:
@@ -112,8 +120,9 @@ Comprobar que existen las tablas:
 docker compose exec db psql -U cargaexpress -d cargaexpress -c "\dt"
 ```
 
-Se esperan 11 tablas de la aplicación y `alembic_version`. Para abrir una
-consola SQL interactiva:
+Se esperan 12 tablas de la aplicación y `alembic_version`. El seed agrega tres
+transportadoras simuladas y sus mapeos; no se crean órdenes de ejemplo. Para
+abrir una consola SQL interactiva:
 
 ```powershell
 docker compose exec db psql -U cargaexpress -d cargaexpress
@@ -141,8 +150,8 @@ Puedes conectarte con DBeaver o con una extensión PostgreSQL para VS Code:
 | Contraseña | El valor de `POSTGRES_PASSWORD` |
 
 En DBeaver, abre la conexión y navega a `Schemas > public > Tables`. Usa
-**View Data** sobre una tabla para consultar sus filas. Las tablas comienzan
-vacías hasta que se agreguen datos.
+**View Data** sobre `carriers` o `state_mapping` para ver las filas del seed.
+Las tablas de órdenes y operación comienzan sin registros de ejemplo.
 
 ## Reflejar cambios de código y de base de datos
 
@@ -193,6 +202,7 @@ La migración inicial crea:
 - `shipping_labels`
 - `picking_tasks`
 - `shipping_label_items`
+- `state_mapping` (agregada por las migraciones de HU-12)
 
 Los modelos SQLAlchemy están en `backend/app/models/`; las migraciones, en
 `backend/alembic/versions/`. Alembic registra esos modelos desde
@@ -207,6 +217,19 @@ docker compose logs -f db
 docker compose stop
 docker compose down
 ```
+
+### Ejecutar las pruebas dentro de Docker
+
+No es necesario crear ni activar `.venv` en la máquina. Desde la raíz del
+repositorio, con las variables de base de datos configuradas en `.env`, ejecuta:
+
+```powershell
+docker compose --profile test up --build --abort-on-container-exit --exit-code-from test test
+```
+
+Docker construye una imagen de pruebas con las dependencias de desarrollo,
+espera a que PostgreSQL esté listo, aplica las migraciones y ejecuta `pytest`.
+Las dependencias de prueba no se incluyen en la imagen del backend de producción.
 
 Para detener y además borrar los datos persistidos:
 

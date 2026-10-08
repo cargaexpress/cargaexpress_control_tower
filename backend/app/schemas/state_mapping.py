@@ -5,10 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.state_mapping import CANONICAL_STATUSES
 
 
-def _clean_source(value: str) -> str:
+def _clean_raw_status(value: str) -> str:
     value = value.strip()
     if not value:
-        raise ValueError("source_status no puede estar vacío")
+        raise ValueError("raw_status no puede estar vacío")
     return value
 
 
@@ -21,13 +21,13 @@ def _clean_canonical(value: str) -> str:
 
 class StateMappingCreate(BaseModel):
     carrier_id: int = Field(gt=0)
-    source_status: str = Field(max_length=100)
+    raw_status: str = Field(max_length=100)
     canonical_status: str
 
-    @field_validator("source_status")
+    @field_validator("raw_status")
     @classmethod
-    def _validate_source(cls, value: str) -> str:
-        return _clean_source(value)
+    def _validate_raw_status(cls, value: str) -> str:
+        return _clean_raw_status(value)
 
     @field_validator("canonical_status")
     @classmethod
@@ -36,13 +36,13 @@ class StateMappingCreate(BaseModel):
 
 
 class StateMappingUpdate(BaseModel):
-    source_status: str | None = Field(default=None, max_length=100)
+    raw_status: str | None = Field(default=None, max_length=100)
     canonical_status: str | None = None
 
-    @field_validator("source_status")
+    @field_validator("raw_status")
     @classmethod
-    def _validate_source(cls, value: str | None) -> str | None:
-        return None if value is None else _clean_source(value)
+    def _validate_raw_status(cls, value: str | None) -> str | None:
+        return None if value is None else _clean_raw_status(value)
 
     @field_validator("canonical_status")
     @classmethod
@@ -51,17 +51,17 @@ class StateMappingUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "StateMappingUpdate":
-        if self.source_status is None and self.canonical_status is None:
-            raise ValueError("Envía al menos source_status o canonical_status")
+        if self.raw_status is None and self.canonical_status is None:
+            raise ValueError("Envía al menos raw_status o canonical_status")
         return self
 
 
 class StateMappingRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    mapping_id: int
+    id: int
     carrier_id: int
-    source_status: str
+    raw_status: str
     canonical_status: str
     created_at: datetime
     updated_at: datetime
@@ -69,5 +69,5 @@ class StateMappingRead(BaseModel):
 
 class StateMappingResolved(BaseModel):
     carrier_id: int
-    source_status: str
+    raw_status: str
     canonical_status: str
