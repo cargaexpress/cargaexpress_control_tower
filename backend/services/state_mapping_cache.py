@@ -1,0 +1,81 @@
+"""Caché en memoria de la tabla state_mapping (RIWI-60).
+
+Cómo funciona:
+- La primera consulta carga TODA la tabla en un diccionario en memoria; las
+  siguientes se responden sin tocar la base de datos.
+- Cuando el endpoint admin crea, edita o elimina un mapeo, llama a `invalidate()`
+  (después del commit). La siguiente consulta recarga desde la base de datos, así
+  los cambios se ven al instante y sin reiniciar el servicio.
+- Respaldo por tiempo (TTL): si OTRO proceso modifica la tabla (por ejemplo un
+  segundo worker o una réplica), esta caché lo notará a más tardar al vencer el TTL.
+"""
+
+import asyncio
+import time
+from collections.abc import Awaitable, Callable
+
+from sqlalchemy import select
+
+from app.config import settings
+from app.database import AsyncSessionLocal
+from app.models.state_mapping import StateMapping
+
+MappingKey = tuple[int, str]  # (carrier_id, source_status)
+Loader = Callable[[], Awaitable[dict[MappingKey, str]]]
+
+
+async def load_mappings_from_db() -> dict[MappingKey, str]:
+    # Sesión propia (no la de la petición) para leer siempre datos ya confirmados.
+    async with AsyncSessionLocal() as session:
+        rows = await session.execute(
+            select(StateMapping.carrier_id, StateMapping.source_status, StateMapping.canonical_status)
+        )
+        return {(carrier_id, source): canonical for carrier_id, source, canonical in rows}
+
+
+class StateMappingCache:
+    def __init__(
+        self,
+        loader: Loader,
+        ttl_seconds: float,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._loader = loader
+        self._ttl = ttl_seconds
+        self._clock = clock
+        self._data: dict[MappingKey, str] | None = None
+        self._loaded_at = 0.0
+        self._generation = 0  # sube con cada invalidate()
+        self._lock = asyncio.Lock()
+
+    def invalidate(self) -> None:
+        """Descarta lo cargado; la próxima consulta vuelve a leer la base de datos."""
+        self._generation += 1
+        self._data = None
+
+    def _is_fresh(self) -> bool:
+        return self._data is not None and (self._clock() - self._loaded_at) < self._ttl
+
+    async def _snapshot(self) -> dict[MappingKey, str]:
+        if self._is_fresh():
+            return self._data  # type: ignore[return-value]
+        async with self._lock:
+            if self._is_fresh():  # otra petición ya recargó mientras esperábamos
+                return self._data  # type: ignore[return-value]
+            generation = self._generation
+            data = await self._loader()
+            # Si alguien invalidó mientras leíamos, lo leído puede ser anterior al
+            # cambio: se usa para esta consulta pero no se guarda en la caché.
+            if generation == self._generation:
+                self._data = data
+                self._loaded_at = self._clock()
+            return data
+
+    async def translate(self, carrier_id: int, source_status: str) -> str | None:
+        """Estado canónico para el estado de la transportadora, o None si no hay mapeo."""
+        return (await self._snapshot()).get((carrier_id, source_status.strip()))
+
+
+state_mapping_cache = StateMappingCache(
+    load_mappings_from_db, settings.state_mapping_cache_ttl_seconds
+)
