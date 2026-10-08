@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from app.config import settings
 from app.database import Base
 
-# Importar aquí cada módulo de app/models para que Alembic detecte sus tablas
-# al generar migraciones automáticas (ej: from app.models import pedido, guia)
+# Importar app.models para que Alembic detecte las 11 tablas del ERD
+# al generar la migración automática (ver app/models/__init__.py)
+import app.models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
