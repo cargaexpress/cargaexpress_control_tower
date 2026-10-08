@@ -30,12 +30,11 @@ Requisitos: Docker y Docker Compose. No hace falta Python, uv ni PostgreSQL inst
 # 1) Entrar a la carpeta del repositorio
 cd cargaexpress_control_tower-main
 
-# 2) Crear el archivo de variables y definir la contraseña de la base de datos
+# 2) Crear el archivo de variables y editar la contraseña local
 cp .env.example .env
-#    editar .env y completar POSTGRES_PASSWORD
 
-# 3) Construir y levantar todo
-docker compose up --build
+# 3) Construir, levantar todo y aplicar migraciones automáticamente
+docker compose up
 
 # 4) Probar (en otra terminal)
 curl http://localhost:8000/api/v1/health
@@ -47,7 +46,7 @@ Swagger: http://localhost:8000/docs
 ### Comandos útiles
 
 ```bash
-docker compose up -d --build     # en segundo plano
+docker compose up -d              # en segundo plano; también construye la imagen
 docker compose ps                # estado de los servicios
 docker compose logs -f backend   # ver logs del backend
 docker compose down              # detener (conserva los datos)
@@ -68,7 +67,7 @@ docker compose down -v           # detener y borrar la base de datos
 | `DB_PORT` | No (`5432`) | Puerto de PostgreSQL en tu máquina |
 
 Si faltan `POSTGRES_USER` o `POSTGRES_PASSWORD`, `docker compose` se detiene con un mensaje claro.
-Si la contraseña tiene caracteres especiales (`@ : / # ?`), debe ir codificada para URL en `.env`, porque se usa dentro de `DATABASE_URL`.
+Usa una contraseña local sin caracteres reservados de URL (`@ : / # ?`) o codifícalos, porque las credenciales se interpolan en `DATABASE_URL`.
 
 ---
 
@@ -79,15 +78,15 @@ Si la contraseña tiene caracteres especiales (`@ : / # ?`), debe ir codificada 
 | Subtarea | Estado | Cómo se cumple |
 |---|---|---|
 | **RIWI-41** Create backend Dockerfile using environment variables | ✅ | `backend/Dockerfile`: la configuración (`DATABASE_URL`, `APP_ENV`, `SQL_ECHO`) llega por variables de entorno al ejecutar el contenedor; el Dockerfile no define ninguna. |
-| **RIWI-42** Create initial docker-compose.yml (backend + PostgreSQL) | ✅ | `docker-compose.yml`: servicios `backend` y `db`, red compartida, volumen `postgres_data`, `depends_on` con healthcheck. |
+| **RIWI-42** Create initial docker-compose.yml (backend + PostgreSQL) | ✅ | `docker-compose.yml`: servicios `backend` y `db`, red compartida, volumen `postgres_data`, `depends_on` con healthcheck; el backend aplica las migraciones al iniciar. |
 
 ### Criterios de aceptación
 
 | # | Criterio | Estado | Evidencia |
 |---|---|---|---|
-| 1 | Con `docker compose up` el backend y PostgreSQL arrancan y el backend se comunica con la base | ✅ | `db` tiene healthcheck (`pg_isready`) y `backend` espera a que esté sano. `GET /api/v1/health` devuelve `"database":"up"`. |
+| 1 | Con `docker compose up` el backend y PostgreSQL arrancan y el backend se comunica con la base | ✅ | `db` tiene healthcheck (`pg_isready`), `backend` espera a que esté sano y aplica `alembic upgrade head` antes de iniciar. `GET /api/v1/health` devuelve `"database":"up"`. |
 | 2 | Configuración y credenciales por variables de entorno, sin datos sensibles en el Dockerfile ni en el código fuente | ✅ | El Dockerfile no tiene credenciales. En `docker-compose.yml` el usuario y la clave son obligatorios y se leen de `.env` (sin valores por defecto escritos). `.env` está en `.gitignore`. Ver la nota de la sección 4. |
-| 3 | Portable: otro miembro del equipo ejecuta el compose documentado en otra máquina y funciona sin configuración específica de su equipo | ✅ | Solo requiere Docker + `cp .env.example .env` + `docker compose up --build`. El backend usa el host `db` (red de Docker), no `localhost`. Dependencias fijadas por `uv.lock`; imágenes base con versión definida. |
+| 3 | Portable: otro miembro del equipo ejecuta el compose documentado en otra máquina y funciona sin configuración específica de su equipo | ✅ | Solo requiere Docker + `cp .env.example .env` + `docker compose up`. Compose construye la imagen; el backend usa el host `db` (red de Docker), no `localhost`. Dependencias fijadas por `uv.lock`; imágenes base con versión definida. |
 
 ### Entorno de la historia
 Docker ✅ · Dockerfile ✅ · Docker-compose ✅
@@ -96,8 +95,7 @@ Docker ✅ · Dockerfile ✅ · Docker-compose ✅
 
 ## 4. Notas importantes
 
-- **Valores de ejemplo en el código original:** `backend/app/config.py` y `backend/.env.example` (del repositorio de tu compañero) traen una URL de base de datos de desarrollo con usuario/clave de ejemplo (`cargaexpress:cargaexpress`). No se tocaron porque son parte del código del compañero y sirven para correr sin Docker. Dentro de Docker esos valores **se sobrescriben** con las variables del `.env`. Si el equipo quiere ser estricto con el criterio 2, conviene dejar `database_url` sin valor por defecto en `config.py`.
-- **Migraciones (Alembic):** el proyecto aún no tiene modelos ni migraciones, por eso el contenedor no las ejecuta al iniciar. Cuando existan, se pueden correr con `docker compose exec backend alembic upgrade head`.
+- **Migraciones (Alembic):** el contenedor ejecuta `alembic upgrade head` en cada inicio antes de lanzar FastAPI; las migraciones ya aplicadas no se vuelven a ejecutar.
 - **Producción:** el compose es para desarrollo/pruebas locales. En producción las credenciales deben venir del gestor de secretos del entorno, no de un `.env`.
 
 ---
@@ -106,7 +104,7 @@ Docker ✅ · Dockerfile ✅ · Docker-compose ✅
 
 | Síntoma | Solución |
 |---|---|
-| `Falta POSTGRES_PASSWORD en el archivo .env` | Crear `.env` (`cp .env.example .env`) y completar la contraseña. |
+| `Falta POSTGRES_PASSWORD en el archivo .env` | Crear `.env` (`cp .env.example .env`) y ajustar la contraseña local. |
 | `port is already allocated` | Cambiar `BACKEND_PORT` o `DB_PORT` en `.env`. |
 | `"database":"down"` | Esperar unos segundos y reintentar; revisar `docker compose logs db`. Si cambiaste la contraseña después de la primera vez, ejecuta `docker compose down -v` para recrear la base. |
-| Cambié el código y no se refleja | `docker compose up --build`. |
+| Cambié el código y no se refleja | Vuelve a ejecutar `docker compose up`; el servicio backend está configurado para reconstruir su imagen. |

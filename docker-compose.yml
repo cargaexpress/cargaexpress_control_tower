@@ -1,6 +1,6 @@
 # Backend (FastAPI) + PostgreSQL con un solo comando:
 #   cp .env.example .env     (y editar las credenciales)
-#   docker compose up --build
+#   docker compose up
 #
 # Las credenciales NO están escritas aquí: se leen del archivo .env
 # (o de variables del sistema). Si faltan, compose se detiene con un mensaje claro.
@@ -26,9 +26,13 @@ services:
       - cargaexpress
 
   backend:
+    pull_policy: build
     build:
       context: ./backend
       dockerfile: Dockerfile
+    # Runtime Python packages installed by the Dockerfile via uv from
+    # pyproject.toml/uv.lock: fastapi, uvicorn[standard], sqlalchemy[asyncio],
+    # asyncpg, alembic, pydantic-settings. Keep the manifest as source of truth.
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-development}
