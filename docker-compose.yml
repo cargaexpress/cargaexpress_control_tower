@@ -3,7 +3,6 @@
 #   docker compose up
 #
 # Las credenciales NO están escritas aquí: se leen del archivo .env
-# (o de variables del sistema). Si faltan, compose se detiene con un mensaje claro.
 
 services:
   db:
