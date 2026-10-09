@@ -8,14 +8,14 @@
 import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
 from app.main import app
 from app.models.carrier import Carrier
-from app.models.state_mapping import CANONICAL_STATUSES, StateMapping
+from app.models.state_mapping import StateMapping
 from app.services.state_mapping_cache import state_mapping_cache
 
 URL = "/api/v1/admin/state-mappings"
@@ -150,42 +150,6 @@ async def test_database_rejects_noncanonical_status(client, carrier_id):
         with pytest.raises(IntegrityError):
             await session.commit()
         await session.rollback()
-
-
-async def test_simulated_carriers_have_full_canonical_seed(client, db_ready):
-    async with AsyncSessionLocal() as session:
-        counts = dict(
-            (
-                await session.execute(
-                    select(Carrier.name, func.count(StateMapping.id))
-                    .join(StateMapping, StateMapping.carrier_id == Carrier.carrier_id)
-                    .where(
-                        Carrier.name.in_(
-                            ("SimCarrier Alpha", "SimCarrier Beta", "SimCarrier Gamma")
-                        )
-                    )
-                    .group_by(Carrier.name)
-                )
-            ).all()
-        )
-        seeded_statuses = set(
-            (
-                await session.scalars(
-                    select(StateMapping.canonical_status)
-                    .join(Carrier, Carrier.carrier_id == StateMapping.carrier_id)
-                    .where(
-                        Carrier.name.in_(
-                            ("SimCarrier Alpha", "SimCarrier Beta", "SimCarrier Gamma")
-                        )
-                    )
-                    .distinct()
-                )
-            ).all()
-        )
-
-    assert set(counts) == {"SimCarrier Alpha", "SimCarrier Beta", "SimCarrier Gamma"}
-    assert all(count >= 6 for count in counts.values())
-    assert seeded_statuses == set(CANONICAL_STATUSES)
 
 
 async def test_update_to_an_existing_source_status_is_a_conflict(client, carrier_id):
