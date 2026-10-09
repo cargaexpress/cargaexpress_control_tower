@@ -15,6 +15,10 @@ from app.schemas.state_mapping import (
 from app.security import require_admin
 from app.services.state_mapping_cache import state_mapping_cache
 
+# Protect the entire admin surface; public carrier events do not need this key.
+# A shared key is used instead of JWT because this scope has no user sessions or roles.
+# Protege toda la API admin; los eventos públicos de transportadoras no usan esta clave.
+# Se usa una clave compartida, no JWT, porque aquí no hay usuarios ni roles individuales.
 router = APIRouter(
     prefix="/api/v1/admin/state-mappings",
     tags=["admin: state mapping"],
@@ -29,7 +33,10 @@ async def list_mappings(
     carrier_id: int | None = Query(default=None, gt=0),
     db: AsyncSession = Depends(get_db),
 ) -> list[StateMapping]:
-    """Lista los mapeos tal como están en la base de datos (no usa la caché)."""
+    """Read current persisted mappings.
+
+    Lista el estado actual persistido.
+    """
     query = select(StateMapping).order_by(StateMapping.carrier_id, StateMapping.raw_status)
     if carrier_id is not None:
         query = query.where(StateMapping.carrier_id == carrier_id)
@@ -41,7 +48,10 @@ async def list_mappings(
 async def resolve_mapping(
     carrier_id: int = Query(gt=0), raw_status: str = Query(min_length=1)
 ) -> StateMappingResolved:
-    """Traduce un estado de transportadora usando la caché en memoria."""
+    """Translate a carrier status from cache.
+
+    Traduce un estado usando caché.
+    """
     canonical = await state_mapping_cache.translate(carrier_id, raw_status)
     if canonical is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay mapeo para ese estado.")
@@ -64,7 +74,9 @@ async def create_mapping(
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_DETAIL)
-    state_mapping_cache.invalidate()  # después del commit, nunca antes
+    # Invalidate only after commit so failed writes never discard good cached data.
+    # Invalidar tras commit evita descartar caché válida si falla la escritura.
+    state_mapping_cache.invalidate()
     await db.refresh(mapping)
     return mapping
 

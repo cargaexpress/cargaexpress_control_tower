@@ -5,6 +5,8 @@ import asyncio
 from app.services.state_mapping_cache import StateMappingCache
 
 
+# Fake loader and clock make cache behavior testable without PostgreSQL or waiting.
+# El cargador y reloj falsos prueban la caché sin PostgreSQL ni esperas reales.
 class FakeLoader:
     """Cuenta cuántas veces se "lee la base de datos" y permite cambiar sus datos."""
 

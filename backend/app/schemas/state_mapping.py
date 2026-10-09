@@ -5,6 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.state_mapping import CANONICAL_STATUSES
 
 
+# Normalize carrier text and reject blank values before they reach persistence.
+# Normaliza el texto recibido y rechaza valores vacíos antes de guardarlos.
 def _clean_raw_status(value: str) -> str:
     value = value.strip()
     if not value:
@@ -19,6 +21,10 @@ def _clean_canonical(value: str) -> str:
     return value
 
 
+# Separate create, partial-update, and read contracts keep API validation explicit.
+# PATCH allows omitted fields but rejects an empty update below.
+# Esquemas distintos hacen explícitas las validaciones de alta, edición y lectura.
+# PATCH admite campos omitidos, pero rechaza una edición sin cambios.
 class StateMappingCreate(BaseModel):
     carrier_id: int = Field(gt=0)
     raw_status: str = Field(max_length=100)

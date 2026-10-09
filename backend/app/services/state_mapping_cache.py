@@ -23,6 +23,10 @@ from app.models.state_mapping import StateMapping
 MappingKey = tuple[int, str]  # (carrier_id, raw_status)
 Loader = Callable[[], Awaitable[dict[MappingKey, str]]]
 
+# Process-local memory avoids a database read per event; TTL covers external edits.
+# This is simpler than Redis for the current single-backend deployment.
+# La memoria local evita consultar la BD por evento; TTL detecta cambios externos.
+# Es más simple que Redis para el despliegue actual de un solo backend.
 
 async def load_mappings_from_db() -> dict[MappingKey, str]:
     # Sesión propia (no la de la petición) para leer siempre datos ya confirmados.
@@ -64,8 +68,8 @@ class StateMappingCache:
                 return self._data  # type: ignore[return-value]
             generation = self._generation
             data = await self._loader()
-            # Si alguien invalidó mientras leíamos, lo leído puede ser anterior al
-            # cambio: se usa para esta consulta pero no se guarda en la caché.
+            # A generation check prevents an in-flight stale read from being cached.
+            # La generación evita guardar como vigente una lectura obsoleta en curso.
             if generation == self._generation:
                 self._data = data
                 self._loaded_at = self._clock()

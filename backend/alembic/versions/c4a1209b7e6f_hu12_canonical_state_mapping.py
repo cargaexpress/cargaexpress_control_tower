@@ -66,6 +66,8 @@ SEED: dict[str, dict[str, str]] = {
 
 
 def upgrade() -> None:
+    # Rename legacy fields in place so existing mapping IDs and data survive.
+    # Renombra columnas existentes para conservar IDs y datos guardados.
     op.drop_constraint(
         "uq_state_mapping_carrier_source", "state_mapping", type_="unique"
     )
@@ -82,6 +84,8 @@ def upgrade() -> None:
     )
 
     canonical_values = ", ".join(f"'{value}'" for value in CANONICAL_STATUSES)
+    # Old unsupported values become EXCEPTION before the DB constraint is added.
+    # Los valores antiguos no válidos pasan a EXCEPTION antes de crear el CHECK.
     op.execute(
         sa.text(
             "UPDATE state_mapping SET canonical_status = 'EXCEPTION' "
@@ -95,6 +99,8 @@ def upgrade() -> None:
     )
 
     connection = op.get_bind()
+    # Add missing defaults without overwriting business edits already in the table.
+    # Inserta valores faltantes sin sobrescribir ajustes comerciales existentes.
     for carrier_name, mappings in SEED.items():
         for raw_status, canonical_status in mappings.items():
             connection.execute(

@@ -5,6 +5,10 @@ from fastapi import Header, HTTPException, status
 from app.config import settings
 
 
+# Fail closed when no admin key is configured; compare secrets in constant time.
+# A single shared token is adequate here; JWT is unnecessary without user identities.
+# Sin clave, la administración queda cerrada; la comparación reduce filtraciones temporales.
+# Basta un token compartido; JWT no aporta valor sin identidades de usuario.
 async def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
     """Protege los endpoints de administración con la clave ADMIN_API_KEY.
 
