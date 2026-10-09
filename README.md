@@ -12,7 +12,12 @@ Alembic y PostgreSQL.
 - Revisión Alembic actual: `c4a1209b7e6f`.
 - Seed inicial de tres transportadoras simuladas y sus mapeos canónicos; no hay
   órdenes de ejemplo.
-- API admin de mapeo de estados editable sin reiniciar. Ver [HU-12](./STATE_MAPPING.md).
+- **HU-12 — Mapeo de estados:** API administrativa con caché invalidable y
+  cambios visibles sin reiniciar. Ver [detalle de HU-12](./STATE_MAPPING.md).
+- **HU-13 — Pedidos:** API para crear pedidos con líneas y destinatario,
+  consultarlos por ID, listarlos con paginación y actualizar su estado.
+  Endpoints bajo `/api/v1/pedidos`; pruebas de integración en
+  `backend/tests/test_orders.py`.
 - Las reglas para impedir retrocesos desde estados terminales y registrar
   anomalías (RN-02) todavía no están implementadas.
 
@@ -189,6 +194,20 @@ detiene y elimina los contenedores, pero conserva los datos. **No uses
 
 ## Servicios y modelos incluidos
 
+### HU-13 — Pedidos
+
+La API expone estas operaciones bajo `/api/v1/pedidos`:
+
+- `POST /api/v1/pedidos`: crea un pedido junto con sus líneas y destinatario;
+  comprueba que existan la marca, el centro de distribución y el tipo de envío.
+- `GET /api/v1/pedidos/{order_id}`: consulta un pedido por ID.
+- `GET /api/v1/pedidos?skip=0&limit=50`: lista pedidos con paginación.
+- `PATCH /api/v1/pedidos/{order_id}/status`: actualiza el estado del pedido.
+
+La integración se probó con la suite ejecutada en Docker. La actualización de
+estado es directa; todavía no aplica RN-02 para impedir retrocesos desde estados
+terminales ni registra anomalías.
+
 La migración inicial crea:
 
 - `brands`
@@ -228,7 +247,8 @@ docker compose --profile test up --build --abort-on-container-exit --exit-code-f
 ```
 
 Docker construye una imagen de pruebas con las dependencias de desarrollo,
-espera a que PostgreSQL esté listo, aplica las migraciones y ejecuta `pytest`.
+inicia una PostgreSQL aislada para tests, restablece sus migraciones y ejecuta
+`pytest`. No borra ni modifica la base de datos normal del proyecto.
 Las dependencias de prueba no se incluyen en la imagen del backend de producción.
 
 Para detener y además borrar los datos persistidos:
