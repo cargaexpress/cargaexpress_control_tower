@@ -47,6 +47,18 @@ async def clean_tables():
             await conn.execute(table.delete())
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def bind_cache_to_test_db(monkeypatch):
+    """Ensure cache queries execute against test database."""
+    import app.services.state_mapping_cache as cache_module
+    from app.services.state_mapping_cache import state_mapping_cache
+
+    monkeypatch.setattr(cache_module, "AsyncSessionLocal", TestSessionLocal)
+    state_mapping_cache.invalidate()
+    yield
+    state_mapping_cache.invalidate()
+
+
 @pytest_asyncio.fixture
 async def db_session():
     """Sesión directa para que los tests siembren datos de referencia (brand, dc, shipment_type)."""

@@ -1,12 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.state_mapping import CANONICAL_STATUSES
 
 
-# Normalize carrier text and reject blank values before they reach persistence.
-# Normaliza el texto recibido y rechaza valores vacíos antes de guardarlos.
 def _clean_raw_status(value: str) -> str:
     value = value.strip()
     if not value:
@@ -21,14 +19,26 @@ def _clean_canonical(value: str) -> str:
     return value
 
 
-# Separate create, partial-update, and read contracts keep API validation explicit.
-# PATCH allows omitted fields but rejects an empty update below.
-# Esquemas distintos hacen explícitas las validaciones de alta, edición y lectura.
-# PATCH admite campos omitidos, pero rechaza una edición sin cambios.
 class StateMappingCreate(BaseModel):
-    carrier_id: int = Field(gt=0)
-    raw_status: str = Field(max_length=100)
-    canonical_status: str
+    """Payload para crear un nuevo mapeo de estado de transportadora a estado canónico."""
+
+    carrier_id: int = Field(
+        ...,
+        gt=0,
+        description="Identificador de la transportadora a mapear.",
+        examples=[1],
+    )
+    raw_status: str = Field(
+        ...,
+        max_length=100,
+        description="Estado original reportado por la transportadora.",
+        examples=["En reparto"],
+    )
+    canonical_status: str = Field(
+        ...,
+        description="Estado canónico normalizado.",
+        examples=["OUT_FOR_DELIVERY"],
+    )
 
     @field_validator("raw_status")
     @classmethod
@@ -40,10 +50,31 @@ class StateMappingCreate(BaseModel):
     def _validate_canonical(cls, value: str) -> str:
         return _clean_canonical(value)
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "carrier_id": 1,
+                "raw_status": "En reparto",
+                "canonical_status": "OUT_FOR_DELIVERY",
+            }
+        }
+    )
+
 
 class StateMappingUpdate(BaseModel):
-    raw_status: str | None = Field(default=None, max_length=100)
-    canonical_status: str | None = None
+    """Payload para actualización parcial de un mapeo de estado existente."""
+
+    raw_status: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Nuevo valor del estado original de la transportadora.",
+        examples=["En ruta de entrega"],
+    )
+    canonical_status: str | None = Field(
+        default=None,
+        description="Nuevo estado canónico homologado.",
+        examples=["OUT_FOR_DELIVERY"],
+    )
 
     @field_validator("raw_status")
     @classmethod
@@ -61,19 +92,50 @@ class StateMappingUpdate(BaseModel):
             raise ValueError("Envía al menos raw_status o canonical_status")
         return self
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "raw_status": "En ruta de entrega",
+                "canonical_status": "OUT_FOR_DELIVERY",
+            }
+        }
+    )
+
 
 class StateMappingRead(BaseModel):
+    """Entidad persistida del mapeo de estado con trazabilidad."""
+
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    carrier_id: int
-    raw_status: str
-    canonical_status: str
-    created_at: datetime
-    updated_at: datetime
+    id: int = Field(..., description="ID secuencial del mapeo.", examples=[1])
+    carrier_id: int = Field(..., description="ID de la transportadora asociada.", examples=[1])
+    raw_status: str = Field(..., description="Estado crudo de origen.", examples=["En reparto"])
+    canonical_status: str = Field(..., description="Estado canónico normalizado.", examples=["OUT_FOR_DELIVERY"])
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Fecha y hora de creación del registro.",
+        examples=["2026-10-13T10:00:00Z"],
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Fecha y hora de la última modificación.",
+        examples=["2026-10-13T10:00:00Z"],
+    )
 
 
 class StateMappingResolved(BaseModel):
-    carrier_id: int
-    raw_status: str
-    canonical_status: str
+    """Resultado de la resolución o traducción de un estado recibido de transportadora."""
+
+    carrier_id: int = Field(..., description="ID de la transportadora consultada.", examples=[1])
+    raw_status: str = Field(..., description="Estado crudo recibido.", examples=["En reparto"])
+    canonical_status: str = Field(..., description="Estado canónico correspondiente según la tabla activa.", examples=["OUT_FOR_DELIVERY"])
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "carrier_id": 1,
+                "raw_status": "En reparto",
+                "canonical_status": "OUT_FOR_DELIVERY",
+            }
+        }
+    )

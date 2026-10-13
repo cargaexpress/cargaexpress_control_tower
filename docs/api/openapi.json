@@ -1,0 +1,2177 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CargaExpress Supply Chain API",
+    "description": "Torre de Control Logística CargaExpress: APIs para orquestación de pedidos WMS, tracking de transportadoras, mapeo dinámico de estados y gestión de anomalías.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "description": "Verifica que el servicio esté arriba y reporta el estado de la conexión a la base de datos.\n\nNo lanza error 500 si la base de datos falla: siempre responde 200 con el detalle,\npara que Docker/ALB sepan que el proceso está vivo aunque la BD tenga un problema puntual.",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/state-mappings": {
+      "get": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "List Mappings",
+        "description": "Read current persisted mappings.\n\nLista el estado actual persistido.",
+        "operationId": "list_mappings_api_v1_admin_state_mappings_get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StateMappingRead"
+                  },
+                  "title": "Response List Mappings Api V1 Admin State Mappings Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Create Mapping",
+        "operationId": "create_mapping_api_v1_admin_state_mappings_post",
+        "parameters": [
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateMappingCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMappingRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/state-mappings/resolve": {
+      "get": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Resolve Mapping",
+        "description": "Translate a carrier status from cache.\n\nTraduce un estado usando caché.",
+        "operationId": "resolve_mapping_api_v1_admin_state_mappings_resolve_get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "raw_status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Raw Status"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMappingResolved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/state-mappings/{mapping_id}": {
+      "patch": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Update Mapping",
+        "operationId": "update_mapping_api_v1_admin_state_mappings__mapping_id__patch",
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mapping Id"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateMappingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMappingRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Delete Mapping",
+        "operationId": "delete_mapping_api_v1_admin_state_mappings__mapping_id__delete",
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mapping Id"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/mapeo-estados/{transportadora_id}": {
+      "get": {
+        "tags": [
+          "admin: mapeo de estados"
+        ],
+        "summary": "Obtener Mapeo",
+        "description": "Consulta el mapeo de estados de una transportadora (tal como está en la base de datos).",
+        "operationId": "obtener_mapeo_api_v1_admin_mapeo_estados__transportadora_id__get",
+        "parameters": [
+          {
+            "name": "transportadora_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Transportadora Id"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapeoEstadosSalida"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin: mapeo de estados"
+        ],
+        "summary": "Actualizar Mapeo",
+        "description": "Reemplaza el mapeo completo de la transportadora y lo aplica sin reiniciar el servicio.",
+        "operationId": "actualizar_mapeo_api_v1_admin_mapeo_estados__transportadora_id__put",
+        "parameters": [
+          {
+            "name": "transportadora_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Transportadora Id"
+            }
+          },
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapeoEstadosActualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapeoEstadosSalida"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pedidos": {
+      "post": {
+        "tags": [
+          "pedidos"
+        ],
+        "summary": "Create Order",
+        "operationId": "create_order_api_v1_pedidos_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "pedidos"
+        ],
+        "summary": "List Orders",
+        "operationId": "list_orders_api_v1_pedidos_get",
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pedidos/{order_id}": {
+      "get": {
+        "tags": [
+          "pedidos"
+        ],
+        "summary": "Get Order",
+        "operationId": "get_order_api_v1_pedidos__order_id__get",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pedidos/{order_id}/status": {
+      "patch": {
+        "tags": [
+          "pedidos"
+        ],
+        "summary": "Update Order Status",
+        "operationId": "update_order_status_api_v1_pedidos__order_id__status_patch",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStatusUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/docs/api/openapi.json": {
+      "get": {
+        "tags": [
+          "contrato openapi"
+        ],
+        "summary": "Exportar especificación OpenAPI en formato JSON",
+        "description": "Retorna el esquema OpenAPI 3.1 completo y serializado de la aplicación.",
+        "operationId": "get_openapi_spec_docs_api_openapi_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud errónea o datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado (Falta o es incorrecto el token de autenticación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validación en la entidad o payload enviado."
+          },
+          "500": {
+            "description": "Error interno del servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Mensaje explicativo del error.",
+            "examples": [
+              "El recurso solicitado no fue encontrado."
+            ]
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "Código de error estandarizado del sistema.",
+            "examples": [
+              "RESOURCE_NOT_FOUND"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "HTTPErrorResponse",
+        "description": "Esquema estándar para respuestas de error de la API.",
+        "example": {
+          "detail": "El recurso solicitado no fue encontrado en el sistema.",
+          "error_code": "NOT_FOUND"
+        }
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "HealthResponse"
+      },
+      "MapeoEstadoEntrada": {
+        "properties": {
+          "raw_status": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Raw Status",
+            "description": "Estado original reportado por la transportadora.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Estado canónico homologado.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "MapeoEstadoEntrada",
+        "description": "Entrada individual de mapeo para una transportadora.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "raw_status": "En reparto"
+        }
+      },
+      "MapeoEstadoSalida": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "ID del registro de mapeo.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "title": "Raw Status",
+            "description": "Estado de origen.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Estado canónico homologado.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Fecha y hora de actualización.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "MapeoEstadoSalida",
+        "description": "Mapeo individual persistido en base de datos."
+      },
+      "MapeoEstadosActualizar": {
+        "properties": {
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/MapeoEstadoEntrada"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Mappings",
+            "description": "Colección de equivalencias de estado."
+          }
+        },
+        "type": "object",
+        "required": [
+          "mappings"
+        ],
+        "title": "MapeoEstadosActualizar",
+        "description": "Cuerpo del PUT: la lista completa de mapeos que debe quedar para la transportadora.",
+        "example": {
+          "mappings": [
+            {
+              "canonical_status": "CREATED",
+              "raw_status": "Generada"
+            },
+            {
+              "canonical_status": "OUT_FOR_DELIVERY",
+              "raw_status": "En reparto"
+            },
+            {
+              "canonical_status": "DELIVERED",
+              "raw_status": "Entregada"
+            }
+          ]
+        }
+      },
+      "MapeoEstadosSalida": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id",
+            "description": "ID de la transportadora.",
+            "examples": [
+              1
+            ]
+          },
+          "carrier_name": {
+            "type": "string",
+            "title": "Carrier Name",
+            "description": "Nombre comercial de la transportadora.",
+            "examples": [
+              "SimCarrier Alpha"
+            ]
+          },
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/MapeoEstadoSalida"
+            },
+            "type": "array",
+            "title": "Mappings",
+            "description": "Lista de mapeos vigentes."
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "carrier_name",
+          "mappings"
+        ],
+        "title": "MapeoEstadosSalida",
+        "description": "Respuesta con el conjunto completo de mapeos de una transportadora.",
+        "example": {
+          "carrier_id": 1,
+          "carrier_name": "SimCarrier Alpha",
+          "mappings": [
+            {
+              "canonical_status": "OUT_FOR_DELIVERY",
+              "id": 1,
+              "raw_status": "En reparto",
+              "updated_at": "2026-10-13T10:00:00Z"
+            }
+          ]
+        }
+      },
+      "OrderCreate": {
+        "properties": {
+          "brand_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Brand Id",
+            "description": "Identificador de la marca dueña del inventario.",
+            "examples": [
+              1
+            ]
+          },
+          "dc_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Dc Id",
+            "description": "Identificador del Centro de Distribución de origen.",
+            "examples": [
+              1
+            ]
+          },
+          "shipment_type_code": {
+            "type": "string",
+            "title": "Shipment Type Code",
+            "description": "Código del tipo de despacho acordado (STANDARD, EXPRESS, SAME_DAY).",
+            "examples": [
+              "STANDARD"
+            ]
+          },
+          "brand_order_ref": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Brand Order Ref",
+            "description": "Referencia única o número de pedido externo de la marca.",
+            "examples": [
+              "ORD-MODA-2026-0001"
+            ]
+          },
+          "destination_country": {
+            "type": "string",
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Destination Country",
+            "description": "Código ISO 3166-1 alpha-2 del país destino.",
+            "default": "CO",
+            "examples": [
+              "CO"
+            ]
+          },
+          "destination_region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Region",
+            "description": "Departamento o provincia de entrega.",
+            "examples": [
+              "Cundinamarca"
+            ]
+          },
+          "freight_value": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Freight Value",
+            "description": "Valor acordado del flete de envío.",
+            "examples": [
+              "15000.00"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Estado operativo inicial de la orden.",
+            "default": "CREATED",
+            "examples": [
+              "CREATED"
+            ]
+          },
+          "order_lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrderLineCreate"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Order Lines",
+            "description": "Lista de ítems incluidos en la orden de despacho."
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/OrderRecipientCreate",
+            "description": "Información detallada del destinatario de la entrega."
+          }
+        },
+        "type": "object",
+        "required": [
+          "brand_id",
+          "dc_id",
+          "shipment_type_code",
+          "brand_order_ref",
+          "freight_value",
+          "order_lines",
+          "recipient"
+        ],
+        "title": "OrderCreate",
+        "description": "Payload para registrar una nueva orden en la Torre de Control WMS.",
+        "example": {
+          "brand_id": 1,
+          "brand_order_ref": "ORD-MODA-2026-0001",
+          "dc_id": 1,
+          "destination_country": "CO",
+          "destination_region": "Cundinamarca",
+          "freight_value": 15000.0,
+          "order_lines": [
+            {
+              "description": "Camiseta de algodón azul talla M",
+              "quantity_ordered": 2,
+              "sku": "SKU-SHIRT-BLUE-M"
+            }
+          ],
+          "recipient": {
+            "address_line": "Carrera 15 # 93-47 Apto 502",
+            "city": "Bogotá D.C.",
+            "email": "juan.perez@example.com",
+            "full_name": "Juan Pérez Rodríguez",
+            "phone": "+573001234567"
+          },
+          "shipment_type_code": "STANDARD",
+          "status": "CREATED"
+        }
+      },
+      "OrderLineCreate": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Sku",
+            "description": "Código único de producto (SKU).",
+            "examples": [
+              "SKU-SHIRT-BLUE-M"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Descripción legible del artículo.",
+            "examples": [
+              "Camiseta de algodón azul talla M"
+            ]
+          },
+          "quantity_ordered": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity Ordered",
+            "description": "Cantidad requerida del artículo.",
+            "examples": [
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku",
+          "quantity_ordered"
+        ],
+        "title": "OrderLineCreate",
+        "description": "Línea de producto o SKU incluida en la creación del pedido.",
+        "example": {
+          "description": "Camiseta de algodón azul talla M",
+          "quantity_ordered": 2,
+          "sku": "SKU-SHIRT-BLUE-M"
+        }
+      },
+      "OrderLineRead": {
+        "properties": {
+          "order_line_id": {
+            "type": "integer",
+            "title": "Order Line Id",
+            "description": "ID secuencial de la línea de pedido.",
+            "examples": [
+              101
+            ]
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "ID del pedido al que pertenece.",
+            "examples": [
+              1
+            ]
+          },
+          "line_number": {
+            "type": "integer",
+            "title": "Line Number",
+            "description": "Número ordinal de la línea dentro del pedido.",
+            "examples": [
+              1
+            ]
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku",
+            "description": "Código único de producto (SKU).",
+            "examples": [
+              "SKU-SHIRT-BLUE-M"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Descripción del artículo.",
+            "examples": [
+              "Camiseta de algodón azul"
+            ]
+          },
+          "quantity_ordered": {
+            "type": "integer",
+            "title": "Quantity Ordered",
+            "description": "Cantidad ordenada.",
+            "examples": [
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_line_id",
+          "order_id",
+          "line_number",
+          "sku",
+          "quantity_ordered"
+        ],
+        "title": "OrderLineRead",
+        "description": "Representación de una línea de producto persistida en el pedido."
+      },
+      "OrderListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderRead"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Listado de pedidos pertenecientes a la página actual."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Cantidad total de pedidos registrados.",
+            "examples": [
+              100
+            ]
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Skip",
+            "description": "Desplazamiento u offset aplicado en la consulta.",
+            "examples": [
+              0
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit",
+            "description": "Límite de registros retornados por página.",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "OrderListResponse",
+        "description": "Estructura de respuesta paginada para el listado de pedidos.",
+        "example": {
+          "items": [],
+          "limit": 20,
+          "skip": 0,
+          "total": 0
+        }
+      },
+      "OrderRead": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "ID interno autogenerado de la orden.",
+            "examples": [
+              1
+            ]
+          },
+          "brand_id": {
+            "type": "integer",
+            "title": "Brand Id",
+            "description": "ID de la marca dueña de la orden.",
+            "examples": [
+              1
+            ]
+          },
+          "dc_id": {
+            "type": "integer",
+            "title": "Dc Id",
+            "description": "ID del Centro de Distribución.",
+            "examples": [
+              1
+            ]
+          },
+          "shipment_type_code": {
+            "type": "string",
+            "title": "Shipment Type Code",
+            "description": "Tipo de envío.",
+            "examples": [
+              "STANDARD"
+            ]
+          },
+          "brand_order_ref": {
+            "type": "string",
+            "title": "Brand Order Ref",
+            "description": "Referencia de la marca.",
+            "examples": [
+              "ORD-MODA-2026-0001"
+            ]
+          },
+          "destination_country": {
+            "type": "string",
+            "title": "Destination Country",
+            "description": "País destino.",
+            "examples": [
+              "CO"
+            ]
+          },
+          "destination_region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Region",
+            "description": "Región/departamento.",
+            "examples": [
+              "Cundinamarca"
+            ]
+          },
+          "freight_value": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Freight Value",
+            "description": "Valor del flete.",
+            "examples": [
+              "15000.00"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Estado actual de la orden.",
+            "examples": [
+              "CREATED"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Fecha y hora de creación de la orden.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          },
+          "order_lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrderLineRead"
+            },
+            "type": "array",
+            "title": "Order Lines",
+            "description": "Ítems asociados a la orden."
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/OrderRecipientRead",
+            "description": "Destinatario de la orden."
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "brand_id",
+          "dc_id",
+          "shipment_type_code",
+          "brand_order_ref",
+          "destination_country",
+          "freight_value",
+          "status",
+          "order_lines",
+          "recipient"
+        ],
+        "title": "OrderRead",
+        "description": "Detalle completo de una orden consultada en el sistema."
+      },
+      "OrderRecipientCreate": {
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Full Name",
+            "description": "Nombre completo o razón social del destinatario.",
+            "examples": [
+              "Juan Pérez Rodríguez"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Correo electrónico para notificaciones de entrega.",
+            "examples": [
+              "juan.perez@example.com"
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone",
+            "description": "Teléfono de contacto para la entrega.",
+            "examples": [
+              "+573001234567"
+            ]
+          },
+          "address_line": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 5,
+            "title": "Address Line",
+            "description": "Dirección de entrega física.",
+            "examples": [
+              "Carrera 15 # 93-47 Apto 502"
+            ]
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "City",
+            "description": "Ciudad de destino.",
+            "examples": [
+              "Bogotá D.C."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "full_name",
+          "address_line",
+          "city"
+        ],
+        "title": "OrderRecipientCreate",
+        "description": "Datos de contacto y entrega del destinatario.",
+        "example": {
+          "address_line": "Carrera 15 # 93-47 Apto 502",
+          "city": "Bogotá D.C.",
+          "email": "juan.perez@example.com",
+          "full_name": "Juan Pérez Rodríguez",
+          "phone": "+573001234567"
+        }
+      },
+      "OrderRecipientRead": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "ID del pedido.",
+            "examples": [
+              1
+            ]
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name",
+            "description": "Nombre del destinatario.",
+            "examples": [
+              "Juan Pérez Rodríguez"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Correo electrónico.",
+            "examples": [
+              "juan.perez@example.com"
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone",
+            "description": "Teléfono de contacto.",
+            "examples": [
+              "+573001234567"
+            ]
+          },
+          "address_line": {
+            "type": "string",
+            "title": "Address Line",
+            "description": "Dirección de entrega.",
+            "examples": [
+              "Carrera 15 # 93-47 Apto 502"
+            ]
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "description": "Ciudad de destino.",
+            "examples": [
+              "Bogotá D.C."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "full_name",
+          "address_line",
+          "city"
+        ],
+        "title": "OrderRecipientRead",
+        "description": "Datos del destinatario de una orden consultada."
+      },
+      "OrderStatusUpdate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Nuevo estado operativo de la orden.",
+            "examples": [
+              "PICKED_UP"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "OrderStatusUpdate",
+        "description": "Payload para actualizar el estado de una orden.",
+        "example": {
+          "status": "PICKED_UP"
+        }
+      },
+      "StateMappingCreate": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Carrier Id",
+            "description": "Identificador de la transportadora a mapear.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Raw Status",
+            "description": "Estado original reportado por la transportadora.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Estado canónico normalizado.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "StateMappingCreate",
+        "description": "Payload para crear un nuevo mapeo de estado de transportadora a estado canónico.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "carrier_id": 1,
+          "raw_status": "En reparto"
+        }
+      },
+      "StateMappingRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "ID secuencial del mapeo.",
+            "examples": [
+              1
+            ]
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id",
+            "description": "ID de la transportadora asociada.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "title": "Raw Status",
+            "description": "Estado crudo de origen.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Estado canónico normalizado.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Fecha y hora de creación del registro.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Fecha y hora de la última modificación.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "carrier_id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "StateMappingRead",
+        "description": "Entidad persistida del mapeo de estado con trazabilidad."
+      },
+      "StateMappingResolved": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id",
+            "description": "ID de la transportadora consultada.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "title": "Raw Status",
+            "description": "Estado crudo recibido.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Estado canónico correspondiente según la tabla activa.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "StateMappingResolved",
+        "description": "Resultado de la resolución o traducción de un estado recibido de transportadora.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "carrier_id": 1,
+          "raw_status": "En reparto"
+        }
+      },
+      "StateMappingUpdate": {
+        "properties": {
+          "raw_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Status",
+            "description": "Nuevo valor del estado original de la transportadora.",
+            "examples": [
+              "En ruta de entrega"
+            ]
+          },
+          "canonical_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Status",
+            "description": "Nuevo estado canónico homologado.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "title": "StateMappingUpdate",
+        "description": "Payload para actualización parcial de un mapeo de estado existente.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "raw_status": "En ruta de entrega"
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Verificación de disponibilidad de la API y conectividad con la base de datos."
+    },
+    {
+      "name": "pedidos",
+      "description": "Gestión del ciclo de vida de pedidos WMS: creación, consulta por ID, listado paginado y actualización de estados."
+    },
+    {
+      "name": "admin: mapeo de estados",
+      "description": "Administración de catálogos de traducción de estados de transportadoras hacia el vocabulario canónico (HU-15)."
+    },
+    {
+      "name": "admin: state mapping",
+      "description": "Operaciones CRUD y resolución de estados en caché en tiempo real (HU-12)."
+    },
+    {
+      "name": "contrato openapi",
+      "description": "Descarga e inspección interactiva del contrato OpenAPI / Swagger (Entregable E-05)."
+    }
+  ]
+}

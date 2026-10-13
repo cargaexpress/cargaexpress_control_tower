@@ -4,3 +4,10 @@
 backend/.env
 backend/.env.*
 !backend/.env.example
+
+# Python runtime artifacts & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
