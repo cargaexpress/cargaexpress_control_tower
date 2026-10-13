@@ -4,3 +4,7 @@
 backend/.env
 backend/.env.*
 !backend/.env.example
+.idea/
+__pycache__/
+*.pyc
+.pytest_cache/
