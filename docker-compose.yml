@@ -82,9 +82,38 @@ services:
       retries: 10
     networks:
       - cargaexpress
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: cargaexpress_rabbitmq
+    restart: unless-stopped
+    ports:
+      # Puerto de protocolo AMQP (para FastAPI, workers, Airflow)
+      - "5672:5672"
+      # Puerto de la interfaz web de administración (UI)
+      - "15672:15672"
+    environment:
+      # Credenciales por defecto (en producción pásalas por archivo .env)
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin123}
+      # Nombre de nodo explícito para garantizar persistencia asociada
+      RABBITMQ_NODENAME: rabbit@cargaexpress_rabbitmq
+    volumes:
+      # Persistencia de colas, exchanges y mensajes persistentes
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - cargaexpress
+
 
 networks:
   cargaexpress:
 
 volumes:
   postgres_data:
+  rabbitmq_data:
+    driver: local
