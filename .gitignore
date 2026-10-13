@@ -4,3 +4,14 @@
 backend/.env
 backend/.env.*
 !backend/.env.example
+
+# Python & Venv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Data outputs
+data/
+
