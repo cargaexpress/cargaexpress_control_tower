@@ -100,6 +100,8 @@ async def test_get_unknown_carrier_returns_404(client):
     response = await client.get(f"{BASE}/999999999", headers=ADMIN)
 
     assert response.status_code == 404
+    # The body distinguishes "unknown carrier" from "route not registered" (also a 404).
+    assert response.json()["detail"] == "La transportadora no existe."
 
 
 async def test_get_always_shows_what_is_in_the_database_even_with_a_warm_cache(
@@ -170,6 +172,7 @@ async def test_put_unknown_carrier_returns_404(client):
     response = await _put(client, 999_999_999, {"A": "CREATED"})
 
     assert response.status_code == 404
+    assert response.json()["detail"] == "La transportadora no existe."
 
 
 @pytest.mark.parametrize(
