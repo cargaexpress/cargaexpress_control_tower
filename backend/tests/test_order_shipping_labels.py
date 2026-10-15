@@ -10,7 +10,7 @@ from app.models.shipment_type import ShipmentType
 
 
 async def _seed_test_context(db_session):
-    """Crea los datos maestros mínimos necesarios para pedidos y transportadoras."""
+    """Create minimal reference master data for orders and carriers."""
     brand_a = Brand(name="Marca Alfa", tier="standard", is_active=True)
     brand_b = Brand(name="Marca Beta", tier="premium", is_active=True)
     dc = DistributionCenter(code="DC01", name="Bogota DC", city="Bogota", country_code="CO")
@@ -27,7 +27,7 @@ async def _seed_test_context(db_session):
 
 
 async def _create_test_order(db_session, brand_id, dc_id, shipment_type_code, ref="ORD-001"):
-    """Helper para crear un pedido completo en base de datos."""
+    """Helper to create a full order in the database."""
     order = Order(
         brand_id=brand_id,
         dc_id=dc_id,
@@ -55,8 +55,8 @@ async def _create_test_order(db_session, brand_id, dc_id, shipment_type_code, re
 
 
 @pytest.mark.asyncio
-async def test_post_guia_success(client, db_session):
-    """Registrar exitosamente una guía en un pedido existente (retorna 201 y persiste la relación)."""
+async def test_create_shipping_label_success(client, db_session):
+    """Successfully register a shipping label on an existing order (returns 201 and persists relationship)."""
     brand_a, _, dc, st, carrier, _ = await _seed_test_context(db_session)
     order = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code)
 
@@ -67,7 +67,7 @@ async def test_post_guia_success(client, db_session):
         "status": "CREADO",
     }
 
-    response = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    response = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
 
     assert response.status_code == 201
     body = response.json()
@@ -81,38 +81,38 @@ async def test_post_guia_success(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_post_multiple_guias_split_order(client, db_session):
-    """Registrar dos o más guías para el mismo pedido (escenario split order para soportar CA-03)."""
+async def test_create_multiple_shipping_labels_split_order(client, db_session):
+    """Register two or more shipping labels for the same order (split order scenario for CA-03)."""
     brand_a, _, dc, st, carrier_1, carrier_2 = await _seed_test_context(db_session)
     order = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="SPLIT-ORDER-99")
 
-    # Guía 1 (Bulto 1 / Transportadora 1)
+    # Label 1 (Package 1 / Carrier 1)
     res_1 = await client.post(
-        f"/api/v1/pedidos/{order.order_id}/guias",
+        f"/api/v1/orders/{order.order_id}/shipping-labels",
         json={"tracking_number": "SPLIT-TRK-01", "carrier_id": carrier_1.carrier_id, "weight_kg": 1.25},
     )
     assert res_1.status_code == 201
 
-    # Guía 2 (Bulto 2 / Transportadora 2)
+    # Label 2 (Package 2 / Carrier 2)
     res_2 = await client.post(
-        f"/api/v1/pedidos/{order.order_id}/guias",
+        f"/api/v1/orders/{order.order_id}/shipping-labels",
         json={"tracking_number": "SPLIT-TRK-02", "carrier_id": carrier_2.carrier_id, "weight_kg": 3.75},
     )
     assert res_2.status_code == 201
 
-    # Verificar que el pedido contenga ambas guías
-    list_res = await client.get(f"/api/v1/pedidos/{order.order_id}/guias")
+    # Verify the order contains both shipping labels
+    list_res = await client.get(f"/api/v1/orders/{order.order_id}/shipping-labels")
     assert list_res.status_code == 200
-    guias = list_res.json()
-    assert len(guias) == 2
-    tracking_numbers = [g["tracking_number"] for g in guias]
+    shipping_labels = list_res.json()
+    assert len(shipping_labels) == 2
+    tracking_numbers = [label["tracking_number"] for label in shipping_labels]
     assert "SPLIT-TRK-01" in tracking_numbers
     assert "SPLIT-TRK-02" in tracking_numbers
 
 
 @pytest.mark.asyncio
-async def test_post_guia_pedido_not_found(client, db_session):
-    """Intentar asociar una guía a un pedido con ID inexistente (retorna 404)."""
+async def test_create_shipping_label_order_not_found(client, db_session):
+    """Attempt to associate a shipping label with a nonexistent order ID (returns 404)."""
     _, _, _, _, carrier, _ = await _seed_test_context(db_session)
 
     payload = {
@@ -121,106 +121,106 @@ async def test_post_guia_pedido_not_found(client, db_session):
         "weight_kg": 1.0,
     }
 
-    response = await client.post("/api/v1/pedidos/999999/guias", json=payload)
+    response = await client.post("/api/v1/orders/999999/shipping-labels", json=payload)
     assert response.status_code == 404
     assert "order" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
-async def test_get_guias_success(client, db_session):
-    """Consultar las guías asociadas a un pedido y comprobar que solo se retornen las guías de ese ID específico."""
+async def test_get_shipping_labels_success(client, db_session):
+    """Query shipping labels associated with an order and ensure only labels for that order ID are returned."""
     brand_a, _, dc, st, carrier, _ = await _seed_test_context(db_session)
 
     order_1 = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-1")
     order_2 = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-2")
 
-    # Guía para orden 1
+    # Label for order 1
     await client.post(
-        f"/api/v1/pedidos/{order_1.order_id}/guias",
+        f"/api/v1/orders/{order_1.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ORDER-1", "carrier_id": carrier.carrier_id},
     )
 
-    # Guía para orden 2
+    # Label for order 2
     await client.post(
-        f"/api/v1/pedidos/{order_2.order_id}/guias",
+        f"/api/v1/orders/{order_2.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ORDER-2", "carrier_id": carrier.carrier_id},
     )
 
-    # Consulta para orden 1: debe devolver únicamente la guía de orden 1
-    response = await client.get(f"/api/v1/pedidos/{order_1.order_id}/guias")
+    # Query for order 1: should return only the shipping label for order 1
+    response = await client.get(f"/api/v1/orders/{order_1.order_id}/shipping-labels")
     assert response.status_code == 200
-    guias = response.json()
-    assert len(guias) == 1
-    assert guias[0]["tracking_number"] == "TRK-ORDER-1"
-    assert guias[0]["order_id"] == order_1.order_id
+    shipping_labels = response.json()
+    assert len(shipping_labels) == 1
+    assert shipping_labels[0]["tracking_number"] == "TRK-ORDER-1"
+    assert shipping_labels[0]["order_id"] == order_1.order_id
 
 
 @pytest.mark.asyncio
-async def test_get_guias_pedido_not_found(client):
-    """Consultar guías de un pedido inexistente (retorna 404)."""
-    response = await client.get("/api/v1/pedidos/999999/guias")
+async def test_get_shipping_labels_order_not_found(client):
+    """Query shipping labels of a nonexistent order (returns 404)."""
+    response = await client.get("/api/v1/orders/999999/shipping-labels")
     assert response.status_code == 404
     assert "order" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
 async def test_tenant_isolation_forbidden(client, db_session):
-    """Intentar registrar o consultar guías de un pedido perteneciente a otra marca (retorna 403)."""
+    """Attempt to register or query shipping labels of an order belonging to another brand (returns 403)."""
     brand_a, brand_b, dc, st, carrier, _ = await _seed_test_context(db_session)
     order_a = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-BRAND-A")
 
-    # Intentar crear guía en pedido de Marca A usando contexto de Marca B
+    # Attempt to create label in Brand A's order using Brand B's context
     headers_brand_b = {"X-Brand-Id": str(brand_b.brand_id)}
     post_res = await client.post(
-        f"/api/v1/pedidos/{order_a.order_id}/guias",
+        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ISOLATION-TEST", "carrier_id": carrier.carrier_id},
         headers=headers_brand_b,
     )
     assert post_res.status_code == 403
-    assert "no pertenece a la marca" in post_res.json()["detail"]
+    assert "does not belong to brand" in post_res.json()["detail"].lower()
 
-    # Crear la guía bajo el contexto legítimo de Marca A
+    # Create label under legitimate Brand A context
     headers_brand_a = {"X-Brand-Id": str(brand_a.brand_id)}
     valid_post = await client.post(
-        f"/api/v1/pedidos/{order_a.order_id}/guias",
+        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ISOLATION-TEST", "carrier_id": carrier.carrier_id},
         headers=headers_brand_a,
     )
     assert valid_post.status_code == 201
 
-    # Intentar consultar guías del pedido de Marca A usando contexto de Marca B (debe responder 403)
+    # Attempt to query labels of Brand A's order using Brand B's context (returns 403)
     get_res = await client.get(
-        f"/api/v1/pedidos/{order_a.order_id}/guias",
+        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
         headers=headers_brand_b,
     )
     assert get_res.status_code == 403
-    assert "no pertenece a la marca" in get_res.json()["detail"]
+    assert "does not belong to brand" in get_res.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
-async def test_post_guia_duplicate_tracking_number_returns_409(client, db_session):
-    """Validar que un número de tracking ya asignado no pueda reutilizarse (409 Conflict)."""
+async def test_create_shipping_label_duplicate_tracking_number_returns_409(client, db_session):
+    """Validate that an already assigned tracking number cannot be reused (409 Conflict)."""
     brand_a, _, dc, st, carrier, _ = await _seed_test_context(db_session)
     order = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code)
 
     payload = {"tracking_number": "TRK-DUP-001", "carrier_id": carrier.carrier_id}
 
-    res_1 = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    res_1 = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
     assert res_1.status_code == 201
 
-    res_2 = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    res_2 = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
     assert res_2.status_code == 409
     assert "already registered" in res_2.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
-async def test_post_guia_carrier_not_found(client, db_session):
-    """Intentar registrar una guía con una transportadora inexistente (retorna 404)."""
+async def test_create_shipping_label_carrier_not_found(client, db_session):
+    """Attempt to register a shipping label with a nonexistent carrier (returns 404)."""
     brand_a, _, dc, st, _, _ = await _seed_test_context(db_session)
     order = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code)
 
     payload = {"tracking_number": "TRK-NO-CARRIER", "carrier_id": 999999}
 
-    response = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    response = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
     assert response.status_code == 404
     assert "carrier" in response.json()["detail"].lower()

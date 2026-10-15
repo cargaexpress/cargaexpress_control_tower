@@ -13,8 +13,6 @@ from app.services.exceptions import EntityNotFoundError
 
 # Eager-load child records to return complete orders without per-row queries.
 # Service functions isolate persistence from HTTP handling for reuse and testing.
-# Carga relaciones por adelantado para evitar consultas adicionales por pedido.
-# El servicio separa persistencia de HTTP para facilitar reutilización y pruebas.
 _ORDER_LOAD_OPTIONS = (selectinload(Order.order_lines), selectinload(Order.recipient))
 
 
@@ -26,11 +24,10 @@ async def _get_or_404(db: AsyncSession, model, pk_value, entity_name: str):
 
 
 async def create_order(db: AsyncSession, payload: OrderCreate) -> Order:
-    """
-    Crea un pedido junto con sus líneas y su destinatario (relación 1:1 obligatoria).
+    """Create an order with its lines and recipient (mandatory 1:1 relation).
 
-    Antes de insertar, valida que brand_id, dc_id y shipment_type_code existan;
-    si alguno no existe, lanza EntityNotFoundError (el router la traduce a 404).
+    Validates that brand_id, dc_id, and shipment_type_code exist prior to inserting;
+    raises EntityNotFoundError if any reference is missing (translated to 404 by router).
     """
     await _get_or_404(db, Brand, payload.brand_id, "brand")
     await _get_or_404(db, DistributionCenter, payload.dc_id, "distribution_center")
@@ -79,7 +76,6 @@ async def get_order(db: AsyncSession, order_id: int) -> Order | None:
 
 async def list_orders(db: AsyncSession, skip: int, limit: int) -> tuple[list[Order], int]:
     # Stable ordering makes offset/limit pagination deterministic.
-    # El orden estable hace predecible la paginación por desplazamiento.
     items_stmt = (
         select(Order)
         .options(*_ORDER_LOAD_OPTIONS)

@@ -17,15 +17,13 @@ from app.services.state_mapping_cache import state_mapping_cache
 
 # Protect the entire admin surface; public carrier events do not need this key.
 # A shared key is used instead of JWT because this scope has no user sessions or roles.
-# Protege toda la API admin; los eventos públicos de transportadoras no usan esta clave.
-# Se usa una clave compartida, no JWT, porque aquí no hay usuarios ni roles individuales.
 router = APIRouter(
     prefix="/api/v1/admin/state-mappings",
     tags=["admin: state mapping"],
     dependencies=[Depends(require_admin)],
 )
 
-DUPLICATE_DETAIL = "Ya existe un mapeo para esa transportadora y ese estado."
+DUPLICATE_DETAIL = "A mapping already exists for this carrier and status."
 
 
 @router.get("", response_model=list[StateMappingRead])
@@ -33,28 +31,22 @@ async def list_mappings(
     carrier_id: int | None = Query(default=None, gt=0),
     db: AsyncSession = Depends(get_db),
 ) -> list[StateMapping]:
-    """Read current persisted mappings.
-
-    Lista el estado actual persistido.
-    """
+    """Read current persisted mappings."""
     query = select(StateMapping).order_by(StateMapping.carrier_id, StateMapping.raw_status)
     if carrier_id is not None:
         query = query.where(StateMapping.carrier_id == carrier_id)
     return list((await db.scalars(query)).all())
 
 
-# Declarado antes de /{mapping_id} para que "resolve" no se confunda con un id.
+# Declared before /{mapping_id} so "resolve" is not parsed as an id parameter.
 @router.get("/resolve", response_model=StateMappingResolved)
 async def resolve_mapping(
     carrier_id: int = Query(gt=0), raw_status: str = Query(min_length=1)
 ) -> StateMappingResolved:
-    """Translate a carrier status from cache.
-
-    Traduce un estado usando caché.
-    """
+    """Translate a carrier status from cache."""
     canonical = await state_mapping_cache.translate(carrier_id, raw_status)
     if canonical is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay mapeo para ese estado.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No mapping found for this status.")
     return StateMappingResolved(
         carrier_id=carrier_id, raw_status=raw_status.strip(), canonical_status=canonical
     )
@@ -65,7 +57,7 @@ async def create_mapping(
     payload: StateMappingCreate, db: AsyncSession = Depends(get_db)
 ) -> StateMapping:
     if await db.get(Carrier, payload.carrier_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "La transportadora no existe.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Carrier does not exist.")
 
     mapping = StateMapping(**payload.model_dump())
     db.add(mapping)
@@ -75,7 +67,6 @@ async def create_mapping(
         await db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_DETAIL)
     # Invalidate only after commit so failed writes never discard good cached data.
-    # Invalidar tras commit evita descartar caché válida si falla la escritura.
     state_mapping_cache.invalidate()
     await db.refresh(mapping)
     return mapping
@@ -87,7 +78,7 @@ async def update_mapping(
 ) -> StateMapping:
     mapping = await db.get(StateMapping, mapping_id)
     if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "El mapeo no existe.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(mapping, field, value)
@@ -105,7 +96,7 @@ async def update_mapping(
 async def delete_mapping(mapping_id: int, db: AsyncSession = Depends(get_db)) -> Response:
     mapping = await db.get(StateMapping, mapping_id)
     if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "El mapeo no existe.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
     await db.delete(mapping)
     await db.commit()
     state_mapping_cache.invalidate()

@@ -1,13 +1,13 @@
-"""Caché en memoria de la tabla state_mapping (RIWI-60).
+"""In-memory cache for state_mapping table (RIWI-60).
 
-Cómo funciona:
-- La primera consulta carga TODA la tabla en un diccionario en memoria; las
-  siguientes se responden sin tocar la base de datos.
-- Cuando el endpoint admin crea, edita o elimina un mapeo, llama a `invalidate()`
-  (después del commit). La siguiente consulta recarga desde la base de datos, así
-  los cambios se ven al instante y sin reiniciar el servicio.
-- Respaldo por tiempo (TTL): si OTRO proceso modifica la tabla (por ejemplo un
-  segundo worker o una réplica), esta caché lo notará a más tardar al vencer el TTL.
+How it works:
+- First lookup loads the entire mapping table into an in-memory dictionary;
+  subsequent queries are answered without hitting the database.
+- When an admin endpoint creates, updates, or deletes a mapping, it calls
+  `invalidate()` (after commit). The next query reloads fresh data from DB,
+  making updates instantly visible without restarting the service.
+- Time-to-live fallback (TTL): if another process updates the table (e.g.
+  a second worker or replica), this cache picks up changes once TTL expires.
 """
 
 import asyncio
@@ -25,11 +25,10 @@ Loader = Callable[[], Awaitable[dict[MappingKey, str]]]
 
 # Process-local memory avoids a database read per event; TTL covers external edits.
 # This is simpler than Redis for the current single-backend deployment.
-# La memoria local evita consultar la BD por evento; TTL detecta cambios externos.
-# Es más simple que Redis para el despliegue actual de un solo backend.
+
 
 async def load_mappings_from_db() -> dict[MappingKey, str]:
-    # Sesión propia (no la de la petición) para leer siempre datos ya confirmados.
+    # Dedicated session (not the request session) to read committed database state.
     async with AsyncSessionLocal() as session:
         rows = await session.execute(
             select(StateMapping.carrier_id, StateMapping.raw_status, StateMapping.canonical_status)
@@ -49,11 +48,11 @@ class StateMappingCache:
         self._clock = clock
         self._data: dict[MappingKey, str] | None = None
         self._loaded_at = 0.0
-        self._generation = 0  # sube con cada invalidate()
+        self._generation = 0  # increments on each invalidate() call
         self._lock = asyncio.Lock()
 
     def invalidate(self) -> None:
-        """Descarta lo cargado; la próxima consulta vuelve a leer la base de datos."""
+        """Discard cached data; next query will reload from database."""
         self._generation += 1
         self._data = None
 
@@ -64,19 +63,18 @@ class StateMappingCache:
         if self._is_fresh():
             return self._data  # type: ignore[return-value]
         async with self._lock:
-            if self._is_fresh():  # otra petición ya recargó mientras esperábamos
+            if self._is_fresh():  # another concurrent request reloaded while waiting
                 return self._data  # type: ignore[return-value]
             generation = self._generation
             data = await self._loader()
             # A generation check prevents an in-flight stale read from being cached.
-            # La generación evita guardar como vigente una lectura obsoleta en curso.
             if generation == self._generation:
                 self._data = data
                 self._loaded_at = self._clock()
             return data
 
     async def translate(self, carrier_id: int, raw_status: str) -> str | None:
-        """Estado canónico para el estado de la transportadora, o None si no hay mapeo."""
+        """Translate carrier raw status to canonical status, or None if no mapping exists."""
         return (await self._snapshot()).get((carrier_id, raw_status.strip()))
 
 

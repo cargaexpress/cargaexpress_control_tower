@@ -1,4 +1,4 @@
-"""El seed inicial solo debe usar estados canónicos válidos."""
+"""Initial seed must only use valid canonical statuses."""
 
 import importlib.util
 from pathlib import Path

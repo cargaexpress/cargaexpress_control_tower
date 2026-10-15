@@ -1,1 +1,1 @@
-"""Módulo de simuladores y generadores de datos de CargaExpress."""
+"""CargaExpress simulators and test data generators module."""

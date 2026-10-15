@@ -4,14 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import ShippingLabel
-from app.schemas.guia import GuiaCreate, GuiaResponse, HTTPErrorResponse
+from app.schemas.errors import HTTPErrorResponse
 from app.schemas.order import (
     OrderCreate,
     OrderListResponse,
     OrderRead,
     OrderStatusUpdate,
 )
-from app.services import guia_service, order_service
+from app.schemas.shipping_label import ShippingLabelCreate, ShippingLabelResponse
+from app.services import order_service, shipping_label_service
 from app.services.exceptions import (
     DuplicateTrackingNumberError,
     EntityNotFoundError,
@@ -19,10 +20,7 @@ from app.services.exceptions import (
 )
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
-# Routes use Spanish resource naming to match the project's API convention.
-# El router traduce solicitudes/errores HTTP; la lógica de datos vive en el servicio.
-# Las rutas usan nombres en español según la convención de la API.
-router = APIRouter(prefix="/api/v1/pedidos", tags=["pedidos"])
+router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 
 @router.post("", response_model=OrderRead, status_code=http_status.HTTP_201_CREATED)
@@ -65,27 +63,27 @@ async def update_order_status(
 
 
 @router.post(
-    "/{order_id}/guias",
-    response_model=GuiaResponse,
+    "/{order_id}/shipping-labels",
+    response_model=ShippingLabelResponse,
     status_code=http_status.HTTP_201_CREATED,
-    summary="Asociar guía de despacho a un pedido (RN-07)",
+    summary="Associate shipping label with an order (RN-07)",
     responses={
-        201: {"description": "Guía creada y asociada exitosamente al pedido", "model": GuiaResponse},
-        400: {"description": "Error de validación o tracking duplicado", "model": HTTPErrorResponse},
-        403: {"description": "Acceso denegado: el pedido no pertenece a la marca (RN-10)", "model": HTTPErrorResponse},
-        404: {"description": "Pedido o transportadora no encontrado", "model": HTTPErrorResponse},
-        409: {"description": "Conflicto por guía de tracking ya existente", "model": HTTPErrorResponse},
+        201: {"description": "Shipping label created and associated successfully", "model": ShippingLabelResponse},
+        400: {"description": "Validation error or duplicate tracking number", "model": HTTPErrorResponse},
+        403: {"description": "Access denied: order does not belong to brand (RN-10)", "model": HTTPErrorResponse},
+        404: {"description": "Order or carrier not found", "model": HTTPErrorResponse},
+        409: {"description": "Conflict: tracking number already exists", "model": HTTPErrorResponse},
     },
 )
-async def create_guia(
+async def create_shipping_label(
     order_id: int,
-    payload: GuiaCreate,
+    payload: ShippingLabelCreate,
     x_brand_id: int | None = Header(default=None, alias="X-Brand-Id"),
     db: AsyncSession = Depends(get_db),
 ) -> ShippingLabel:
-    """Registra y asocia una nueva guía de despacho al pedido indicado."""
+    """Register and associate a new shipping label with the specified order."""
     try:
-        guia = await guia_service.create_guia_for_order(
+        shipping_label = await shipping_label_service.create_shipping_label_for_order(
             db=db,
             order_id=order_id,
             payload=payload,
@@ -106,28 +104,28 @@ async def create_guia(
             status_code=http_status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
-    return guia
+    return shipping_label
 
 
 @router.get(
-    "/{order_id}/guias",
-    response_model=list[GuiaResponse],
+    "/{order_id}/shipping-labels",
+    response_model=list[ShippingLabelResponse],
     status_code=http_status.HTTP_200_OK,
-    summary="Listar guías de despacho de un pedido (RN-07)",
+    summary="List shipping labels for an order (RN-07)",
     responses={
-        200: {"description": "Lista de guías asociadas al pedido", "model": list[GuiaResponse]},
-        403: {"description": "Acceso denegado: el pedido no pertenece a la marca (RN-10)", "model": HTTPErrorResponse},
-        404: {"description": "Pedido no encontrado", "model": HTTPErrorResponse},
+        200: {"description": "List of shipping labels associated with order", "model": list[ShippingLabelResponse]},
+        403: {"description": "Access denied: order does not belong to brand (RN-10)", "model": HTTPErrorResponse},
+        404: {"description": "Order not found", "model": HTTPErrorResponse},
     },
 )
-async def get_guias(
+async def get_shipping_labels(
     order_id: int,
     x_brand_id: int | None = Header(default=None, alias="X-Brand-Id"),
     db: AsyncSession = Depends(get_db),
 ) -> list[ShippingLabel]:
-    """Obtiene el listado de todas las guías de despacho asociadas al pedido indicado."""
+    """Retrieve all shipping labels associated with the specified order."""
     try:
-        guias = await guia_service.get_guias_by_order(
+        shipping_labels = await shipping_label_service.get_shipping_labels_by_order(
             db=db,
             order_id=order_id,
             tenant_brand_id=x_brand_id,
@@ -142,4 +140,4 @@ async def get_guias(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
-    return guias
+    return shipping_labels

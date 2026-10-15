@@ -4,8 +4,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Keep deployment settings in environment variables, not source code.
 # Test DB is optional for runtime, but tests require a separate database.
-# La configuración de despliegue vive en variables de entorno, no en el código.
-# La BD de pruebas es opcional en producción; los tests usan una aislada.
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

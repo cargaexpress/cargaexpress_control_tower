@@ -14,14 +14,14 @@ Alembic y PostgreSQL.
   órdenes de ejemplo.
 - **HU-12 — Mapeo de estados:** API administrativa con caché invalidable y
   cambios visibles sin reiniciar. Ver [detalle de HU-12](./STATE_MAPPING.md).
-- **HU-13 — Pedidos:** API para crear pedidos con líneas y destinatario,
+- **HU-13 — Pedidos / Orders:** API para crear pedidos con líneas y destinatario,
   consultarlos por ID, listarlos con paginación y actualizar su estado.
-  Endpoints bajo `/api/v1/pedidos`; pruebas de integración en
+  Endpoints bajo `/api/v1/orders`; pruebas de integración en
   `backend/tests/test_orders.py`.
 - **RN-07 — Pedidos Divididos en Múltiples Guías:** Endpoints para asociar (`POST`)
-  y listar (`GET`) guías vinculadas a un pedido bajo `/api/v1/pedidos/{order_id}/guias`,
+  y listar (`GET`) guías vinculadas a un pedido bajo `/api/v1/orders/{order_id}/shipping-labels`,
   con soporte de aislamiento multitenant (RN-10 con header `X-Brand-Id`), unicidad
-  de códigos de rastreo y pruebas en `backend/tests/test_order_guias.py`.
+  de códigos de rastreo y pruebas en `backend/tests/test_order_shipping_labels.py`.
 - Las reglas para impedir retrocesos desde estados terminales y registrar
   anomalías (RN-02) todavía no están implementadas.
 
@@ -198,15 +198,15 @@ detiene y elimina los contenedores, pero conserva los datos. **No uses
 
 ## Servicios y modelos incluidos
 
-### HU-13 — Pedidos
+### HU-13 — Pedidos / Orders
 
-La API expone estas operaciones bajo `/api/v1/pedidos`:
+La API expone estas operaciones bajo `/api/v1/orders`:
 
-- `POST /api/v1/pedidos`: crea un pedido junto con sus líneas y destinatario;
+- `POST /api/v1/orders`: crea un pedido junto con sus líneas y destinatario;
   comprueba que existan la marca, el centro de distribución y el tipo de envío.
-- `GET /api/v1/pedidos/{order_id}`: consulta un pedido por ID.
-- `GET /api/v1/pedidos?skip=0&limit=50`: lista pedidos con paginación.
-- `PATCH /api/v1/pedidos/{order_id}/status`: actualiza el estado del pedido.
+- `GET /api/v1/orders/{order_id}`: consulta un pedido por ID.
+- `GET /api/v1/orders?skip=0&limit=50`: lista pedidos con paginación.
+- `PATCH /api/v1/orders/{order_id}/status`: actualiza el estado del pedido.
 
 La integración se probó con la suite ejecutada en Docker. La actualización de
 estado es directa; todavía no aplica RN-02 para impedir retrocesos desde estados

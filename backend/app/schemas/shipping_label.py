@@ -1,91 +1,65 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class GuiaCreate(BaseModel):
-    """Esquema de entrada para la generación o registro de una guía de despacho (Shipping Label)."""
+class ShippingLabelCreate(BaseModel):
+    """Input payload to register and associate a shipping label with an order (RN-07)."""
 
-    order_id: int = Field(
+    tracking_number: str = Field(
         ...,
-        gt=0,
-        description="Identificador del pedido asociado a la guía de transporte.",
-        examples=[1],
+        min_length=1,
+        max_length=100,
+        description="Unique carrier tracking number assigned to the package.",
+        examples=["TRK-001-ALPHA"],
     )
     carrier_id: int = Field(
         ...,
         gt=0,
-        description="Identificador de la empresa transportadora asignada.",
+        description="Identifier of the assigned carrier.",
         examples=[1],
-    )
-    tracking_number: str = Field(
-        ...,
-        min_length=3,
-        max_length=64,
-        description="Número de guía o código de seguimiento oficial.",
-        examples=["TRK-BOG-2026-0001"],
-    )
-    status: str = Field(
-        default="CREATED",
-        description="Estado operativo inicial de la guía.",
-        examples=["CREATED"],
     )
     weight_kg: Decimal | None = Field(
         default=None,
+        ge=0,
+        description="Physical package weight in kilograms.",
+        examples=[Decimal("2.50")],
+    )
+    dispatch_id: int | None = Field(
+        default=None,
         gt=0,
-        description="Peso físico del paquete en kilogramos.",
-        examples=[Decimal("2.500")],
+        description="Identifier of the grouping dispatch if already consolidated.",
+        examples=[None],
     )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "order_id": 1,
-                "carrier_id": 1,
-                "tracking_number": "TRK-BOG-2026-0001",
-                "status": "CREATED",
-                "weight_kg": 2.500,
-            }
-        }
+    status: str = Field(
+        default="CREADO",
+        description="Initial canonical status of the shipping label according to RN-01.",
+        examples=["CREADO"],
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional initial metadata for the label.",
     )
 
 
-class GuiaResponse(BaseModel):
-    """Representación de salida de una guía de transporte (Shipping Label)."""
+class ShippingLabelResponse(BaseModel):
+    """Output representation with canonical information of the associated shipping label (RN-07 / RN-01)."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    label_id: int = Field(..., description="ID secuencial interno de la guía.", examples=[1])
-    order_id: int = Field(..., description="ID del pedido relacionado.", examples=[1])
-    carrier_id: int = Field(..., description="ID de la transportadora.", examples=[1])
-    tracking_number: str = Field(..., description="Número de tracking de la guía.", examples=["TRK-BOG-2026-0001"])
-    dispatch_id: int | None = Field(default=None, description="ID del despacho en caso de estar consolidado.", examples=[None])
-    status: str = Field(..., description="Estado actual de la guía en el ciclo logístico.", examples=["CREATED"])
-    weight_kg: Decimal | None = Field(default=None, description="Peso del paquete en kg.", examples=[Decimal("2.500")])
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="Fecha y hora de generación de la guía.",
-        examples=["2026-10-13T10:00:00Z"],
-    )
-
-    model_config = ConfigDict(
-        from_attributes=True,
-        json_schema_extra={
-            "example": {
-                "label_id": 1,
-                "order_id": 1,
-                "carrier_id": 1,
-                "tracking_number": "TRK-BOG-2026-0001",
-                "dispatch_id": None,
-                "status": "CREATED",
-                "weight_kg": 2.500,
-                "created_at": "2026-10-13T10:00:00Z",
-            }
-        },
-    )
+    label_id: int = Field(..., description="Internal sequential ID of the shipping label.", examples=[1])
+    order_id: int = Field(..., description="Associated order ID (1:N relationship).", examples=[1])
+    carrier_id: int = Field(..., description="Carrier ID responsible for transit.", examples=[1])
+    tracking_number: str = Field(..., description="Tracking code of the label.", examples=["TRK-001-ALPHA"])
+    status: str = Field(..., description="Current canonical status of the label in logistics cycle.", examples=["CREADO"])
+    weight_kg: Decimal | None = Field(default=None, description="Recorded package weight in kg.", examples=[Decimal("2.50")])
+    dispatch_id: int | None = Field(default=None, description="Dispatch ID if consolidated.", examples=[None])
+    created_at: datetime = Field(..., description="Date and time when the label was created.")
 
 
-# Alias en inglés para compatibilidad
-ShippingLabelCreate = GuiaCreate
-ShippingLabelRead = GuiaResponse
+# Backwards compatibility aliases
+GuiaCreate = ShippingLabelCreate
+GuiaResponse = ShippingLabelResponse
+ShippingLabelRead = ShippingLabelResponse

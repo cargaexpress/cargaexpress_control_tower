@@ -1,8 +1,8 @@
-"""Pruebas del endpoint admin de state_mapping.
+"""Tests for state_mapping admin endpoint.
 
-- Las de seguridad no necesitan base de datos.
-- Las de flujo completo usan PostgreSQL real con las migraciones ya aplicadas
-  (`alembic upgrade head`); si la base no está disponible, se omiten.
+- Security tests do not require a database.
+- End-to-end tests use real PostgreSQL with migrations already applied
+  (`alembic upgrade head`); if the database is unavailable, they are skipped.
 """
 
 import pytest
@@ -23,7 +23,7 @@ ADMIN = {"X-Admin-Token": "test-admin-key"}
 TEST_CARRIER_NAME = "pytest-carrier"
 
 
-# ---------- Seguridad (sin base de datos) ----------
+# ---------- Security (without database) ----------
 
 
 def test_admin_is_disabled_when_no_key_is_configured(monkeypatch):
@@ -39,10 +39,10 @@ def test_admin_rejects_missing_or_wrong_token(monkeypatch):
     client = TestClient(app)
 
     assert client.get(URL).status_code == 401
-    assert client.get(URL, headers={"X-Admin-Token": "otra-cosa"}).status_code == 401
+    assert client.get(URL, headers={"X-Admin-Token": "invalid-token"}).status_code == 401
 
 
-# ---------- Flujo completo (PostgreSQL real) ----------
+# ---------- Full flow (real PostgreSQL) ----------
 
 
 @pytest.fixture
@@ -53,9 +53,9 @@ async def db_ready():
             await session.execute(text("SELECT 1 FROM state_mapping LIMIT 1"))
     except Exception:
         await engine.dispose()
-        pytest.skip("PostgreSQL con migraciones aplicadas no disponible")
+        pytest.skip("PostgreSQL with migrations applied is unavailable")
     yield
-    await engine.dispose()  # cada test usa su propio event loop
+    await engine.dispose()  # each test uses its own event loop
 
 
 @pytest.fixture
@@ -97,21 +97,21 @@ async def test_changes_are_reflected_without_restarting(client, carrier_id):
     )
     assert created.status_code == 201
     body = created.json()
-    assert body["raw_status"] == "SHIPPED"  # sin espacios
-    assert body["canonical_status"] == "IN_TRANSIT"  # normalizado a mayúsculas
+    assert body["raw_status"] == "SHIPPED"  # without surrounding whitespace
+    assert body["canonical_status"] == "IN_TRANSIT"  # normalized to uppercase
 
-    # Primera consulta: llena la caché.
+    # First lookup: populates the cache.
     first = await resolve(client, carrier_id, "SHIPPED")
     assert first.json()["canonical_status"] == "IN_TRANSIT"
 
-    # Editar: la caché ya tenía el valor viejo, pero el cambio se ve de inmediato.
+    # Edit: cache already held old value, but change is visible immediately.
     patched = await client.patch(
         f"{URL}/{body['id']}", json={"canonical_status": "DELIVERED"}, headers=ADMIN
     )
     assert patched.status_code == 200
     assert (await resolve(client, carrier_id, "SHIPPED")).json()["canonical_status"] == "DELIVERED"
 
-    # Borrar: deja de resolverse.
+    # Delete: stops resolving.
     deleted = await client.delete(f"{URL}/{body['id']}", headers=ADMIN)
     assert deleted.status_code == 204
     assert (await resolve(client, carrier_id, "SHIPPED")).status_code == 404
@@ -169,7 +169,7 @@ async def test_update_to_an_existing_source_status_is_a_conflict(client, carrier
     response = await client.patch(f"{URL}/{first['id']}", json={"raw_status": "B"}, headers=ADMIN)
 
     assert response.status_code == 409
-    # El conflicto no dejó la sesión rota: el listado sigue funcionando.
+    # The conflict did not leave a broken session: listing continues to work.
     listing = await client.get(URL, params={"carrier_id": carrier_id}, headers=ADMIN)
     assert [m["raw_status"] for m in listing.json()] == ["A", "B"]
 

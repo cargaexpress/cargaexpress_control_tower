@@ -1,29 +1,29 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from app.routers import admin_mapeo_estados, admin_state_mapping, health, orders
+from app.routers import admin_carrier_state_mapping, admin_state_mapping, health, orders
 from app.schemas.errors import HTTPErrorResponse
 
 openapi_tags = [
     {
         "name": "health",
-        "description": "Verificación de disponibilidad de la API y conectividad con la base de datos.",
+        "description": "API health check and database connectivity probe.",
     },
     {
-        "name": "pedidos",
-        "description": "Gestión del ciclo de vida de pedidos WMS: creación, consulta por ID, listado paginado y actualización de estados.",
+        "name": "orders",
+        "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels.",
     },
     {
-        "name": "admin: mapeo de estados",
-        "description": "Administración de catálogos de traducción de estados de transportadoras hacia el vocabulario canónico (HU-15).",
+        "name": "admin: carrier state mapping",
+        "description": "Carrier status mapping administration for canonical status normalization (HU-15).",
     },
     {
         "name": "admin: state mapping",
-        "description": "Operaciones CRUD y resolución de estados en caché en tiempo real (HU-12).",
+        "description": "CRUD operations and real-time cached status translation (HU-12).",
     },
     {
-        "name": "contrato openapi",
-        "description": "Descarga e inspección interactiva del contrato OpenAPI / Swagger (Entregable E-05).",
+        "name": "openapi contract",
+        "description": "Download and interactive inspection of OpenAPI / Swagger contract.",
     },
 ]
 
@@ -31,35 +31,35 @@ app = FastAPI(
     title="CargaExpress Supply Chain API",
     version="1.0.0",
     description=(
-        "Torre de Control Logística CargaExpress: APIs para orquestación de pedidos WMS, "
-        "tracking de transportadoras, mapeo dinámico de estados y gestión de anomalías."
+        "CargaExpress Control Tower Logistics: APIs for WMS order orchestration, "
+        "carrier tracking, dynamic state mapping, and exception management."
     ),
     openapi_tags=openapi_tags,
     docs_url="/docs",
     redoc_url="/redoc",
     responses={
-        400: {"model": HTTPErrorResponse, "description": "Solicitud errónea o datos inválidos."},
-        401: {"model": HTTPErrorResponse, "description": "No autorizado (Falta o es incorrecto el token de autenticación)."},
-        404: {"model": HTTPErrorResponse, "description": "Recurso no encontrado."},
-        422: {"description": "Error de validación en la entidad o payload enviado."},
-        500: {"model": HTTPErrorResponse, "description": "Error interno del servidor."},
+        400: {"model": HTTPErrorResponse, "description": "Bad request or invalid input."},
+        401: {"model": HTTPErrorResponse, "description": "Unauthorized (missing or invalid credentials)."},
+        404: {"model": HTTPErrorResponse, "description": "Resource not found."},
+        422: {"description": "Validation error in entity or payload."},
+        500: {"model": HTTPErrorResponse, "description": "Internal server error."},
     },
 )
 
-# Inclusión de routers modulares
+# Modular routers
 app.include_router(health.router)
 app.include_router(admin_state_mapping.router)
-app.include_router(admin_mapeo_estados.router)
+app.include_router(admin_carrier_state_mapping.router)
 app.include_router(orders.router)
 
 
 @app.get(
     "/docs/api/openapi.json",
-    tags=["contrato openapi"],
-    summary="Exportar especificación OpenAPI en formato JSON",
-    description="Retorna el esquema OpenAPI 3.1 completo y serializado de la aplicación.",
+    tags=["openapi contract"],
+    summary="Export OpenAPI specification in JSON format",
+    description="Returns full application OpenAPI 3.1 serialized schema.",
     response_class=JSONResponse,
 )
 async def get_openapi_spec() -> JSONResponse:
-    """Entrega el esquema OpenAPI completo en formato JSON para consumo estático o herramientas externas."""
+    """Deliver full OpenAPI schema in JSON format for static consumption or external tooling."""
     return JSONResponse(content=app.openapi())

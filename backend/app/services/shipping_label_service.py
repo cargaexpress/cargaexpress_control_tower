@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.carrier import Carrier
 from app.models.order import Order
 from app.models.shipping_label import ShippingLabel
-from app.schemas.guia import GuiaCreate
+from app.schemas.shipping_label import ShippingLabelCreate
 from app.services.exceptions import (
     DuplicateTrackingNumberError,
     EntityNotFoundError,
@@ -12,20 +12,19 @@ from app.services.exceptions import (
 )
 
 
-async def create_guia_for_order(
+async def create_shipping_label_for_order(
     db: AsyncSession,
     order_id: int,
-    payload: GuiaCreate,
+    payload: ShippingLabelCreate,
     tenant_brand_id: int | None = None,
 ) -> ShippingLabel:
-    """
-    Asocia y crea una guía de despacho para un pedido existente (RN-07).
+    """Associate and create a shipping label for an existing order (RN-07).
 
-    Validaciones:
-    1. Existencia del pedido (404 si no existe).
-    2. Aislamiento multitenant (RN-10): Si se especifica tenant_brand_id, el pedido debe pertenecer a dicha marca.
-    3. Existencia de la transportadora (404 si no existe).
-    4. Unicidad del tracking_number: no puede estar asignado previamente a ninguna guía.
+    Validations:
+    1. Order existence (404 if missing).
+    2. Multitenant isolation (RN-10): If tenant_brand_id is provided, order must belong to that brand.
+    3. Carrier existence (404 if missing).
+    4. Uniqueness of tracking_number: cannot be already assigned to any shipping label.
     """
     order = await db.get(Order, order_id)
     if order is None:
@@ -33,7 +32,7 @@ async def create_guia_for_order(
 
     if tenant_brand_id is not None and order.brand_id != tenant_brand_id:
         raise TenantForbiddenError(
-            f"El pedido {order_id} no pertenece a la marca {tenant_brand_id}"
+            f"Order {order_id} does not belong to brand {tenant_brand_id}"
         )
 
     carrier = await db.get(Carrier, payload.carrier_id)
@@ -47,7 +46,7 @@ async def create_guia_for_order(
     if existing_label is not None:
         raise DuplicateTrackingNumberError(payload.tracking_number.strip())
 
-    guia = ShippingLabel(
+    shipping_label = ShippingLabel(
         order_id=order_id,
         carrier_id=payload.carrier_id,
         tracking_number=payload.tracking_number.strip(),
@@ -56,23 +55,22 @@ async def create_guia_for_order(
         status=payload.status.upper() if payload.status else "CREADO",
     )
 
-    db.add(guia)
+    db.add(shipping_label)
     await db.commit()
-    await db.refresh(guia)
-    return guia
+    await db.refresh(shipping_label)
+    return shipping_label
 
 
-async def get_guias_by_order(
+async def get_shipping_labels_by_order(
     db: AsyncSession,
     order_id: int,
     tenant_brand_id: int | None = None,
 ) -> list[ShippingLabel]:
-    """
-    Retorna la lista de guías asociadas a un pedido (RN-07).
+    """Return the list of shipping labels associated with an order (RN-07).
 
-    Validaciones:
-    1. Existencia del pedido (404 si no existe).
-    2. Aislamiento multitenant (RN-10): Si se especifica tenant_brand_id, el pedido debe pertenecer a dicha marca.
+    Validations:
+    1. Order existence (404 if missing).
+    2. Multitenant isolation (RN-10): If tenant_brand_id is provided, order must belong to that brand.
     """
     order = await db.get(Order, order_id)
     if order is None:
@@ -80,7 +78,7 @@ async def get_guias_by_order(
 
     if tenant_brand_id is not None and order.brand_id != tenant_brand_id:
         raise TenantForbiddenError(
-            f"El pedido {order_id} no pertenece a la marca {tenant_brand_id}"
+            f"Order {order_id} does not belong to brand {tenant_brand_id}"
         )
 
     stmt = (
@@ -90,3 +88,8 @@ async def get_guias_by_order(
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+# Backwards compatibility aliases
+create_guia_for_order = create_shipping_label_for_order
+get_guias_by_order = get_shipping_labels_by_order
