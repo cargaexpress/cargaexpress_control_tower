@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import ShippingLabel
+from app.security import get_tenant_brand_id, require_api_key
 from app.schemas.errors import HTTPErrorResponse
 from app.schemas.order import (
     OrderCreate,
@@ -20,7 +21,7 @@ from app.services.exceptions import (
 )
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
-router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
+router = APIRouter(prefix="/api/v1/orders", tags=["orders"], dependencies=[Depends(require_api_key)])
 
 
 @router.post(
@@ -126,7 +127,7 @@ async def update_order_status(
 async def create_shipping_label(
     order_id: int,
     payload: ShippingLabelCreate,
-    x_brand_id: int | None = Header(default=None, alias="X-Brand-Id"),
+    x_brand_id: int = Depends(get_tenant_brand_id),
     db: AsyncSession = Depends(get_db),
 ) -> ShippingLabel:
     """Register and associate a new shipping label with the specified order."""
@@ -168,7 +169,7 @@ async def create_shipping_label(
 )
 async def get_shipping_labels(
     order_id: int,
-    x_brand_id: int | None = Header(default=None, alias="X-Brand-Id"),
+    x_brand_id: int = Depends(get_tenant_brand_id),
     db: AsyncSession = Depends(get_db),
 ) -> list[ShippingLabel]:
     """Retrieve all shipping labels associated with the specified order."""
