@@ -5,25 +5,25 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class OrderLineCreate(BaseModel):
-    """Línea de producto o SKU incluida en la creación del pedido."""
+    """Product line or SKU item included when creating an order."""
 
     sku: str = Field(
         ...,
         min_length=1,
         max_length=64,
-        description="Código único de producto (SKU).",
+        description="Unique product identifier (SKU).",
         examples=["SKU-SHIRT-BLUE-M"],
     )
     description: str | None = Field(
         default=None,
         max_length=255,
-        description="Descripción legible del artículo.",
-        examples=["Camiseta de algodón azul talla M"],
+        description="Human-readable description of the item.",
+        examples=["Blue cotton shirt size M"],
     )
     quantity_ordered: int = Field(
         ...,
         gt=0,
-        description="Cantidad requerida del artículo.",
+        description="Quantity ordered for the item.",
         examples=[2],
     )
 
@@ -31,7 +31,7 @@ class OrderLineCreate(BaseModel):
         json_schema_extra={
             "example": {
                 "sku": "SKU-SHIRT-BLUE-M",
-                "description": "Camiseta de algodón azul talla M",
+                "description": "Blue cotton shirt size M",
                 "quantity_ordered": 2,
             }
         }
@@ -39,140 +39,140 @@ class OrderLineCreate(BaseModel):
 
 
 class OrderLineRead(BaseModel):
-    """Representación de una línea de producto persistida en el pedido."""
+    """Representation of an order line persisted in the database."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    order_line_id: int = Field(..., description="ID secuencial de la línea de pedido.", examples=[101])
-    order_id: int = Field(..., description="ID del pedido al que pertenece.", examples=[1])
-    line_number: int = Field(..., description="Número ordinal de la línea dentro del pedido.", examples=[1])
-    sku: str = Field(..., description="Código único de producto (SKU).", examples=["SKU-SHIRT-BLUE-M"])
-    description: str | None = Field(default=None, description="Descripción del artículo.", examples=["Camiseta de algodón azul"])
-    quantity_ordered: int = Field(..., description="Cantidad ordenada.", examples=[2])
+    order_line_id: int = Field(..., description="Sequential ID of the order line.", examples=[101])
+    order_id: int = Field(..., description="ID of the parent order.", examples=[1])
+    line_number: int = Field(..., description="Ordinal line number within the order.", examples=[1])
+    sku: str = Field(..., description="Unique product SKU.", examples=["SKU-SHIRT-BLUE-M"])
+    description: str | None = Field(default=None, description="Item description.", examples=["Blue cotton shirt"])
+    quantity_ordered: int = Field(..., description="Quantity ordered.", examples=[2])
 
 
 class OrderRecipientCreate(BaseModel):
-    """Datos de contacto y entrega del destinatario."""
+    """Recipient contact and delivery address information."""
 
     full_name: str = Field(
         ...,
         min_length=2,
         max_length=150,
-        description="Nombre completo o razón social del destinatario.",
-        examples=["Juan Pérez Rodríguez"],
+        description="Full name or company name of the recipient.",
+        examples=["Juan Perez"],
     )
     email: str | None = Field(
         default=None,
         max_length=120,
-        description="Correo electrónico para notificaciones de entrega.",
+        description="Email address for delivery notifications.",
         examples=["juan.perez@example.com"],
     )
     phone: str | None = Field(
         default=None,
         max_length=30,
-        description="Teléfono de contacto para la entrega.",
+        description="Contact phone number for delivery.",
         examples=["+573001234567"],
     )
     address_line: str = Field(
         ...,
         min_length=5,
         max_length=255,
-        description="Dirección de entrega física.",
+        description="Physical delivery street address.",
         examples=["Carrera 15 # 93-47 Apto 502"],
     )
     city: str = Field(
         ...,
         min_length=2,
         max_length=100,
-        description="Ciudad de destino.",
-        examples=["Bogotá D.C."],
+        description="Destination city.",
+        examples=["Bogota"],
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "full_name": "Juan Pérez Rodríguez",
+                "full_name": "Juan Perez",
                 "email": "juan.perez@example.com",
                 "phone": "+573001234567",
                 "address_line": "Carrera 15 # 93-47 Apto 502",
-                "city": "Bogotá D.C.",
+                "city": "Bogota",
             }
         }
     )
 
 
 class OrderRecipientRead(BaseModel):
-    """Datos del destinatario de una orden consultada."""
+    """Recipient information for a queried order."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    order_id: int = Field(..., description="ID del pedido.", examples=[1])
-    full_name: str = Field(..., description="Nombre del destinatario.", examples=["Juan Pérez Rodríguez"])
-    email: str | None = Field(default=None, description="Correo electrónico.", examples=["juan.perez@example.com"])
-    phone: str | None = Field(default=None, description="Teléfono de contacto.", examples=["+573001234567"])
-    address_line: str = Field(..., description="Dirección de entrega.", examples=["Carrera 15 # 93-47 Apto 502"])
-    city: str = Field(..., description="Ciudad de destino.", examples=["Bogotá D.C."])
+    order_id: int = Field(..., description="Order ID.", examples=[1])
+    full_name: str = Field(..., description="Recipient full name.", examples=["Juan Perez"])
+    email: str | None = Field(default=None, description="Email address.", examples=["juan.perez@example.com"])
+    phone: str | None = Field(default=None, description="Contact phone.", examples=["+573001234567"])
+    address_line: str = Field(..., description="Delivery address.", examples=["Carrera 15 # 93-47 Apto 502"])
+    city: str = Field(..., description="Destination city.", examples=["Bogota"])
 
 
 class OrderCreate(BaseModel):
-    """Payload para registrar una nueva orden en la Torre de Control WMS."""
+    """Payload to register a new order in the WMS Control Tower."""
 
     brand_id: int = Field(
         ...,
         gt=0,
-        description="Identificador de la marca dueña del inventario.",
+        description="Identifier of the brand owning the inventory.",
         examples=[1],
     )
     dc_id: int = Field(
         ...,
         gt=0,
-        description="Identificador del Centro de Distribución de origen.",
+        description="Origin Distribution Center identifier.",
         examples=[1],
     )
     shipment_type_code: str = Field(
         ...,
-        description="Código del tipo de despacho acordado (STANDARD, EXPRESS, SAME_DAY).",
+        description="Shipment type code (STANDARD, EXPRESS, SAME_DAY).",
         examples=["STANDARD"],
     )
     brand_order_ref: str = Field(
         ...,
         min_length=1,
         max_length=100,
-        description="Referencia única o número de pedido externo de la marca.",
+        description="Unique external order reference provided by the brand.",
         examples=["ORD-MODA-2026-0001"],
     )
     destination_country: str = Field(
         default="CO",
         min_length=2,
         max_length=2,
-        description="Código ISO 3166-1 alpha-2 del país destino.",
+        description="ISO 3166-1 alpha-2 destination country code.",
         examples=["CO"],
     )
     destination_region: str | None = Field(
         default=None,
         max_length=100,
-        description="Departamento o provincia de entrega.",
+        description="Department or province of delivery.",
         examples=["Cundinamarca"],
     )
     freight_value: Decimal = Field(
         ...,
         gt=0,
-        description="Valor acordado del flete de envío.",
+        description="Agreed shipping freight charge.",
         examples=[Decimal("15000.00")],
     )
     status: str = Field(
         default="CREATED",
-        description="Estado operativo inicial de la orden.",
+        description="Initial operational status of the order.",
         examples=["CREATED"],
     )
     order_lines: list[OrderLineCreate] = Field(
         ...,
         min_length=1,
-        description="Lista de ítems incluidos en la orden de despacho.",
+        description="List of product items included in the order.",
     )
     recipient: OrderRecipientCreate = Field(
         ...,
-        description="Información detallada del destinatario de la entrega.",
+        description="Detailed delivery recipient information.",
     )
 
     model_config = ConfigDict(
@@ -189,16 +189,16 @@ class OrderCreate(BaseModel):
                 "order_lines": [
                     {
                         "sku": "SKU-SHIRT-BLUE-M",
-                        "description": "Camiseta de algodón azul talla M",
+                        "description": "Blue cotton shirt size M",
                         "quantity_ordered": 2,
                     }
                 ],
                 "recipient": {
-                    "full_name": "Juan Pérez Rodríguez",
+                    "full_name": "Juan Perez",
                     "email": "juan.perez@example.com",
                     "phone": "+573001234567",
                     "address_line": "Carrera 15 # 93-47 Apto 502",
-                    "city": "Bogotá D.C.",
+                    "city": "Bogota",
                 },
             }
         }
@@ -206,11 +206,11 @@ class OrderCreate(BaseModel):
 
 
 class OrderStatusUpdate(BaseModel):
-    """Payload para actualizar el estado de una orden."""
+    """Payload to update an order's status."""
 
     status: str = Field(
         ...,
-        description="Nuevo estado operativo de la orden.",
+        description="New operational status of the order.",
         examples=["PICKED_UP"],
     )
 
@@ -224,35 +224,35 @@ class OrderStatusUpdate(BaseModel):
 
 
 class OrderRead(BaseModel):
-    """Detalle completo de una orden consultada en el sistema."""
+    """Full detail of a queried order."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    order_id: int = Field(..., description="ID interno autogenerado de la orden.", examples=[1])
-    brand_id: int = Field(..., description="ID de la marca dueña de la orden.", examples=[1])
-    dc_id: int = Field(..., description="ID del Centro de Distribución.", examples=[1])
-    shipment_type_code: str = Field(..., description="Tipo de envío.", examples=["STANDARD"])
-    brand_order_ref: str = Field(..., description="Referencia de la marca.", examples=["ORD-MODA-2026-0001"])
-    destination_country: str = Field(..., description="País destino.", examples=["CO"])
-    destination_region: str | None = Field(default=None, description="Región/departamento.", examples=["Cundinamarca"])
-    freight_value: Decimal = Field(..., description="Valor del flete.", examples=[Decimal("15000.00")])
-    status: str = Field(..., description="Estado actual de la orden.", examples=["CREATED"])
+    order_id: int = Field(..., description="Auto-generated internal order ID.", examples=[1])
+    brand_id: int = Field(..., description="ID of the brand owning the order.", examples=[1])
+    dc_id: int = Field(..., description="Distribution Center ID.", examples=[1])
+    shipment_type_code: str = Field(..., description="Shipment type code.", examples=["STANDARD"])
+    brand_order_ref: str = Field(..., description="Brand external reference.", examples=["ORD-MODA-2026-0001"])
+    destination_country: str = Field(..., description="Destination country.", examples=["CO"])
+    destination_region: str | None = Field(default=None, description="Region/department.", examples=["Cundinamarca"])
+    freight_value: Decimal = Field(..., description="Freight charge value.", examples=[Decimal("15000.00")])
+    status: str = Field(..., description="Current order status.", examples=["CREATED"])
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="Fecha y hora de creación de la orden.",
+        description="Order creation date and time.",
         examples=["2026-10-13T10:00:00Z"],
     )
-    order_lines: list[OrderLineRead] = Field(..., description="Ítems asociados a la orden.")
-    recipient: OrderRecipientRead = Field(..., description="Destinatario de la orden.")
+    order_lines: list[OrderLineRead] = Field(..., description="Items associated with the order.")
+    recipient: OrderRecipientRead = Field(..., description="Order recipient details.")
 
 
 class OrderListResponse(BaseModel):
-    """Estructura de respuesta paginada para el listado de pedidos."""
+    """Paginated response structure for order listings."""
 
-    items: list[OrderRead] = Field(..., description="Listado de pedidos pertenecientes a la página actual.")
-    total: int = Field(..., ge=0, description="Cantidad total de pedidos registrados.", examples=[100])
-    skip: int = Field(..., ge=0, description="Desplazamiento u offset aplicado en la consulta.", examples=[0])
-    limit: int = Field(..., gt=0, description="Límite de registros retornados por página.", examples=[20])
+    items: list[OrderRead] = Field(..., description="List of orders on the current page.")
+    total: int = Field(..., ge=0, description="Total count of matching orders.", examples=[100])
+    skip: int = Field(..., ge=0, description="Offset applied to the query.", examples=[0])
+    limit: int = Field(..., gt=0, description="Maximum number of records returned per page.", examples=[20])
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -266,6 +266,6 @@ class OrderListResponse(BaseModel):
     )
 
 
-# Alias según nomenclatura en español del entregable
+# Backwards compatibility aliases
 PedidoCreate = OrderCreate
 PedidoResponse = OrderRead

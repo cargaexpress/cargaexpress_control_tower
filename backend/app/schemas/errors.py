@@ -2,23 +2,23 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class HTTPErrorResponse(BaseModel):
-    """Esquema estándar para respuestas de error de la API."""
+    """Standard error response schema for the API."""
 
     detail: str = Field(
         ...,
-        description="Mensaje explicativo del error.",
-        examples=["El recurso solicitado no fue encontrado."],
+        description="Detailed explanatory error message.",
+        examples=["Requested resource was not found."],
     )
     error_code: str | None = Field(
         default=None,
-        description="Código de error estandarizado del sistema.",
+        description="Standardized system error code.",
         examples=["RESOURCE_NOT_FOUND"],
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "detail": "El recurso solicitado no fue encontrado en el sistema.",
+                "detail": "Requested resource was not found in the system.",
                 "error_code": "NOT_FOUND",
             }
         }

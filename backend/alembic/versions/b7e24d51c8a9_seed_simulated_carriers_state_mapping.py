@@ -1,11 +1,12 @@
-"""seed state_mapping para las transportadoras simuladas
+"""Seed state_mapping for simulated carriers.
 
-Crea (si no existen) tres transportadoras simuladas y su traducción inicial de
-estados al vocabulario canónico. Cada una habla un "idioma" distinto a propósito:
-Alpha usa palabras en inglés, Beta usa códigos numéricos y Gamma usa español.
+Creates (if they do not exist) three simulated carriers and their initial
+status translation to the canonical vocabulary. Each speaks a different
+format on purpose: Alpha uses English words, Beta uses numeric codes,
+and Gamma uses Spanish.
 
-Es seguro ejecutarlo más de una vez: no duplica transportadoras ni mapeos y NO
-sobrescribe cambios hechos después desde el endpoint admin.
+Safe to run multiple times: does not duplicate carriers or mappings and
+does NOT overwrite changes made subsequently from the admin endpoint.
 
 Revision ID: b7e24d51c8a9
 Revises: a3f1c9d27b45
@@ -26,7 +27,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 SIMULATED_INTEGRATION_TYPE = "simulated"
 
-# {nombre de la transportadora: {estado que reporta: estado canónico}}
+# {carrier_name: {reported_status: canonical_status}}
 SEED: dict[str, dict[str, str]] = {
     "SimCarrier Alpha": {
         "CREATED": "CREATED",
@@ -101,7 +102,7 @@ def downgrade() -> None:
     conn = op.get_bind()
     names = list(SEED)
 
-    # Quita todos los mapeos de las transportadoras simuladas (incluidos los editados).
+    # Remove all mappings for simulated carriers (including edited ones).
     conn.execute(
         sa.text(
             "DELETE FROM state_mapping WHERE carrier_id IN "
@@ -109,7 +110,7 @@ def downgrade() -> None:
         ),
         {"names": names},
     )
-    # Quita las transportadoras solo si siguen siendo simuladas y nadie las usa.
+    # Remove carriers only if they remain simulated and are not referenced.
     conn.execute(
         sa.text(
             "DELETE FROM carriers c WHERE c.name = ANY(:names) "

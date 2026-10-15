@@ -1,11 +1,8 @@
-"""Domain error for missing references.
-
-Error de dominio para referencias inexistentes.
-"""
+"""Domain exceptions for core business and persistence rules."""
 
 
 class EntityNotFoundError(Exception):
-    """Se lanza cuando una entidad referenciada (FK) no existe en base de datos."""
+    """Raised when a referenced foreign key or domain entity does not exist."""
 
     def __init__(self, entity_name: str, entity_id) -> None:
         self.entity_name = entity_name
@@ -14,14 +11,14 @@ class EntityNotFoundError(Exception):
 
 
 class TenantForbiddenError(Exception):
-    """Se lanza cuando un tenant (marca) intenta acceder o modificar recursos de otra marca (RN-10)."""
+    """Raised when a tenant (brand) attempts to access or modify resources of another brand (RN-10)."""
 
     def __init__(self, message: str = "Access denied for this tenant context") -> None:
         super().__init__(message)
 
 
 class DuplicateTrackingNumberError(Exception):
-    """Se lanza cuando se intenta asociar una guía cuyo tracking number ya existe."""
+    """Raised when attempting to associate a shipping label whose tracking number already exists."""
 
     def __init__(self, tracking_number: str) -> None:
         self.tracking_number = tracking_number

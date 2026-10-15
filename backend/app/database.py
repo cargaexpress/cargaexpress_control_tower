@@ -10,10 +10,10 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=As
 
 
 class Base(DeclarativeBase):
-    """Clase base de la que heredan todos los modelos ORM del proyecto."""
+    """Base declarative class from which all project ORM models inherit."""
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependencia de FastAPI: entrega una sesión async por request y la cierra al terminar."""
+    """FastAPI dependency: yields an async database session per request and closes it on completion."""
     async with AsyncSessionLocal() as session:
         yield session

@@ -6,8 +6,8 @@ from app.models.state_mapping import StateMapping
 from app.services.exceptions import EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
 
-# La lógica de datos vive aquí; el router solo traduce HTTP.
-# populate_existing garantiza leer valores frescos (updated_at lo fija la base de datos).
+# Business and data logic lives here; the router only handles HTTP concerns.
+# populate_existing ensures reading fresh values (updated_at is set by the database).
 
 
 async def _read_mappings(db: AsyncSession, carrier_id: int) -> list[StateMapping]:
@@ -21,9 +21,9 @@ async def _read_mappings(db: AsyncSession, carrier_id: int) -> list[StateMapping
 
 
 async def get_carrier_mapping(db: AsyncSession, carrier_id: int) -> tuple[Carrier, list[StateMapping]]:
-    """Mapeo actual de una transportadora, leído de la base de datos (no de la caché).
+    """Retrieve current state mappings for a carrier directly from the database (bypassing cache).
 
-    Lanza EntityNotFoundError si la transportadora no existe.
+    Raises EntityNotFoundError if the carrier does not exist.
     """
     carrier = await db.get(Carrier, carrier_id)
     if carrier is None:
@@ -34,13 +34,13 @@ async def get_carrier_mapping(db: AsyncSession, carrier_id: int) -> tuple[Carrie
 async def replace_carrier_mapping(
     db: AsyncSession, carrier_id: int, desired: dict[str, str]
 ) -> tuple[Carrier, list[StateMapping]]:
-    """Deja el mapeo de la transportadora EXACTAMENTE igual a `desired` ({raw_status: canonical_status}).
+    """Synchronize carrier mappings to EXACTLY match `desired` ({raw_status: canonical_status}).
 
-    En una sola transacción: crea los estados nuevos, actualiza los que cambiaron de
-    significado y elimina los que ya no vienen. Los estados que no cambian conservan su id.
-    Después de confirmar, invalida la caché para que el cambio se vea sin reiniciar.
+    In a single transaction: inserts new statuses, updates changed meanings,
+    and deletes obsolete ones. Unchanged entries retain their IDs.
+    After commit, invalidates the cache so changes take effect immediately without restart.
     """
-    # Bloquea la fila de la transportadora: dos PUT simultáneos a la misma se ejecutan en fila.
+    # Lock the carrier row: concurrent PUT requests for the same carrier are serialized.
     carrier = await db.get(Carrier, carrier_id, with_for_update=True)
     if carrier is None:
         raise EntityNotFoundError("carrier", carrier_id)
@@ -60,6 +60,6 @@ async def replace_carrier_mapping(
         await db.delete(removed)
 
     await db.commit()
-    # Solo después del commit: si la escritura falla, la caché vigente no se descarta.
+    # Invalidate cache only after commit: if writing fails, valid cache is preserved.
     state_mapping_cache.invalidate()
     return carrier, await _read_mappings(db, carrier_id)

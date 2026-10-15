@@ -10,11 +10,10 @@ router = APIRouter(prefix="/api/v1", tags=["health"])
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check(db: AsyncSession = Depends(get_db)) -> HealthResponse:
-    """
-    Verifica que el servicio esté arriba y reporta el estado de la conexión a la base de datos.
+    """Check service availability and report database connection status.
 
-    No lanza error 500 si la base de datos falla: siempre responde 200 con el detalle,
-    para que Docker/ALB sepan que el proceso está vivo aunque la BD tenga un problema puntual.
+    Does not return 500 if database query fails: always returns 200 with connectivity detail,
+    allowing orchestrators (Docker / ALB) to confirm the process is alive.
     """
     db_status = "up"
     try:
