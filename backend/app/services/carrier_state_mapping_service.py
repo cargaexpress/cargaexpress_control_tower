@@ -1,23 +1,16 @@
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
+from app.repositories import StateMappingRepository
 from app.services.exceptions import EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
 
 # Business and data logic lives here; the router only handles HTTP concerns.
-# populate_existing ensures reading fresh values (updated_at is set by the database).
 
 
 async def _read_mappings(db: AsyncSession, carrier_id: int) -> list[StateMapping]:
-    query = (
-        select(StateMapping)
-        .where(StateMapping.carrier_id == carrier_id)
-        .order_by(StateMapping.raw_status)
-        .execution_options(populate_existing=True)
-    )
-    return list((await db.scalars(query)).all())
+    return await StateMappingRepository.get_mappings_for_carrier(db, carrier_id)
 
 
 async def get_carrier_mapping(db: AsyncSession, carrier_id: int) -> tuple[Carrier, list[StateMapping]]:
@@ -25,7 +18,7 @@ async def get_carrier_mapping(db: AsyncSession, carrier_id: int) -> tuple[Carrie
 
     Raises EntityNotFoundError if the carrier does not exist.
     """
-    carrier = await db.get(Carrier, carrier_id)
+    carrier = await StateMappingRepository.get_carrier(db, carrier_id)
     if carrier is None:
         raise EntityNotFoundError("carrier", carrier_id)
     return carrier, await _read_mappings(db, carrier_id)
@@ -41,7 +34,7 @@ async def replace_carrier_mapping(
     After commit, invalidates the cache so changes take effect immediately without restart.
     """
     # Lock the carrier row: concurrent PUT requests for the same carrier are serialized.
-    carrier = await db.get(Carrier, carrier_id, with_for_update=True)
+    carrier = await StateMappingRepository.get_carrier(db, carrier_id, with_for_update=True)
     if carrier is None:
         raise EntityNotFoundError("carrier", carrier_id)
 

@@ -3,12 +3,11 @@
 Isolates database persistence and cache invalidation from HTTP routing concerns.
 """
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
+from app.repositories import StateMappingRepository
 from app.schemas.state_mapping import StateMappingCreate, StateMappingUpdate
 from app.services.exceptions import DuplicateMappingError, EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
@@ -18,10 +17,7 @@ async def list_mappings(
     db: AsyncSession, carrier_id: int | None = None
 ) -> list[StateMapping]:
     """Retrieve persisted mappings, optionally filtered by carrier."""
-    query = select(StateMapping).order_by(StateMapping.carrier_id, StateMapping.raw_status)
-    if carrier_id is not None:
-        query = query.where(StateMapping.carrier_id == carrier_id)
-    return list((await db.scalars(query)).all())
+    return await StateMappingRepository.list_by_carrier(db, carrier_id)
 
 
 async def create_mapping(db: AsyncSession, payload: StateMappingCreate) -> StateMapping:
@@ -31,7 +27,7 @@ async def create_mapping(db: AsyncSession, payload: StateMappingCreate) -> State
         EntityNotFoundError: If the carrier does not exist.
         DuplicateMappingError: If a mapping for this carrier and raw_status already exists.
     """
-    carrier = await db.get(Carrier, payload.carrier_id)
+    carrier = await StateMappingRepository.get_carrier(db, payload.carrier_id)
     if carrier is None:
         raise EntityNotFoundError("carrier", payload.carrier_id)
 
@@ -57,7 +53,7 @@ async def update_mapping(
         EntityNotFoundError: If the mapping does not exist.
         DuplicateMappingError: If the updated raw_status conflicts with an existing mapping.
     """
-    mapping = await db.get(StateMapping, mapping_id)
+    mapping = await StateMappingRepository.get_by_id(db, mapping_id)
     if mapping is None:
         raise EntityNotFoundError("mapping", mapping_id)
 
@@ -81,7 +77,7 @@ async def delete_mapping(db: AsyncSession, mapping_id: int) -> None:
     Raises:
         EntityNotFoundError: If the mapping does not exist.
     """
-    mapping = await db.get(StateMapping, mapping_id)
+    mapping = await StateMappingRepository.get_by_id(db, mapping_id)
     if mapping is None:
         raise EntityNotFoundError("mapping", mapping_id)
 

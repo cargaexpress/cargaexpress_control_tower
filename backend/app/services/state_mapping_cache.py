@@ -14,11 +14,9 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable
 
-from sqlalchemy import select
-
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.models.state_mapping import StateMapping
+from app.repositories import StateMappingRepository
 
 MappingKey = tuple[int, str]  # (carrier_id, raw_status)
 Loader = Callable[[], Awaitable[dict[MappingKey, str]]]
@@ -30,10 +28,7 @@ Loader = Callable[[], Awaitable[dict[MappingKey, str]]]
 async def load_mappings_from_db() -> dict[MappingKey, str]:
     # Dedicated session (not the request session) to read committed database state.
     async with AsyncSessionLocal() as session:
-        rows = await session.execute(
-            select(StateMapping.carrier_id, StateMapping.raw_status, StateMapping.canonical_status)
-        )
-        return {(carrier_id, raw_status): canonical for carrier_id, raw_status, canonical in rows}
+        return await StateMappingRepository.get_all_pairs(session)
 
 
 class StateMappingCache:
