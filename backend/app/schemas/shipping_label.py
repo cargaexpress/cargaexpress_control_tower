@@ -1,8 +1,19 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+CanonicalLabelStatus = Literal[
+    "CREATED",
+    "PICKED_UP",
+    "IN_TRANSIT",
+    "OUT_FOR_DELIVERY",
+    "EXCEPTION",
+    "DELIVERED",
+    "RETURNED",
+    "LOST_OR_DAMAGED",
+]
 
 
 class ShippingLabelCreate(BaseModel):
@@ -33,15 +44,18 @@ class ShippingLabelCreate(BaseModel):
         description="Identifier of the grouping dispatch if already consolidated.",
         examples=[None],
     )
-    status: str = Field(
-        default="CREADO",
+    status: CanonicalLabelStatus = Field(
+        default="CREATED",
         description="Initial canonical status of the shipping label according to RN-01.",
-        examples=["CREADO"],
+        examples=["CREATED"],
     )
-    metadata: dict[str, Any] | None = Field(
-        default=None,
-        description="Optional initial metadata for the label.",
-    )
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return value.strip().upper()
 
 
 class ShippingLabelResponse(BaseModel):
@@ -53,13 +67,13 @@ class ShippingLabelResponse(BaseModel):
     order_id: int = Field(..., description="Associated order ID (1:N relationship).", examples=[1])
     carrier_id: int = Field(..., description="Carrier ID responsible for transit.", examples=[1])
     tracking_number: str = Field(..., description="Tracking code of the label.", examples=["TRK-001-ALPHA"])
-    status: str = Field(..., description="Current canonical status of the label in logistics cycle.", examples=["CREADO"])
+    status: str = Field(..., description="Current canonical status of the label in logistics cycle.", examples=["CREATED"])
     weight_kg: Decimal | None = Field(default=None, description="Recorded package weight in kg.", examples=[Decimal("2.50")])
     dispatch_id: int | None = Field(default=None, description="Dispatch ID if consolidated.", examples=[None])
     created_at: datetime = Field(..., description="Date and time when the label was created.")
 
 
-# Backwards compatibility aliases
-GuiaCreate = ShippingLabelCreate
-GuiaResponse = ShippingLabelResponse
+# Backward-compatible aliases with English naming.
+ShippingLabelCreateLegacy = ShippingLabelCreate
+ShippingLabelResponseLegacy = ShippingLabelResponse
 ShippingLabelRead = ShippingLabelResponse

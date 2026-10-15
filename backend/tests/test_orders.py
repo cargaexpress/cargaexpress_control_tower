@@ -104,13 +104,13 @@ async def test_update_order_status(client, db_session):
     created = await client.post("/api/v1/orders", json=payload)
     order_id = created.json()["order_id"]
 
-    response = await client.patch(f"/api/v1/orders/{order_id}/status", json={"status": "dispatched"})
+    response = await client.patch(f"/api/v1/orders/{order_id}/status", json={"status": "PICKED_UP"})
 
     assert response.status_code == 200
-    assert response.json()["status"] == "dispatched"
+    assert response.json()["status"] == "PICKED_UP"
 
 
 async def test_update_order_status_not_found(client):
-    response = await client.patch("/api/v1/orders/999999/status", json={"status": "dispatched"})
+    response = await client.patch("/api/v1/orders/999999/status", json={"status": "PICKED_UP"})
 
     assert response.status_code == 404

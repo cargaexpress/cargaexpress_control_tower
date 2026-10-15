@@ -1,7 +1,19 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+CanonicalStatus = Literal[
+    "CREATED",
+    "PICKED_UP",
+    "IN_TRANSIT",
+    "OUT_FOR_DELIVERY",
+    "EXCEPTION",
+    "DELIVERED",
+    "RETURNED",
+    "LOST_OR_DAMAGED",
+]
 
 
 class OrderLineCreate(BaseModel):
@@ -160,11 +172,19 @@ class OrderCreate(BaseModel):
         description="Agreed shipping freight charge.",
         examples=[Decimal("15000.00")],
     )
-    status: str = Field(
+    status: CanonicalStatus = Field(
         default="CREATED",
         description="Initial operational status of the order.",
         examples=["CREATED"],
     )
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return value.strip().upper()
+
     order_lines: list[OrderLineCreate] = Field(
         ...,
         min_length=1,
@@ -208,11 +228,18 @@ class OrderCreate(BaseModel):
 class OrderStatusUpdate(BaseModel):
     """Payload to update an order's status."""
 
-    status: str = Field(
+    status: CanonicalStatus = Field(
         ...,
         description="New operational status of the order.",
         examples=["PICKED_UP"],
     )
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return value.strip().upper()
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -238,7 +265,7 @@ class OrderRead(BaseModel):
     freight_value: Decimal = Field(..., description="Freight charge value.", examples=[Decimal("15000.00")])
     status: str = Field(..., description="Current order status.", examples=["CREATED"])
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        ...,
         description="Order creation date and time.",
         examples=["2026-10-13T10:00:00Z"],
     )
@@ -266,6 +293,6 @@ class OrderListResponse(BaseModel):
     )
 
 
-# Backwards compatibility aliases
-PedidoCreate = OrderCreate
-PedidoResponse = OrderRead
+# Backward-compatible aliases with English naming.
+OrderCreateLegacy = OrderCreate
+OrderReadLegacy = OrderRead

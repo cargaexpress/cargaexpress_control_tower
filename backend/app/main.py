@@ -1,8 +1,14 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from app.config import settings
 from app.routers import admin_carrier_state_mapping, admin_state_mapping, health, orders
 from app.schemas.errors import HTTPErrorResponse
+
+logging.basicConfig(level=getattr(logging, settings.app_env.upper(), logging.INFO))
+logger = logging.getLogger("cargaexpress")
 
 openapi_tags = [
     {
@@ -23,7 +29,7 @@ openapi_tags = [
     },
     {
         "name": "openapi contract",
-        "description": "Download and interactive inspection of OpenAPI / Swagger contract.",
+        "description": "OpenAPI metadata and contract validation for the platform API surface.",
     },
 ]
 
@@ -35,16 +41,15 @@ app = FastAPI(
         "carrier tracking, dynamic state mapping, and exception management."
     ),
     openapi_tags=openapi_tags,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    responses={
-        400: {"model": HTTPErrorResponse, "description": "Bad request or invalid input."},
-        401: {"model": HTTPErrorResponse, "description": "Unauthorized (missing or invalid credentials)."},
-        404: {"model": HTTPErrorResponse, "description": "Resource not found."},
-        422: {"description": "Validation error in entity or payload."},
-        500: {"model": HTTPErrorResponse, "description": "Internal server error."},
-    },
+    docs_url="/docs" if settings.app_env != "production" else None,
+    redoc_url="/redoc" if settings.app_env != "production" else None,
+    openapi_url="/openapi.json" if settings.app_env != "production" else None,
 )
+
+
+@app.get("/docs/api/openapi.json")
+async def docs_api_openapi_json() -> JSONResponse:
+    return JSONResponse(app.openapi())
 
 # Modular routers
 app.include_router(health.router)
@@ -53,13 +58,14 @@ app.include_router(admin_carrier_state_mapping.router)
 app.include_router(orders.router)
 
 
-@app.get(
-    "/docs/api/openapi.json",
-    tags=["openapi contract"],
-    summary="Export OpenAPI specification in JSON format",
-    description="Returns full application OpenAPI 3.1 serialized schema.",
-    response_class=JSONResponse,
-)
-async def get_openapi_spec() -> JSONResponse:
-    """Deliver full OpenAPI schema in JSON format for static consumption or external tooling."""
-    return JSONResponse(content=app.openapi())
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    payload = HTTPErrorResponse(detail=str(exc.detail), error_code="HTTP_ERROR")
+    return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled application exception", exc_info=exc)
+    payload = HTTPErrorResponse(detail="Internal server error.", error_code="INTERNAL_SERVER_ERROR")
+    return JSONResponse(status_code=500, content=payload.model_dump())
