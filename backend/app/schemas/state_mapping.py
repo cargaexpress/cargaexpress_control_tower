@@ -5,18 +5,22 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.state_mapping import CANONICAL_STATUSES
 
 
-def _clean_raw_status(value: str) -> str:
+def clean_raw_status(value: str) -> str:
     value = value.strip()
     if not value:
         raise ValueError("raw_status cannot be empty")
     return value
 
 
-def _clean_canonical(value: str) -> str:
+def clean_canonical_status(value: str) -> str:
     value = value.strip().upper()
     if value not in CANONICAL_STATUSES:
         raise ValueError(f"canonical_status must be one of: {', '.join(CANONICAL_STATUSES)}")
     return value
+
+
+_clean_raw_status = clean_raw_status
+_clean_canonical = clean_canonical_status
 
 
 class StateMappingCreate(BaseModel):
