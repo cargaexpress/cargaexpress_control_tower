@@ -4,7 +4,6 @@ from app.models.shipment_type import ShipmentType
 
 
 # Seed only required references so tests exercise the real API validation path.
-# Crea solo referencias necesarias para probar validaciones reales de la API.
 async def _seed_reference_data(db_session):
     brand = Brand(name="Acme", tier="standard", is_active=True)
     dc = DistributionCenter(code="DC01", name="Bogota DC", city="Bogota", country_code="CO")

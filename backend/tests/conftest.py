@@ -7,7 +7,6 @@ from app.database import Base, get_db
 from app.main import app
 
 # Refuse to run against an unspecified DB, preventing tests from touching runtime data.
-# Exige una BD explícita para evitar que los tests modifiquen datos de ejecución.
 if not settings.test_database_url:
     raise RuntimeError("TEST_DATABASE_URL must point to an isolated test database")
 
@@ -25,10 +24,7 @@ app.dependency_overrides[get_db] = _override_get_db
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_test_database():
-    """Prepare an isolated schema.
-
-    Prepara un esquema aislado.
-    """
+    """Prepare an isolated schema."""
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -37,10 +33,7 @@ async def setup_test_database():
 
 @pytest_asyncio.fixture(autouse=True)
 async def clean_tables():
-    """Keep test records independent.
-
-    Aísla los datos entre pruebas.
-    """
+    """Keep test records independent across tests."""
     yield
     async with test_engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
@@ -49,7 +42,7 @@ async def clean_tables():
 
 @pytest_asyncio.fixture(autouse=True)
 async def bind_cache_to_test_db(monkeypatch):
-    """Ensure cache queries execute against test database."""
+    """Ensure cache queries execute against the test database."""
     import app.services.state_mapping_cache as cache_module
     from app.services.state_mapping_cache import state_mapping_cache
 
@@ -61,7 +54,7 @@ async def bind_cache_to_test_db(monkeypatch):
 
 @pytest_asyncio.fixture
 async def db_session():
-    """Sesión directa para que los tests siembren datos de referencia (brand, dc, shipment_type)."""
+    """Direct a database session for tests to seed reference data (brand, dc, shipment_type)."""
     async with TestSessionLocal() as session:
         yield session
 

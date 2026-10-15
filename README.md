@@ -21,7 +21,7 @@ Alembic y PostgreSQL.
 - **RN-07 — Pedidos Divididos en Múltiples Guías:** Endpoints para asociar (`POST`)
   y listar (`GET`) guías vinculadas a un pedido bajo `/api/v1/pedidos/{order_id}/guias`,
   con soporte de aislamiento multitenant (RN-10 con header `X-Brand-Id`), unicidad
-  de códigos de rastreo y pruebas en `backend/tests/test_order_guias.py`.
+  de códigos de rastreo y pruebas en `backend/tests/test_order_shipping_labels.py`.
 - Las reglas para impedir retrocesos desde estados terminales y registrar
   anomalías (RN-02) todavía no están implementadas.
 

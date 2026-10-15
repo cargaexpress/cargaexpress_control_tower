@@ -1,4 +1,4 @@
-"""Pruebas unitarias de la caché de state_mapping (sin base de datos)."""
+"""Unit tests for state_mapping cache (in-memory, no database)."""
 
 import asyncio
 
@@ -6,9 +6,8 @@ from app.services.state_mapping_cache import StateMappingCache
 
 
 # Fake loader and clock make cache behavior testable without PostgreSQL or waiting.
-# El cargador y reloj falsos prueban la caché sin PostgreSQL ni esperas reales.
 class FakeLoader:
-    """Cuenta cuántas veces se "lee la base de datos" y permite cambiar sus datos."""
+    """Tracks how many times the database is "read" and allows updating test data."""
 
     def __init__(self, data):
         self.data = data
@@ -43,10 +42,10 @@ async def test_invalidate_makes_changes_visible_without_restart():
     cache = StateMappingCache(loader, ttl_seconds=300)
     assert await cache.translate(1, "SENT") == "IN_TRANSIT"
 
-    loader.data = {(1, "SENT"): "DELIVERED"}  # alguien edita la tabla...
-    assert await cache.translate(1, "SENT") == "IN_TRANSIT"  # ...la caché aún no lo sabe
+    loader.data = {(1, "SENT"): "DELIVERED"}  # table is edited externally...
+    assert await cache.translate(1, "SENT") == "IN_TRANSIT"  # ...cache does not know yet
 
-    cache.invalidate()  # el endpoint admin avisa tras guardar
+    cache.invalidate()  # admin endpoint notifies after commit
 
     assert await cache.translate(1, "SENT") == "DELIVERED"
     assert loader.calls == 2
@@ -60,9 +59,9 @@ async def test_ttl_expiry_reloads_changes_made_by_other_processes():
 
     loader.data = {(1, "SENT"): "DELIVERED"}
     clock.now = 59
-    assert await cache.translate(1, "SENT") == "IN_TRANSIT"  # aún vigente
+    assert await cache.translate(1, "SENT") == "IN_TRANSIT"  # still valid
     clock.now = 61
-    assert await cache.translate(1, "SENT") == "DELIVERED"  # venció el TTL
+    assert await cache.translate(1, "SENT") == "DELIVERED"  # TTL expired
 
 
 async def test_lookup_ignores_surrounding_spaces():
@@ -82,27 +81,27 @@ async def test_concurrent_lookups_load_only_once():
 
 
 async def test_invalidation_during_a_load_does_not_cache_stale_data():
-    """Si se invalida mientras se lee, lo leído puede ser anterior al cambio."""
+    """If invalidated during a load, stale loaded data must not be cached."""
     started = asyncio.Event()
     release = asyncio.Event()
     state = {"data": {(1, "SENT"): "IN_TRANSIT"}, "calls": 0}
 
     async def slow_loader():
         state["calls"] += 1
-        snapshot = dict(state["data"])  # lee los datos viejos...
+        snapshot = dict(state["data"])  # reads old data...
         started.set()
-        await release.wait()  # ...y tarda en terminar
+        await release.wait()  # ...and takes time to finish
         return snapshot
 
     cache = StateMappingCache(slow_loader, ttl_seconds=300)
     first = asyncio.create_task(cache.translate(1, "SENT"))
     await started.wait()
 
-    state["data"] = {(1, "SENT"): "DELIVERED"}  # se confirma un cambio
+    state["data"] = {(1, "SENT"): "DELIVERED"}  # a change is committed
     cache.invalidate()
     release.set()
     await first
 
-    # La lectura vieja no debe haber quedado guardada: la siguiente consulta recarga.
+    # Old read should not be retained: next lookup triggers a reload.
     assert await cache.translate(1, "SENT") == "DELIVERED"
     assert state["calls"] == 2

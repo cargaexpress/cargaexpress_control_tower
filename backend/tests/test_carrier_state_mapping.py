@@ -1,8 +1,8 @@
 """HU-15: GET/PUT /api/v1/admin/mapeo-estados/{transportadora_id}.
 
-Usan los fixtures de conftest.py (base de datos de pruebas aislada). Los datos se
-siembran con `db_session`, nunca con la base de ejecución, así que funcionan tanto
-si TEST_DATABASE_URL es una base aparte como si coincide con DATABASE_URL.
+Uses fixtures from conftest.py (isolated test database). Data is seeded
+using `db_session`, never touching runtime DB, so tests work whether
+TEST_DATABASE_URL is a dedicated test database or matches DATABASE_URL.
 """
 
 import pytest
@@ -17,7 +17,7 @@ from app.models.state_mapping import StateMapping
 from app.services.state_mapping_cache import state_mapping_cache
 
 BASE = "/api/v1/admin/mapeo-estados"
-RESOLVE = "/api/v1/admin/state-mappings/resolve"  # endpoint de HU-12 que lee de la caché
+RESOLVE = "/api/v1/admin/state-mappings/resolve"  # HU-12 endpoint reading from cache
 ADMIN = {"X-Admin-Token": "test-admin-key"}
 
 
@@ -28,7 +28,7 @@ def admin_key(monkeypatch):
 
 @pytest_asyncio.fixture(autouse=True)
 async def cache_reads_test_database(db_session, monkeypatch):
-    """La caché real de la aplicación debe leer la base de pruebas, no la de ejecución."""
+    """The application cache must read from the test database, not runtime DB."""
     maker = async_sessionmaker(db_session.bind, expire_on_commit=False, class_=AsyncSession)
     monkeypatch.setattr(cache_module, "AsyncSessionLocal", maker)
     state_mapping_cache.invalidate()
@@ -106,9 +106,9 @@ async def test_get_always_shows_what_is_in_the_database_even_with_a_warm_cache(
     client, db_session, carrier_id
 ):
     await _seed(db_session, carrier_id, {"A": "CREATED"})
-    await state_mapping_cache.translate(carrier_id, "A")  # calienta la caché
+    await state_mapping_cache.translate(carrier_id, "A")  # warms up cache
 
-    await _seed(db_session, carrier_id, {"B": "DELIVERED"})  # cambio directo en la base
+    await _seed(db_session, carrier_id, {"B": "DELIVERED"})  # direct change in database
 
     response = await client.get(f"{BASE}/{carrier_id}", headers=ADMIN)
     assert _as_dict(response.json()) == {"A": "CREATED", "B": "DELIVERED"}
@@ -123,7 +123,7 @@ async def test_put_replaces_the_whole_mapping(client, db_session, carrier_id):
     response = await _put(client, carrier_id, {"B": "DELIVERED", "C": "DELIVERED", "D": "EXCEPTION"})
 
     assert response.status_code == 200
-    expected = {"B": "DELIVERED", "C": "DELIVERED", "D": "EXCEPTION"}  # A desaparece
+    expected = {"B": "DELIVERED", "C": "DELIVERED", "D": "EXCEPTION"}  # A disappears
     assert _as_dict(response.json()) == expected
     assert _as_dict((await client.get(f"{BASE}/{carrier_id}", headers=ADMIN)).json()) == expected
 
@@ -138,9 +138,9 @@ async def test_put_keeps_ids_of_unchanged_entries_and_ignores_other_carriers(
     await _put(client, carrier_id, {"A": "CREATED", "B": "DELIVERED"})
 
     after = (await client.get(f"{BASE}/{carrier_id}", headers=ADMIN)).json()["mappings"]
-    assert {m["raw_status"]: m["id"] for m in after} == before  # se actualizó en sitio
+    assert {m["raw_status"]: m["id"] for m in after} == before  # updated in place
     other = await client.get(f"{BASE}/{other_carrier_id}", headers=ADMIN)
-    assert _as_dict(other.json()) == {"A": "DELIVERED"}  # la otra transportadora no se tocó
+    assert _as_dict(other.json()) == {"A": "DELIVERED"}  # another carrier was not touched
 
 
 async def test_put_is_idempotent(client, carrier_id):
@@ -176,7 +176,7 @@ async def test_put_unknown_carrier_returns_404(client):
     "body",
     [
         {"mappings": [{"raw_status": "A", "canonical_status": "NOPE"}]},
-        {"mappings": [{"raw_status": "A", "canonical_status": "CANCELLED"}]},  # ya no está en el catálogo
+        {"mappings": [{"raw_status": "A", "canonical_status": "CANCELLED"}]},  # no longer in catalog
         {"mappings": [{"raw_status": "   ", "canonical_status": "CREATED"}]},
         {"mappings": [{"raw_status": "x" * 101, "canonical_status": "CREATED"}]},
         {"mappings": [
@@ -186,7 +186,7 @@ async def test_put_unknown_carrier_returns_404(client):
         {"mappings": []},
         {},
     ],
-    ids=["canonico-invalido", "canonico-obsoleto", "raw-vacio", "raw-muy-largo", "raw-repetido", "lista-vacia", "sin-mappings"],
+    ids=["invalid-canonical", "obsolete-canonical", "empty-raw", "too-long-raw", "duplicate-raw", "empty-list", "missing-mappings"],
 )
 async def test_put_with_invalid_body_returns_422_and_changes_nothing(client, db_session, carrier_id, body):
     await _seed(db_session, carrier_id, {"KEEP": "CREATED"})
@@ -204,7 +204,7 @@ async def test_non_positive_or_non_numeric_carrier_id_returns_422(client, bad_id
     assert (await _put(client, bad_id, {"A": "CREATED"})).status_code == 422
 
 
-# ---------- Seguridad ----------
+# ---------- Security ----------
 
 
 @pytest.mark.parametrize("method", ["get", "put"])
@@ -213,25 +213,24 @@ async def test_admin_token_is_required(client, carrier_id, monkeypatch, method):
     url = f"{BASE}/{carrier_id}"
 
     assert (await client.request(method, url, **kwargs)).status_code == 401
-    assert (await client.request(method, url, headers={"X-Admin-Token": "otra"}, **kwargs)).status_code == 401
+    assert (await client.request(method, url, headers={"X-Admin-Token": "invalid-token"}, **kwargs)).status_code == 401
 
-    monkeypatch.setattr(settings, "admin_api_key", "")  # sin clave configurada
+    monkeypatch.setattr(settings, "admin_api_key", "")  # no key configured
     assert (await client.request(method, url, headers=ADMIN, **kwargs)).status_code == 503
 
 
-# ---------- RIWI-75: el cambio se refleja sin reiniciar el servicio ----------
+# ---------- RIWI-75: change is reflected without restarting the service ----------
 
 
 async def test_put_change_is_reflected_without_restarting_the_service(client, db_session, carrier_id):
-    """Misma aplicación, mismo proceso y la misma instancia de caché de principio a fin."""
+    """The same application, the same process, and the same cache instance from start to finish."""
     await _seed(db_session, carrier_id, {"SENT": "IN_TRANSIT", "LOST": "EXCEPTION"})
 
-    # 1) La caché se calienta con el mapeo actual.
+    # 1) Cache is warmed with current mapping.
     assert await state_mapping_cache.translate(carrier_id, "SENT") == "IN_TRANSIT"
     assert await state_mapping_cache.translate(carrier_id, "LOST") == "EXCEPTION"
 
-    # 2) Prueba de que la caché de verdad se está usando: un cambio hecho directo en la
-    #    base de datos (sin pasar por la API) NO se ve todavía.
+    # 2) Proof that cache is actively used: direct DB change (bypassing API) is NOT visible yet.
     await db_session.execute(
         update(StateMapping)
         .where(StateMapping.carrier_id == carrier_id, StateMapping.raw_status == "SENT")
@@ -240,22 +239,22 @@ async def test_put_change_is_reflected_without_restarting_the_service(client, db
     await db_session.commit()
     assert await state_mapping_cache.translate(carrier_id, "SENT") == "IN_TRANSIT"
 
-    # 3) El administrador actualiza el mapeo por el endpoint PUT.
+    # 3) Admin updates mapping via PUT endpoint.
     response = await _put(client, carrier_id, {"SENT": "DELIVERED", "NEW": "CREATED"})
     assert response.status_code == 200
 
-    # 4) Sin reiniciar nada, el cambio ya se ve en la caché...
+    # 4) Without restarting, change is immediately visible in the cache...
     assert await state_mapping_cache.translate(carrier_id, "SENT") == "DELIVERED"
     assert await state_mapping_cache.translate(carrier_id, "NEW") == "CREATED"
     assert await state_mapping_cache.translate(carrier_id, "LOST") is None
 
-    # ...en el endpoint de HU-12 que traduce usando la caché...
+    # ...in HU-12 endpoint resolving via cache...
     resolved = await client.get(RESOLVE, params={"carrier_id": carrier_id, "raw_status": "SENT"}, headers=ADMIN)
     assert resolved.json()["canonical_status"] == "DELIVERED"
     lost = await client.get(RESOLVE, params={"carrier_id": carrier_id, "raw_status": "LOST"}, headers=ADMIN)
     assert lost.status_code == 404
 
-    # ...y en la consulta GET.
+    # ...and in GET endpoint.
     assert _as_dict((await client.get(f"{BASE}/{carrier_id}", headers=ADMIN)).json()) == {
         "SENT": "DELIVERED",
         "NEW": "CREATED",

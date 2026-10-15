@@ -16,7 +16,7 @@ from scripts.export_openapi import export_openapi_schema
 
 @pytest.mark.asyncio
 async def test_docs_ui_is_available():
-    """Verifica que la interfaz de Swagger UI esté disponible y retorne HTTP 200 en /docs."""
+    """Verify Swagger UI interface is available and returns HTTP 200 at /docs."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/docs")
@@ -26,7 +26,7 @@ async def test_docs_ui_is_available():
 
 @pytest.mark.asyncio
 async def test_openapi_json_endpoint_is_available():
-    """Verifica que /docs/api/openapi.json sirva directamente la especificación OpenAPI válida."""
+    """Verify /docs/api/openapi.json directly serves a valid OpenAPI specification."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/docs/api/openapi.json")
@@ -41,12 +41,12 @@ async def test_openapi_json_endpoint_is_available():
 
 @pytest.mark.asyncio
 async def test_openapi_schema_contains_required_metadata_and_tags():
-    """Verifica que el schema contenga los tags requeridos y los endpoints principales organizados."""
+    """Verify OpenAPI schema contains required tags and organized core endpoints."""
     spec = app.openapi()
 
     tags = {tag["name"] for tag in spec.get("tags", [])}
     expected_tags = {"health", "pedidos", "admin: state mapping", "admin: mapeo de estados", "contrato openapi"}
-    assert expected_tags.issubset(tags), f"Tags faltantes: {expected_tags - tags}"
+    assert expected_tags.issubset(tags), f"Missing tags: {expected_tags - tags}"
 
     paths = spec.get("paths", {})
     assert "/api/v1/health" in paths
@@ -59,7 +59,7 @@ async def test_openapi_schema_contains_required_metadata_and_tags():
 
 @pytest.mark.asyncio
 async def test_openapi_schema_models_have_examples():
-    """Verifica que los modelos Pydantic incluyan ejemplos representativos en schemas."""
+    """Verify Pydantic models include representative examples in schemas."""
     spec = app.openapi()
     schemas = spec.get("components", {}).get("schemas", {})
 
@@ -74,7 +74,7 @@ async def test_openapi_schema_models_have_examples():
 
 
 def test_export_openapi_script_generates_valid_file(tmp_path: Path):
-    """Verifica que scripts/export_openapi.py genere un JSON válido idéntico a app.openapi()."""
+    """Verify scripts/export_openapi.py generates a valid JSON identical to app.openapi()."""
     target_file = tmp_path / "openapi_test.json"
     result_path = export_openapi_schema(target_file)
 
