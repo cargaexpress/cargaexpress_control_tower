@@ -1,4 +1,4 @@
-"""Generador reproducible de archivos de eventos en lote para transportadoras Tipo C (Fuente F5)."""
+"""Reproducible batch event file generator for Type C carriers (Source F5)."""
 
 import csv
 from datetime import datetime, timezone
@@ -14,7 +14,7 @@ from simulators.type_c.corruption import apply_all_corruptions
 
 
 class TypeCSimulator:
-    """Simulador de eventos en lote para transportadoras Tipo C con inyección de defectos."""
+    """Batch event simulator for Type C carriers with defect injection."""
 
     def __init__(
         self,
@@ -37,12 +37,12 @@ class TypeCSimulator:
         universe_guides: Optional[List[str]] = None,
         base_datetime: Optional[datetime] = None,
     ) -> List[Dict[str, Any]]:
-        """Genera la lista estructurada de eventos, aplicando inyección de defectos si corresponde."""
+        """Generate structured event list, applying defect injection if applicable."""
         if base_datetime is None:
-            # Fecha base fija y determinista (UTC)
+            # Fixed and deterministic base datetime (UTC)
             base_datetime = datetime(2026, 10, 1, 8, 0, 0, tzinfo=timezone.utc)
 
-        # Determinar universo de guías legítimas
+        # Determine universe of legitimate waybills
         events_per_guide = max(1, len(self.config.status_flow))
         num_guides = max(1, num_rows // events_per_guide + 1)
 
@@ -60,13 +60,13 @@ class TypeCSimulator:
         centers_c3 = ["DC-01", "DC-02", "DC-03", "DC-04"]
 
         for guide_idx, guide in enumerate(guides):
-            guide_start_time = base_datetime.timestamp() + (guide_idx * 1800)  # +30 min por cada guía
+            guide_start_time = base_datetime.timestamp() + (guide_idx * 1800)  # +30 min per waybill
 
             for step_idx, raw_status in enumerate(self.config.status_flow):
                 if len(raw_events) >= num_rows:
                     break
 
-                event_epoch = guide_start_time + (step_idx * 7200)  # +2 horas por estado
+                event_epoch = guide_start_time + (step_idx * 7200)  # +2 hours per status
                 event_dt = datetime.fromtimestamp(event_epoch, tz=timezone.utc)
                 formatted_dt = event_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -106,7 +106,7 @@ class TypeCSimulator:
             if len(raw_events) >= num_rows:
                 break
 
-        # Inyección orquestada de defectos si error_rate > 0
+        # Orchestrated defect injection if error_rate > 0
         if self.error_rate > 0:
             final_events = apply_all_corruptions(
                 rows=raw_events,
@@ -123,7 +123,7 @@ class TypeCSimulator:
         return final_events
 
     def write_csv(self, events: List[Dict[str, Any]], output_path: Path) -> Path:
-        """Escribe los eventos en archivo CSV determinista."""
+        """Write events to deterministic CSV file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, mode="w", newline="", encoding="utf-8") as f:
@@ -140,17 +140,17 @@ class TypeCSimulator:
         return output_path
 
     def write_xlsx(self, events: List[Dict[str, Any]], output_path: Path) -> Path:
-        """Escribe los eventos en un archivo Excel (.xlsx) determinista."""
+        """Write events to deterministic Excel (.xlsx) file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = self.config.code
 
-        # Escribir encabezado
+        # Write header
         ws.append(self.config.columns)
 
-        # Escribir filas
+        # Write rows
         for row in events:
             row_vals = [row.get(col, "") for col in self.config.columns]
             ws.append(row_vals)
@@ -166,13 +166,13 @@ class TypeCSimulator:
         filename_prefix: Optional[str] = None,
         universe_guides: Optional[List[str]] = None,
     ) -> Path:
-        """Genera el dataset y lo escribe en el formato especificado (csv o xlsx)."""
+        """Generate dataset and write it in the specified format (csv or xlsx)."""
         target_dir = Path(output_dir)
         target_dir.mkdir(parents=True, exist_ok=True)
 
         fmt = (file_format or self.config.default_format).lower().strip().replace(".", "")
         if fmt not in {"csv", "xlsx"}:
-            raise ValueError(f"Formato no soportado: '{fmt}'. Solo 'csv' o 'xlsx'.")
+            raise ValueError(f"Unsupported format: '{fmt}'. Only 'csv' or 'xlsx' are allowed.")
 
         prefix = filename_prefix or f"batch_{self.config.code.lower()}"
         filename = f"{prefix}_seed{self.seed}_err{int(self.error_rate * 100)}.{fmt}"
@@ -189,7 +189,7 @@ class TypeCSimulator:
 
 
 def compute_file_sha256(file_path: Path) -> str:
-    """Calcula el hash SHA-256 de un archivo para validar reproducibilidad exacta."""
+    """Calculate SHA-256 hash of a file to validate exact reproducibility."""
     hasher = hashlib.sha256()
     with open(file_path, "rb") as f:
         while chunk := f.read(65536):

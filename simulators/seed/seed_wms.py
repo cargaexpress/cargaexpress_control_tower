@@ -1,11 +1,11 @@
-"""Script y servicio de Seed idempotente para el WMS y transportadoras simuladas.
+"""Idempotent seed script and service for WMS and simulated carriers.
 
-Garantiza la inicialización o sincronización de:
+Ensures initialization or synchronization of:
 1. ShipmentTypes (STANDARD, EXPRESS, SAME_DAY).
-2. Centros de Distribución (DCs).
-3. Marcas comerciales (Brands).
-4. Transportadoras Tipo C y sus mapeos canónicos en state_mapping.
-5. Pedidos de prueba (Orders), líneas, destinatarios y guías de despacho (ShippingLabels).
+2. Distribution Centers (DCs).
+3. Commercial brands (Brands).
+4. Type C Carriers and their canonical status mappings in state_mapping.
+5. Test orders (Orders), lines, recipients, and shipping labels (ShippingLabels).
 """
 
 from dataclasses import dataclass
@@ -34,7 +34,7 @@ class SeedConfig:
 
 
 class WMSSeeder:
-    """Ejecutor idempotente de seeding sobre PostgreSQL / WMS."""
+    """Idempotent seeder executor on PostgreSQL / WMS."""
 
     def __init__(self, session: AsyncSession, config: Optional[SeedConfig] = None) -> None:
         self.session = session
@@ -42,13 +42,13 @@ class WMSSeeder:
         self.rng = random.Random(self.config.seed)
 
     async def seed_shipment_types(self) -> Dict[str, str]:
-        """Siembra los tipos de envío estándar si no existen."""
+        """Seed standard shipment types if they do not exist."""
         from app.models.shipment_type import ShipmentType
 
         types = [
-            ("STANDARD", "Envío terrestre estándar (3 a 5 días)"),
-            ("EXPRESS", "Envío expreso prioritario (24 a 48 horas)"),
-            ("SAME_DAY", "Entrega el mismo día en ciudad capital"),
+            ("STANDARD", "Standard ground shipping (3 to 5 days)"),
+            ("EXPRESS", "Express priority shipping (24 to 48 hours)"),
+            ("SAME_DAY", "Same day delivery in capital city"),
         ]
         created = {}
         for code, desc in types:
@@ -63,13 +63,13 @@ class WMSSeeder:
         return created
 
     async def seed_distribution_centers(self) -> Dict[str, int]:
-        """Siembra centros de distribución si no existen."""
+        """Seed distribution centers if they do not exist."""
         from app.models.distribution_center import DistributionCenter
 
         dcs = [
-            ("DC-BOG", "Centro de Distribución Bogotá Hub", "Bogotá", "CO"),
-            ("DC-MED", "Centro de Distribución Medellín Antioquia", "Medellín", "CO"),
-            ("DC-CLO", "Centro Logístico Occidente Cali", "Cali", "CO"),
+            ("DC-BOG", "Bogota Hub Distribution Center", "Bogotá", "CO"),
+            ("DC-MED", "Medellin Antioquia Distribution Center", "Medellín", "CO"),
+            ("DC-CLO", "Occidente Cali Logistics Center", "Cali", "CO"),
         ]
         dc_ids = {}
         for code, name, city, country in dcs:
@@ -89,7 +89,7 @@ class WMSSeeder:
         return dc_ids
 
     async def seed_brands(self) -> Dict[str, int]:
-        """Siembra marcas clientes si no existen."""
+        """Seed client brands if they do not exist."""
         from app.models.brand import Brand
 
         brands = [
@@ -110,7 +110,7 @@ class WMSSeeder:
         return brand_ids
 
     async def seed_carriers_and_mappings(self) -> Dict[int, int]:
-        """Siembra las transportadoras Tipo C y sus traducciones a estados canónicos (HU-12 / RN-01)."""
+        """Seed Type C carriers and their canonical status mappings (HU-12 / RN-01)."""
         from app.models.carrier import Carrier
         from app.models.state_mapping import StateMapping
 
@@ -118,7 +118,7 @@ class WMSSeeder:
 
         for c_id in self.config.carriers_to_seed:
             cfg = CARRIERS_REGISTRY[c_id]
-            # Buscar o crear transportadora por nombre
+            # Find or create carrier by name
             stmt = select(Carrier).where(Carrier.name == cfg.name)
             result = await self.session.execute(stmt)
             carrier_obj = result.scalar_one_or_none()
@@ -134,7 +134,7 @@ class WMSSeeder:
 
             carrier_db_ids[c_id] = carrier_obj.carrier_id
 
-            # Sincronizar catálogo de mapeos canónicos de forma idempotente
+            # Synchronize canonical mappings catalog idempotently
             for raw_status, canonical_status in cfg.status_catalog.items():
                 mapping_stmt = select(StateMapping).where(
                     StateMapping.carrier_id == carrier_obj.carrier_id,
@@ -160,7 +160,7 @@ class WMSSeeder:
         dc_ids: Dict[str, int],
         carrier_db_ids: Dict[int, int],
     ) -> List[str]:
-        """Genera órdenes y guías de envío deterministas para pruebas e ingestión de archivos."""
+        """Generate deterministic test orders and shipping labels for file ingestion testing."""
         from app.models.order import Order
         from app.models.order_line import OrderLine
         from app.models.order_recipient import OrderRecipient
@@ -173,7 +173,7 @@ class WMSSeeder:
 
         for i in range(1, self.config.orders_count + 1):
             ref = f"ORD-SEED-{self.config.seed}-{i:04d}"
-            # Comprobar si ya existe el pedido para mantener idempotencia estricta
+            # Check if order already exists for strict idempotency
             stmt = select(Order).where(Order.brand_order_ref == ref)
             res = await self.session.execute(stmt)
             order_obj = res.scalar_one_or_none()
@@ -200,28 +200,28 @@ class WMSSeeder:
                 self.session.add(order_obj)
                 await self.session.flush()
 
-                # Líneas de pedido
+                # Order lines
                 line = OrderLine(
                     order_id=order_obj.order_id,
                     line_number=1,
                     sku=f"SKU-{self.rng.randint(100, 999)}",
-                    description="Artículo de prueba de seed",
+                    description="Seed test item",
                     quantity_ordered=self.rng.randint(1, 3),
                 )
                 self.session.add(line)
 
-                # Destinatario
+                # Order recipient
                 recipient = OrderRecipient(
                     order_id=order_obj.order_id,
-                    full_name=f"Cliente Prueba {i}",
-                    email=f"cliente{i}@ejemplo.com",
+                    full_name=f"Test Customer {i}",
+                    email=f"customer{i}@example.com",
                     phone="+573001234567",
                     address_line=f"Calle {10 + i} # {20 + i} - {30 + i}",
                     city="Bogotá",
                 )
                 self.session.add(recipient)
 
-                # Guía de despacho (ShippingLabel)
+                # Shipping label
                 label = ShippingLabel(
                     order_id=order_obj.order_id,
                     carrier_id=carrier_db_id,
@@ -235,7 +235,7 @@ class WMSSeeder:
         return generated_tracking_numbers
 
     async def execute_full_seed(self) -> Dict[str, Any]:
-        """Ejecuta el pipeline completo de seed de manera idempotente."""
+        """Execute full idempotent seeding pipeline."""
         st = await self.seed_shipment_types()
         dcs = await self.seed_distribution_centers()
         brands = await self.seed_brands()
@@ -254,10 +254,10 @@ class WMSSeeder:
 
 
 async def run_seed(database_url: Optional[str] = None, config: Optional[SeedConfig] = None) -> Dict[str, Any]:
-    """Función de conveniencia para ejecutar el seed contra una base de datos PostgreSQL."""
+    """Convenience function to run the seed against a PostgreSQL database."""
     db_url = database_url or os.getenv("DATABASE_URL")
     if not db_url:
-        raise ValueError("DATABASE_URL no especificada y no presente en variables de entorno.")
+        raise ValueError("DATABASE_URL not specified and not present in environment variables.")
 
     engine = create_async_engine(db_url)
     session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)

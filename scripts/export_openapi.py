@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Script para exportar el contrato OpenAPI de FastAPI a docs/api/openapi.json.
+"""Script to export FastAPI OpenAPI contract to docs/api/openapi.json.
 
-Cumple con el entregable E-05 (FastAPI I & II):
-- Carga la aplicación FastAPI.
-- Genera el schema JSON con indentación legible (2 espacios).
-- Guarda el archivo en docs/api/openapi.json.
+Meets deliverable E-05 (FastAPI I & II):
+- Loads the FastAPI application.
+- Generates JSON schema with readable indentation (2 spaces).
+- Saves the file to docs/api/openapi.json.
 """
 
 import json
@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-# Agregar backend al sys.path para poder importar app.main
+# Add backend to sys.path to allow importing app.main
 CURRENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = CURRENT_DIR.parent
 BACKEND_DIR = REPO_ROOT / "backend"
@@ -20,14 +20,14 @@ BACKEND_DIR = REPO_ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-# Variables mínimas para que Settings() inicialice sin error si no hay .env cargado
+# Minimal environment variables to initialize Settings() without error when no .env is loaded
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://cargaexpress:cargaexpress@localhost:5432/cargaexpress")
 
 from app.main import app  # noqa: E402
 
 
 def export_openapi_schema(output_path: Path | None = None) -> Path:
-    """Exporta el esquema OpenAPI como JSON formateado."""
+    """Export OpenAPI schema as formatted JSON."""
     if output_path is None:
         output_path = REPO_ROOT / "docs" / "api" / "openapi.json"
 
@@ -39,7 +39,7 @@ def export_openapi_schema(output_path: Path | None = None) -> Path:
         json.dump(openapi_data, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    print(f"✅ Esquema OpenAPI exportado exitosamente a: {output_path}")
+    print(f"✅ OpenAPI schema successfully exported to: {output_path}")
     return output_path
 
 

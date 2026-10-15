@@ -1,4 +1,4 @@
-"""Módulo de simulador de transportadoras Tipo C con inyección de anomalías."""
+"""Type C simulated carrier module with anomaly injection."""
 
 from simulators.type_c.catalogs import (
     CARRIERS_REGISTRY,

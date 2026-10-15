@@ -1,4 +1,4 @@
-"""CLI para ejecutar el simulador de transportadoras Tipo C con inyección de defectos."""
+"""CLI to execute Type C simulated carrier generator with defect injection."""
 
 import argparse
 from pathlib import Path
@@ -10,45 +10,47 @@ from simulators.type_c.generator import TypeCSimulator, compute_file_sha256
 
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Simulador de Archivos Tipo C (Transportadoras en Lote) con Inyección de Defectos (F5, Sec 5.2 y 5.3)",
+        description="Type C Batch Carrier File Simulator with Defect Injection (F5, Sec 5.2 and 5.3)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="Semilla aleatoria fija para garantizar reproducibilidad exacta",
+        help="Fixed random seed to ensure exact reproducibility",
     )
     parser.add_argument(
+        "--carrier",
         "--transportadora",
+        dest="carrier",
         type=str,
         default="1",
-        help="Identificador de la transportadora (1 a 3)",
+        help="Carrier identifier (1 to 3)",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
         default="./data/type_c",
-        help="Ruta del directorio de salida",
+        help="Path to output directory",
     )
     parser.add_argument(
         "--rows",
         type=int,
         default=100,
-        help="Cantidad base de filas/eventos a generar",
+        help="Base number of rows/events to generate",
     )
     parser.add_argument(
         "--error-rate",
         type=float,
         default=0.1,
-        help="Tasa configurable de inyección de anomalías (0.0 a 1.0)",
+        help="Configurable anomaly injection rate (0.0 to 1.0)",
     )
     parser.add_argument(
         "--format",
         type=str,
         default=None,
         choices=["csv", "xlsx", None],
-        help="Formato de salida (por defecto toma el formato nativo de la transportadora)",
+        help="Output file format (defaults to carrier native format)",
     )
 
     return parser.parse_args(argv)
@@ -58,9 +60,9 @@ def main(argv=None) -> int:
     args = parse_args(argv)
 
     try:
-        config = get_carrier_config(args.transportadora)
+        config = get_carrier_config(args.carrier)
     except ValueError as e:
-        print(f"Error de configuración: {e}", file=sys.stderr)
+        print(f"Configuration error: {e}", file=sys.stderr)
         return 1
 
     simulator = TypeCSimulator(
@@ -79,14 +81,14 @@ def main(argv=None) -> int:
     sha256_hash = compute_file_sha256(generated_file)
 
     print("=================================================================")
-    print("SIMULADOR TIPO C - GENERACIÓN COMPLETADA CON ÉXITO")
+    print("TYPE C SIMULATOR - GENERATION COMPLETED SUCCESSFULLY")
     print("=================================================================")
-    print(f" Transportadora : [{config.carrier_id}] {config.name} ({config.code})")
-    print(f" Semilla (Seed) : {args.seed}")
-    print(f" Filas base     : {args.rows}")
-    print(f" Tasa de error  : {args.error_rate * 100:.1f}%")
-    print(f" Archivo destino: {generated_file.resolve()}")
-    print(f" SHA-256 Hash   : {sha256_hash}")
+    print(f" Carrier     : [{config.carrier_id}] {config.name} ({config.code})")
+    print(f" Seed        : {args.seed}")
+    print(f" Base rows   : {args.rows}")
+    print(f" Error rate  : {args.error_rate * 100:.1f}%")
+    print(f" Target file : {generated_file.resolve()}")
+    print(f" SHA-256 Hash: {sha256_hash}")
     print("=================================================================")
 
     return 0

@@ -1,4 +1,4 @@
-"""Módulo de seeding idempotente para WMS y transportadoras simuladas."""
+"""Idempotent seeding module for WMS and simulated carriers."""
 
 from simulators.seed.seed_wms import SeedConfig, WMSSeeder, run_seed
 

@@ -1,11 +1,11 @@
-"""Módulo de inyección de defectos de calidad de datos para transportadoras Tipo C (Sección 5.3).
+"""Data quality defect injection module for Type C carriers (Section 5.3).
 
-Implementa los 5 tipos de anomalías deliberadas:
-1. Guías inexistentes (fuera del universo WMS).
-2. Eventos fuera de secuencia temporal.
-3. Formatos de fecha mezclados (DD/MM/YYYY HH:MM vs MM/DD/YYYY HH:MM).
-4. Filas basura y encabezados repetidos (totales al pie, cabeceras intermedias).
-5. Filas duplicadas.
+Implements 5 types of deliberate anomalies:
+1. Nonexistent shipping labels/waybills (outside WMS universe).
+2. Out-of-sequence temporal events.
+3. Mixed date formats (DD/MM/YYYY HH:MM vs MM/DD/YYYY HH:MM).
+4. Junk rows and repeated headers (summary footer, intermediate headers).
+5. Duplicate rows.
 """
 
 from copy import deepcopy
@@ -20,7 +20,7 @@ def inject_nonexistent_guides(
     rng: random.Random,
     error_rate: float,
 ) -> List[Dict[str, Any]]:
-    """Inyecta números de guía ficticios que no existen en el WMS."""
+    """Inject fictional waybill numbers that do not exist in the WMS."""
     if not rows or error_rate <= 0:
         return rows
 
@@ -43,19 +43,19 @@ def inject_out_of_sequence_events(
     rng: random.Random,
     error_rate: float,
 ) -> List[Dict[str, Any]]:
-    """Genera eventos fuera de secuencia temporal (ej. entregado antes de tránsito o timestamps invertidos)."""
+    """Generate out-of-sequence temporal events (e.g. delivered before transit or swapped timestamps)."""
     if not rows or error_rate <= 0:
         return rows
 
     result = deepcopy(rows)
 
-    # Agrupar índices por tracking_col
+    # Group indices by tracking_col
     guides_map: Dict[str, List[int]] = {}
     for idx, row in enumerate(result):
         guide = str(row.get(tracking_col, ""))
         guides_map.setdefault(guide, []).append(idx)
 
-    # Filtrar guías con al menos 2 eventos para invertir temporalmente
+    # Filter waybills with at least 2 events to swap temporally
     candidates = [indices for indices in guides_map.values() if len(indices) >= 2]
     if not candidates:
         return result
@@ -64,7 +64,7 @@ def inject_out_of_sequence_events(
     selected_groups = rng.sample(candidates, min(target_count, len(candidates)))
 
     for group in selected_groups:
-        # Tomar dos eventos dentro del grupo y swappear sus marcas de tiempo
+        # Pick two events in the group and swap their timestamps
         i, j = rng.sample(group, 2)
         ts_i = result[i][timestamp_col]
         ts_j = result[j][timestamp_col]
@@ -80,7 +80,7 @@ def inject_mixed_date_formats(
     rng: random.Random,
     error_rate: float,
 ) -> List[Dict[str, Any]]:
-    """Intercala formatos de fecha ambiguos: DD/MM/YYYY HH:MM y MM/DD/YYYY HH:MM."""
+    """Interleave ambiguous date formats: DD/MM/YYYY HH:MM and MM/DD/YYYY HH:MM."""
     if not rows or error_rate <= 0:
         return rows
 
@@ -90,7 +90,7 @@ def inject_mixed_date_formats(
 
     for idx in indices_to_corrupt:
         raw_val = result[idx].get(timestamp_col)
-        # Parsear datetime si viene en formato estándar
+        # Parse datetime if standard format
         dt: datetime
         if isinstance(raw_val, datetime):
             dt = raw_val
@@ -102,12 +102,12 @@ def inject_mixed_date_formats(
         else:
             continue
 
-        # Decidir aleatoriamente entre DD/MM/YYYY y MM/DD/YYYY
+        # Randomly choose between DD/MM/YYYY and MM/DD/YYYY
         if rng.random() < 0.5:
-            # Formato latino/europeo
+            # European / Latin format
             result[idx][timestamp_col] = dt.strftime("%d/%m/%Y %H:%M")
         else:
-            # Formato anglosajón
+            # Anglo-Saxon format
             result[idx][timestamp_col] = dt.strftime("%m/%d/%Y %H:%M")
 
     return result
@@ -118,7 +118,7 @@ def inject_duplicate_rows(
     rng: random.Random,
     error_rate: float,
 ) -> List[Dict[str, Any]]:
-    """Duplica registros completos dentro de la lista de eventos."""
+    """Duplicate complete records within the events list."""
     if not rows or error_rate <= 0:
         return rows
 
@@ -128,7 +128,7 @@ def inject_duplicate_rows(
 
     for idx in indices_to_duplicate:
         duplicate_item = deepcopy(rows[idx])
-        # Insertar en una posición aleatoria
+        # Insert at a random position
         insert_pos = rng.randint(0, len(result))
         result.insert(insert_pos, duplicate_item)
 
@@ -141,23 +141,23 @@ def inject_header_and_summary_rows(
     rng: random.Random,
     error_rate: float,
 ) -> List[Dict[str, Any]]:
-    """Inserta filas intermedias repetidas con el encabezado y filas de pie/resumen (ej. TOTAL REGISTROS: N)."""
+    """Insert repeated intermediate header rows and footer/summary rows (e.g. TOTAL REGISTROS: N)."""
     if not rows or error_rate <= 0:
         return rows
 
     result = deepcopy(rows)
 
-    # 1. Inserción de cabeceras intermedias repetidas
+    # 1. Insertion of intermediate repeated headers
     num_headers = max(1, int(len(result) * (error_rate * 0.5)))
     for _ in range(num_headers):
         if len(result) < 3:
             break
-        # Crear un registro donde cada columna tiene el nombre de la propia columna
+        # Create a record where each column holds the column name itself
         repeated_header = {col: col for col in columns}
         insert_pos = rng.randint(1, len(result) - 1)
         result.insert(insert_pos, repeated_header)
 
-    # 2. Inserción de filas de pie con resumen o totales
+    # 2. Insertion of footer rows with summary or totals
     summary_row = {col: "" for col in columns}
     primary_col = columns[0]
     secondary_col = columns[1] if len(columns) > 1 else primary_col
@@ -178,23 +178,23 @@ def apply_all_corruptions(
     rng: random.Random,
     error_rate: float,
 ) -> List[Dict[str, Any]]:
-    """Aplica de forma orquestada y determinista los 5 tipos de defectos según el error_rate."""
+    """Apply the 5 deliberate anomaly types deterministically based on error_rate."""
     if error_rate <= 0.0:
         return rows
 
-    # 1. Guías inexistentes
+    # 1. Nonexistent waybills
     step1 = inject_nonexistent_guides(rows, tracking_col, rng, error_rate)
 
-    # 2. Eventos fuera de secuencia temporal
+    # 2. Out-of-sequence events
     step2 = inject_out_of_sequence_events(step1, tracking_col, status_col, timestamp_col, rng, error_rate)
 
-    # 3. Formatos de fecha mezclados
+    # 3. Mixed date formats
     step3 = inject_mixed_date_formats(step2, timestamp_col, rng, error_rate)
 
-    # 4. Filas duplicadas
+    # 4. Duplicate rows
     step4 = inject_duplicate_rows(step3, rng, error_rate)
 
-    # 5. Cabeceras repetidas y filas de totales/resumen
+    # 5. Repeated headers and summary rows
     final_rows = inject_header_and_summary_rows(step4, columns, rng, error_rate)
 
     return final_rows

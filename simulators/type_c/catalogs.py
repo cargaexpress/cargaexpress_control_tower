@@ -1,4 +1,4 @@
-"""Catálogos y configuraciones para transportadoras Tipo C (Fuente F5)."""
+"""Catalogs and configurations for Type C carriers (Source F5)."""
 
 from dataclasses import dataclass
 from typing import Dict, List
@@ -6,21 +6,21 @@ from typing import Dict, List
 
 @dataclass(frozen=True)
 class CarrierConfig:
-    """Configuración de esquema y catálogo propietario de una transportadora Tipo C."""
+    """Schema configuration and proprietary catalog for a Type C carrier."""
 
     carrier_id: int
     code: str
     name: str
-    default_format: str  # "csv" o "xlsx"
+    default_format: str  # "csv" or "xlsx"
     columns: List[str]
     tracking_col: str
     status_col: str
     timestamp_col: str
     status_catalog: Dict[str, str]  # {raw_status: canonical_status}
-    status_flow: List[str]  # Secuencia típica esperada de raw_status
+    status_flow: List[str]  # Typical expected raw_status sequence
 
 
-# Transportadora 1: TransExpress Logistics (Inglés técnico, CSV)
+# Carrier 1: TransExpress Logistics (Technical English, CSV)
 CARRIER_1_CONFIG = CarrierConfig(
     carrier_id=1,
     code="CARRIER_1",
@@ -55,7 +55,7 @@ CARRIER_1_CONFIG = CarrierConfig(
     ],
 )
 
-# Transportadora 2: Rápido Andino (Español operativo, XLSX)
+# Carrier 2: Rápido Andino (Operational Spanish, XLSX)
 CARRIER_2_CONFIG = CarrierConfig(
     carrier_id=2,
     code="CARRIER_2",
@@ -90,7 +90,7 @@ CARRIER_2_CONFIG = CarrierConfig(
     ],
 )
 
-# Transportadora 3: Logística 360 (Códigos numéricos, CSV)
+# Carrier 3: Logística 360 (Numeric codes, CSV)
 CARRIER_3_CONFIG = CarrierConfig(
     carrier_id=3,
     code="CARRIER_3",
@@ -132,9 +132,9 @@ CARRIERS_REGISTRY: Dict[int, CarrierConfig] = {
 
 
 def get_carrier_config(carrier_id: int | str) -> CarrierConfig:
-    """Obtiene la configuración de la transportadora por ID numérico o código."""
+    """Retrieve carrier configuration by numeric ID or code."""
     if isinstance(carrier_id, str):
-        # Convertir carrier_1 -> 1 si aplica, o parsear int
+        # Convert carrier_1 -> 1 if applicable, or parse int
         normalized = carrier_id.strip().upper()
         if normalized in {"1", "CARRIER_1", "CARRIER1"}:
             c_id = 1
@@ -146,11 +146,11 @@ def get_carrier_config(carrier_id: int | str) -> CarrierConfig:
             try:
                 c_id = int(carrier_id)
             except ValueError:
-                raise ValueError(f"Identificador de transportadora no válido: '{carrier_id}'. Válidos: 1, 2, 3.")
+                raise ValueError(f"Invalid carrier identifier: '{carrier_id}'. Valid options: 1, 2, 3.")
     else:
         c_id = carrier_id
 
     if c_id not in CARRIERS_REGISTRY:
-        raise ValueError(f"Transportadora Tipo C con ID {c_id} no registrada. Opciones válidas: 1, 2, 3.")
+        raise ValueError(f"Type C carrier with ID {c_id} is not registered. Valid options: 1, 2, 3.")
 
     return CARRIERS_REGISTRY[c_id]
