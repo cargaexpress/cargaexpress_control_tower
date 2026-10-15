@@ -36,7 +36,7 @@ async def _create_test_order(db_session, brand_id, dc_id, shipment_type_code, re
         destination_country="CO",
         destination_region="Cundinamarca",
         freight_value=Decimal("25000.00"),
-        status="CREADO",
+        status="CREATED",
         order_lines=[
             OrderLine(line_number=1, sku="SKU-100", quantity_ordered=2),
         ],
@@ -64,7 +64,7 @@ async def test_create_shipping_label_success(client, db_session):
         "tracking_number": "TRK-001-ALPHA",
         "carrier_id": carrier.carrier_id,
         "weight_kg": 2.50,
-        "status": "CREADO",
+        "status": "CREATED",
     }
 
     response = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
@@ -74,7 +74,7 @@ async def test_create_shipping_label_success(client, db_session):
     assert body["tracking_number"] == "TRK-001-ALPHA"
     assert body["order_id"] == order.order_id
     assert body["carrier_id"] == carrier.carrier_id
-    assert body["status"] == "CREADO"
+    assert body["status"] == "CREATED"
     assert float(body["weight_kg"]) == 2.50
     assert "label_id" in body
     assert "created_at" in body

@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.carrier import Carrier
@@ -52,11 +53,15 @@ async def create_shipping_label_for_order(
         tracking_number=payload.tracking_number.strip(),
         weight_kg=payload.weight_kg,
         dispatch_id=payload.dispatch_id,
-        status=payload.status.upper() if payload.status else "CREADO",
+        status=payload.status,
     )
 
     db.add(shipping_label)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise DuplicateTrackingNumberError(payload.tracking_number.strip()) from exc
     await db.refresh(shipping_label)
     return shipping_label
 
@@ -90,6 +95,6 @@ async def get_shipping_labels_by_order(
     return list(result.scalars().all())
 
 
-# Backwards compatibility aliases
-create_guia_for_order = create_shipping_label_for_order
-get_guias_by_order = get_shipping_labels_by_order
+# Backward-compatible aliases with English naming.
+create_shipping_label_for_order_legacy = create_shipping_label_for_order
+get_shipping_labels_by_order_legacy = get_shipping_labels_by_order
