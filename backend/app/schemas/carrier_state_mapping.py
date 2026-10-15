@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.state_mapping import CANONICAL_STATUSES
+from app.schemas.state_mapping import clean_canonical_status, clean_raw_status
 
 
 class CarrierStateMappingEntry(BaseModel):
@@ -23,18 +23,12 @@ class CarrierStateMappingEntry(BaseModel):
     @field_validator("raw_status")
     @classmethod
     def _validate_raw_status(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("raw_status cannot be empty")
-        return value
+        return clean_raw_status(value)
 
     @field_validator("canonical_status")
     @classmethod
     def _validate_canonical_status(cls, value: str) -> str:
-        value = value.strip().upper()
-        if value not in CANONICAL_STATUSES:
-            raise ValueError(f"canonical_status must be one of: {', '.join(CANONICAL_STATUSES)}")
-        return value
+        return clean_canonical_status(value)
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -116,10 +110,3 @@ class CarrierStateMappingResponse(BaseModel):
             }
         }
     )
-
-
-# Backwards compatibility aliases
-MapeoEstadoEntrada = CarrierStateMappingEntry
-MapeoEstadosActualizar = CarrierStateMappingUpdate
-MapeoEstadoSalida = CarrierStateMappingRead
-MapeoEstadosSalida = CarrierStateMappingResponse

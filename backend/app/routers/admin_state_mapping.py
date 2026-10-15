@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
+from app.schemas.errors import HTTPErrorResponse
 from app.schemas.state_mapping import (
     StateMappingCreate,
     StateMappingRead,
@@ -13,6 +11,8 @@ from app.schemas.state_mapping import (
     StateMappingUpdate,
 )
 from app.security import require_admin
+from app.services import state_mapping_service
+from app.services.exceptions import DuplicateMappingError, EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
 
 # Protect the entire admin surface; public carrier events do not need this key.
@@ -23,23 +23,40 @@ router = APIRouter(
     dependencies=[Depends(require_admin)],
 )
 
-DUPLICATE_DETAIL = "A mapping already exists for this carrier and status."
+CARRIER_NOT_FOUND = "Carrier does not exist."
+MAPPING_NOT_FOUND = "Mapping does not exist."
 
 
-@router.get("", response_model=list[StateMappingRead])
+@router.get(
+    "",
+    response_model=list[StateMappingRead],
+    summary="List persisted state mappings (HU-12)",
+    description="Retrieve all configured status mappings, optionally filtered by carrier ID.",
+    responses={
+        200: {"description": "List of state mappings retrieved successfully."},
+        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+    },
+)
 async def list_mappings(
     carrier_id: int | None = Query(default=None, gt=0),
     db: AsyncSession = Depends(get_db),
 ) -> list[StateMapping]:
     """Read current persisted mappings."""
-    query = select(StateMapping).order_by(StateMapping.carrier_id, StateMapping.raw_status)
-    if carrier_id is not None:
-        query = query.where(StateMapping.carrier_id == carrier_id)
-    return list((await db.scalars(query)).all())
+    return await state_mapping_service.list_mappings(db, carrier_id)
 
 
 # Declared before /{mapping_id} so "resolve" is not parsed as an id parameter.
-@router.get("/resolve", response_model=StateMappingResolved)
+@router.get(
+    "/resolve",
+    response_model=StateMappingResolved,
+    summary="Translate raw carrier status to canonical status (HU-12)",
+    description="Translate a carrier's raw status to the normalized canonical status using the in-memory cache.",
+    responses={
+        200: {"description": "Status resolved successfully.", "model": StateMappingResolved},
+        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        404: {"description": "No mapping found for given status.", "model": HTTPErrorResponse},
+    },
+)
 async def resolve_mapping(
     carrier_id: int = Query(gt=0), raw_status: str = Query(min_length=1)
 ) -> StateMappingResolved:
@@ -52,52 +69,69 @@ async def resolve_mapping(
     )
 
 
-@router.post("", response_model=StateMappingRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=StateMappingRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new state mapping (HU-12)",
+    description="Register a new single mapping between a carrier's raw status and a canonical status.",
+    responses={
+        201: {"description": "State mapping created successfully.", "model": StateMappingRead},
+        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        404: {"description": "Carrier does not exist.", "model": HTTPErrorResponse},
+        409: {"description": "Mapping already exists for this carrier and status.", "model": HTTPErrorResponse},
+        422: {"description": "Validation error in payload (e.g. invalid canonical status or blank raw status)."},
+    },
+)
 async def create_mapping(
     payload: StateMappingCreate, db: AsyncSession = Depends(get_db)
 ) -> StateMapping:
-    if await db.get(Carrier, payload.carrier_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Carrier does not exist.")
-
-    mapping = StateMapping(**payload.model_dump())
-    db.add(mapping)
     try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_DETAIL)
-    # Invalidate only after commit so failed writes never discard good cached data.
-    state_mapping_cache.invalidate()
-    await db.refresh(mapping)
-    return mapping
+        return await state_mapping_service.create_mapping(db, payload)
+    except EntityNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, CARRIER_NOT_FOUND) from exc
+    except DuplicateMappingError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.patch("/{mapping_id}", response_model=StateMappingRead)
+@router.patch(
+    "/{mapping_id}",
+    response_model=StateMappingRead,
+    summary="Partially update an existing state mapping (HU-12)",
+    description="Modify the raw status or canonical status of an existing mapping by its ID.",
+    responses={
+        200: {"description": "State mapping updated successfully.", "model": StateMappingRead},
+        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        404: {"description": "Mapping does not exist.", "model": HTTPErrorResponse},
+        409: {"description": "Updated raw status conflicts with an existing mapping.", "model": HTTPErrorResponse},
+        422: {"description": "Validation error in payload."},
+    },
+)
 async def update_mapping(
     mapping_id: int, payload: StateMappingUpdate, db: AsyncSession = Depends(get_db)
 ) -> StateMapping:
-    mapping = await db.get(StateMapping, mapping_id)
-    if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
-
-    for field, value in payload.model_dump(exclude_none=True).items():
-        setattr(mapping, field, value)
     try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_DETAIL)
-    state_mapping_cache.invalidate()
-    await db.refresh(mapping)
-    return mapping
+        return await state_mapping_service.update_mapping(db, mapping_id, payload)
+    except EntityNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, MAPPING_NOT_FOUND) from exc
+    except DuplicateMappingError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.delete("/{mapping_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{mapping_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an existing state mapping (HU-12)",
+    description="Remove a state mapping record by its primary key ID.",
+    responses={
+        204: {"description": "State mapping deleted successfully."},
+        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        404: {"description": "Mapping does not exist.", "model": HTTPErrorResponse},
+    },
+)
 async def delete_mapping(mapping_id: int, db: AsyncSession = Depends(get_db)) -> Response:
-    mapping = await db.get(StateMapping, mapping_id)
-    if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
-    await db.delete(mapping)
-    await db.commit()
-    state_mapping_cache.invalidate()
+    try:
+        await state_mapping_service.delete_mapping(db, mapping_id)
+    except EntityNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, MAPPING_NOT_FOUND) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -23,3 +23,17 @@ class DuplicateTrackingNumberError(Exception):
     def __init__(self, tracking_number: str) -> None:
         self.tracking_number = tracking_number
         super().__init__(f"Tracking number '{tracking_number}' is already registered")
+
+
+class DuplicateMappingError(Exception):
+    """Raised when a state mapping violates uniqueness for (carrier_id, raw_status)."""
+
+    def __init__(self, message: str = "A mapping already exists for this carrier and status.") -> None:
+        super().__init__(message)
+
+
+class ConcurrentUpdateConflictError(Exception):
+    """Raised when concurrent operations conflict during a batch update."""
+
+    def __init__(self, message: str = "Mapping changed during update; please retry.") -> None:
+        super().__init__(message)
