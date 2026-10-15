@@ -15,6 +15,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
+*$py.class
 
 # Data outputs
 data/

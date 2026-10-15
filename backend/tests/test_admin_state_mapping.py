@@ -12,7 +12,7 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
-from app.database import AsyncSessionLocal, engine
+from tests.conftest import TestSessionLocal as AsyncSessionLocal, test_engine as engine
 from app.main import app
 from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
