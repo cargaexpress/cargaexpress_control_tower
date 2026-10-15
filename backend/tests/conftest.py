@@ -1,5 +1,6 @@
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
@@ -33,11 +34,11 @@ async def setup_test_database():
 
 @pytest_asyncio.fixture(autouse=True)
 async def clean_tables():
-    """Keep test records independent across tests."""
+    """Keep test records independent across tests and reset identity sequences."""
     yield
     async with test_engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
-            await conn.execute(table.delete())
+            await conn.execute(text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE'))
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -61,6 +62,10 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def client():
+    default_headers = {
+        "X-API-Key": settings.api_key or "test-api-key",
+        "X-Brand-Id": "1",
+    }
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=default_headers) as ac:
         yield ac
