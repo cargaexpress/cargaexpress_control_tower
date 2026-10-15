@@ -45,15 +45,15 @@ async def test_openapi_schema_contains_required_metadata_and_tags():
     spec = app.openapi()
 
     tags = {tag["name"] for tag in spec.get("tags", [])}
-    expected_tags = {"health", "pedidos", "admin: state mapping", "admin: mapeo de estados", "contrato openapi"}
+    expected_tags = {"health", "orders", "admin: state mapping", "admin: carrier state mapping", "openapi contract"}
     assert expected_tags.issubset(tags), f"Missing tags: {expected_tags - tags}"
 
     paths = spec.get("paths", {})
     assert "/api/v1/health" in paths
-    assert "/api/v1/pedidos" in paths
-    assert "/api/v1/pedidos/{order_id}" in paths
+    assert "/api/v1/orders" in paths
+    assert "/api/v1/orders/{order_id}" in paths
     assert "/api/v1/admin/state-mappings" in paths
-    assert "/api/v1/admin/mapeo-estados/{transportadora_id}" in paths
+    assert "/api/v1/admin/carrier-state-mappings/{carrier_id}" in paths
     assert "/docs/api/openapi.json" in paths
 
 

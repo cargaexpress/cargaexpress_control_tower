@@ -1,4 +1,4 @@
-"""HU-15: GET/PUT /api/v1/admin/mapeo-estados/{transportadora_id}.
+"""HU-15: GET/PUT /api/v1/admin/carrier-state-mappings/{carrier_id}.
 
 Uses fixtures from conftest.py (isolated test database). Data is seeded
 using `db_session`, never touching runtime DB, so tests work whether
@@ -16,7 +16,7 @@ from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
 from app.services.state_mapping_cache import state_mapping_cache
 
-BASE = "/api/v1/admin/mapeo-estados"
+BASE = "/api/v1/admin/carrier-state-mappings"
 RESOLVE = "/api/v1/admin/state-mappings/resolve"  # HU-12 endpoint reading from cache
 ADMIN = {"X-Admin-Token": "test-admin-key"}
 

@@ -10,11 +10,11 @@ openapi_tags = [
         "description": "API health check and database connectivity probe.",
     },
     {
-        "name": "pedidos",
+        "name": "orders",
         "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels.",
     },
     {
-        "name": "admin: mapeo de estados",
+        "name": "admin: carrier state mapping",
         "description": "Carrier status mapping administration for canonical status normalization (HU-15).",
     },
     {
@@ -22,7 +22,7 @@ openapi_tags = [
         "description": "CRUD operations and real-time cached status translation (HU-12).",
     },
     {
-        "name": "contrato openapi",
+        "name": "openapi contract",
         "description": "Download and interactive inspection of OpenAPI / Swagger contract.",
     },
 ]
@@ -55,7 +55,7 @@ app.include_router(orders.router)
 
 @app.get(
     "/docs/api/openapi.json",
-    tags=["contrato openapi"],
+    tags=["openapi contract"],
     summary="Export OpenAPI specification in JSON format",
     description="Returns full application OpenAPI 3.1 serialized schema.",
     response_class=JSONResponse,

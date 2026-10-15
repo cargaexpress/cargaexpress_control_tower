@@ -551,23 +551,23 @@
         }
       }
     },
-    "/api/v1/admin/mapeo-estados/{transportadora_id}": {
+    "/api/v1/admin/carrier-state-mappings/{carrier_id}": {
       "get": {
         "tags": [
-          "admin: mapeo de estados"
+          "admin: carrier state mapping"
         ],
         "summary": "Get Carrier Mapping",
         "description": "Retrieve state mappings of a carrier directly as stored in the database.",
-        "operationId": "get_carrier_mapping_api_v1_admin_mapeo_estados__transportadora_id__get",
+        "operationId": "get_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__get",
         "parameters": [
           {
-            "name": "transportadora_id",
+            "name": "carrier_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
               "exclusiveMinimum": 0,
-              "title": "Transportadora Id"
+              "title": "Carrier Id"
             }
           },
           {
@@ -645,20 +645,20 @@
       },
       "put": {
         "tags": [
-          "admin: mapeo de estados"
+          "admin: carrier state mapping"
         ],
         "summary": "Update Carrier Mapping",
         "description": "Replace the full carrier mapping set and apply immediately without restarting.",
-        "operationId": "update_carrier_mapping_api_v1_admin_mapeo_estados__transportadora_id__put",
+        "operationId": "update_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__put",
         "parameters": [
           {
-            "name": "transportadora_id",
+            "name": "carrier_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
               "exclusiveMinimum": 0,
-              "title": "Transportadora Id"
+              "title": "Carrier Id"
             }
           },
           {
@@ -745,13 +745,13 @@
         }
       }
     },
-    "/api/v1/pedidos": {
+    "/api/v1/orders": {
       "post": {
         "tags": [
-          "pedidos"
+          "orders"
         ],
         "summary": "Create Order",
-        "operationId": "create_order_api_v1_pedidos_post",
+        "operationId": "create_order_api_v1_orders_post",
         "requestBody": {
           "required": true,
           "content": {
@@ -820,10 +820,10 @@
       },
       "get": {
         "tags": [
-          "pedidos"
+          "orders"
         ],
         "summary": "List Orders",
-        "operationId": "list_orders_api_v1_pedidos_get",
+        "operationId": "list_orders_api_v1_orders_get",
         "parameters": [
           {
             "name": "skip",
@@ -906,13 +906,13 @@
         }
       }
     },
-    "/api/v1/pedidos/{order_id}": {
+    "/api/v1/orders/{order_id}": {
       "get": {
         "tags": [
-          "pedidos"
+          "orders"
         ],
         "summary": "Get Order",
-        "operationId": "get_order_api_v1_pedidos__order_id__get",
+        "operationId": "get_order_api_v1_orders__order_id__get",
         "parameters": [
           {
             "name": "order_id",
@@ -981,13 +981,13 @@
         }
       }
     },
-    "/api/v1/pedidos/{order_id}/status": {
+    "/api/v1/orders/{order_id}/status": {
       "patch": {
         "tags": [
-          "pedidos"
+          "orders"
         ],
         "summary": "Update Order Status",
-        "operationId": "update_order_status_api_v1_pedidos__order_id__status_patch",
+        "operationId": "update_order_status_api_v1_orders__order_id__status_patch",
         "parameters": [
           {
             "name": "order_id",
@@ -1066,14 +1066,14 @@
         }
       }
     },
-    "/api/v1/pedidos/{order_id}/guias": {
+    "/api/v1/orders/{order_id}/shipping-labels": {
       "post": {
         "tags": [
-          "pedidos"
+          "orders"
         ],
         "summary": "Associate shipping label with an order (RN-07)",
         "description": "Register and associate a new shipping label with the specified order.",
-        "operationId": "create_shipping_label_api_v1_pedidos__order_id__guias_post",
+        "operationId": "create_shipping_label_api_v1_orders__order_id__shipping_labels_post",
         "parameters": [
           {
             "name": "order_id",
@@ -1189,11 +1189,11 @@
       },
       "get": {
         "tags": [
-          "pedidos"
+          "orders"
         ],
         "summary": "List shipping labels for an order (RN-07)",
         "description": "Retrieve all shipping labels associated with the specified order.",
-        "operationId": "get_shipping_labels_api_v1_pedidos__order_id__guias_get",
+        "operationId": "get_shipping_labels_api_v1_orders__order_id__shipping_labels_get",
         "parameters": [
           {
             "name": "order_id",
@@ -1231,7 +1231,7 @@
                   "items": {
                     "$ref": "#/components/schemas/ShippingLabelResponse"
                   },
-                  "title": "Response 200 Get Shipping Labels Api V1 Pedidos  Order Id  Guias Get"
+                  "title": "Response 200 Get Shipping Labels Api V1 Orders  Order Id  Shipping Labels Get"
                 }
               }
             }
@@ -1295,7 +1295,7 @@
     "/docs/api/openapi.json": {
       "get": {
         "tags": [
-          "contrato openapi"
+          "openapi contract"
         ],
         "summary": "Export OpenAPI specification in JSON format",
         "description": "Returns full application OpenAPI 3.1 serialized schema.",
@@ -2564,11 +2564,11 @@
       "description": "API health check and database connectivity probe."
     },
     {
-      "name": "pedidos",
+      "name": "orders",
       "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels."
     },
     {
-      "name": "admin: mapeo de estados",
+      "name": "admin: carrier state mapping",
       "description": "Carrier status mapping administration for canonical status normalization (HU-15)."
     },
     {
@@ -2576,7 +2576,7 @@
       "description": "CRUD operations and real-time cached status translation (HU-12)."
     },
     {
-      "name": "contrato openapi",
+      "name": "openapi contract",
       "description": "Download and interactive inspection of OpenAPI / Swagger contract."
     }
   ]

@@ -17,12 +17,12 @@ async def require_admin(x_admin_token: str | None = Header(default=None)) -> Non
     if not expected:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Endpoints de administración deshabilitados: falta configurar ADMIN_API_KEY.",
+            detail="Admin endpoints disabled: ADMIN_API_KEY is not configured.",
         )
     if x_admin_token is None or not hmac.compare_digest(
         x_admin_token.encode(), expected.encode()
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de administración inválido o ausente (header X-Admin-Token).",
+            detail="Invalid or missing admin token (X-Admin-Token header).",
         )

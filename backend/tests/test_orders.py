@@ -44,7 +44,7 @@ async def test_create_order_success(client, db_session):
     brand, dc, shipment_type = await _seed_reference_data(db_session)
     payload = _order_payload(brand.brand_id, dc.dc_id, shipment_type.shipment_type_code)
 
-    response = await client.post("/api/v1/pedidos", json=payload)
+    response = await client.post("/api/v1/orders", json=payload)
 
     assert response.status_code == 201
     body = response.json()
@@ -59,7 +59,7 @@ async def test_create_order_invalid_brand_returns_404(client, db_session):
     _, dc, shipment_type = await _seed_reference_data(db_session)
     payload = _order_payload(999999, dc.dc_id, shipment_type.shipment_type_code)
 
-    response = await client.post("/api/v1/pedidos", json=payload)
+    response = await client.post("/api/v1/orders", json=payload)
 
     assert response.status_code == 404
 
@@ -67,17 +67,17 @@ async def test_create_order_invalid_brand_returns_404(client, db_session):
 async def test_get_order_by_id(client, db_session):
     brand, dc, shipment_type = await _seed_reference_data(db_session)
     payload = _order_payload(brand.brand_id, dc.dc_id, shipment_type.shipment_type_code)
-    created = await client.post("/api/v1/pedidos", json=payload)
+    created = await client.post("/api/v1/orders", json=payload)
     order_id = created.json()["order_id"]
 
-    response = await client.get(f"/api/v1/pedidos/{order_id}")
+    response = await client.get(f"/api/v1/orders/{order_id}")
 
     assert response.status_code == 200
     assert response.json()["order_id"] == order_id
 
 
 async def test_get_order_not_found(client):
-    response = await client.get("/api/v1/pedidos/999999")
+    response = await client.get("/api/v1/orders/999999")
 
     assert response.status_code == 404
 
@@ -85,10 +85,10 @@ async def test_get_order_not_found(client):
 async def test_list_orders_paginated(client, db_session):
     brand, dc, shipment_type = await _seed_reference_data(db_session)
     payload = _order_payload(brand.brand_id, dc.dc_id, shipment_type.shipment_type_code)
-    await client.post("/api/v1/pedidos", json=payload)
-    await client.post("/api/v1/pedidos", json=payload)
+    await client.post("/api/v1/orders", json=payload)
+    await client.post("/api/v1/orders", json=payload)
 
-    response = await client.get("/api/v1/pedidos", params={"skip": 0, "limit": 1})
+    response = await client.get("/api/v1/orders", params={"skip": 0, "limit": 1})
 
     assert response.status_code == 200
     body = response.json()
@@ -101,16 +101,16 @@ async def test_list_orders_paginated(client, db_session):
 async def test_update_order_status(client, db_session):
     brand, dc, shipment_type = await _seed_reference_data(db_session)
     payload = _order_payload(brand.brand_id, dc.dc_id, shipment_type.shipment_type_code)
-    created = await client.post("/api/v1/pedidos", json=payload)
+    created = await client.post("/api/v1/orders", json=payload)
     order_id = created.json()["order_id"]
 
-    response = await client.patch(f"/api/v1/pedidos/{order_id}/status", json={"status": "dispatched"})
+    response = await client.patch(f"/api/v1/orders/{order_id}/status", json={"status": "dispatched"})
 
     assert response.status_code == 200
     assert response.json()["status"] == "dispatched"
 
 
 async def test_update_order_status_not_found(client):
-    response = await client.patch("/api/v1/pedidos/999999/status", json={"status": "dispatched"})
+    response = await client.patch("/api/v1/orders/999999/status", json={"status": "dispatched"})
 
     assert response.status_code == 404

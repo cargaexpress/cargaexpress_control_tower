@@ -32,7 +32,7 @@ async def create_shipping_label_for_order(
 
     if tenant_brand_id is not None and order.brand_id != tenant_brand_id:
         raise TenantForbiddenError(
-            f"El pedido {order_id} no pertenece a la marca {tenant_brand_id}"
+            f"Order {order_id} does not belong to brand {tenant_brand_id}"
         )
 
     carrier = await db.get(Carrier, payload.carrier_id)
@@ -78,7 +78,7 @@ async def get_shipping_labels_by_order(
 
     if tenant_brand_id is not None and order.brand_id != tenant_brand_id:
         raise TenantForbiddenError(
-            f"El pedido {order_id} no pertenece a la marca {tenant_brand_id}"
+            f"Order {order_id} does not belong to brand {tenant_brand_id}"
         )
 
     stmt = (

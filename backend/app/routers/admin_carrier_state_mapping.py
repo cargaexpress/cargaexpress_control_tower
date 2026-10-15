@@ -14,14 +14,13 @@ from app.security import require_admin
 from app.services import carrier_state_mapping_service
 from app.services.exceptions import EntityNotFoundError
 
-# Routes use Spanish naming to match the project's current API convention; secured with ADMIN_API_KEY.
 router = APIRouter(
-    prefix="/api/v1/admin/mapeo-estados",
-    tags=["admin: mapeo de estados"],
+    prefix="/api/v1/admin/carrier-state-mappings",
+    tags=["admin: carrier state mapping"],
     dependencies=[Depends(require_admin)],
 )
 
-CARRIER_NOT_FOUND = "La transportadora no existe."
+CARRIER_NOT_FOUND = "Carrier not found."
 
 
 def _to_response(carrier: Carrier, rows: list[StateMapping]) -> CarrierStateMappingResponse:
@@ -32,29 +31,29 @@ def _to_response(carrier: Carrier, rows: list[StateMapping]) -> CarrierStateMapp
     )
 
 
-@router.get("/{transportadora_id}", response_model=CarrierStateMappingResponse)
+@router.get("/{carrier_id}", response_model=CarrierStateMappingResponse)
 async def get_carrier_mapping(
-    transportadora_id: int = Path(gt=0), db: AsyncSession = Depends(get_db)
+    carrier_id: int = Path(gt=0), db: AsyncSession = Depends(get_db)
 ) -> CarrierStateMappingResponse:
     """Retrieve state mappings of a carrier directly as stored in the database."""
     try:
-        carrier, rows = await carrier_state_mapping_service.get_carrier_mapping(db, transportadora_id)
+        carrier, rows = await carrier_state_mapping_service.get_carrier_mapping(db, carrier_id)
     except EntityNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, CARRIER_NOT_FOUND) from exc
     return _to_response(carrier, rows)
 
 
-@router.put("/{transportadora_id}", response_model=CarrierStateMappingResponse)
+@router.put("/{carrier_id}", response_model=CarrierStateMappingResponse)
 async def update_carrier_mapping(
     payload: CarrierStateMappingUpdate,
-    transportadora_id: int = Path(gt=0),
+    carrier_id: int = Path(gt=0),
     db: AsyncSession = Depends(get_db),
 ) -> CarrierStateMappingResponse:
     """Replace the full carrier mapping set and apply immediately without restarting."""
     desired = {entry.raw_status: entry.canonical_status for entry in payload.mappings}
     try:
         carrier, rows = await carrier_state_mapping_service.replace_carrier_mapping(
-            db, transportadora_id, desired
+            db, carrier_id, desired
         )
     except EntityNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, CARRIER_NOT_FOUND) from exc
@@ -63,6 +62,6 @@ async def update_carrier_mapping(
         await db.rollback()
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "El mapeo cambió mientras se actualizaba; vuelve a intentarlo.",
+            "Mapping changed during update; please retry.",
         ) from exc
     return _to_response(carrier, rows)

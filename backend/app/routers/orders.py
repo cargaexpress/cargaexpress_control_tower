@@ -20,8 +20,7 @@ from app.services.exceptions import (
 )
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
-# Routes currently use Spanish resource naming to match the project's API convention.
-router = APIRouter(prefix="/api/v1/pedidos", tags=["pedidos"])
+router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 
 @router.post("", response_model=OrderRead, status_code=http_status.HTTP_201_CREATED)
@@ -64,7 +63,7 @@ async def update_order_status(
 
 
 @router.post(
-    "/{order_id}/guias",
+    "/{order_id}/shipping-labels",
     response_model=ShippingLabelResponse,
     status_code=http_status.HTTP_201_CREATED,
     summary="Associate shipping label with an order (RN-07)",
@@ -109,7 +108,7 @@ async def create_shipping_label(
 
 
 @router.get(
-    "/{order_id}/guias",
+    "/{order_id}/shipping-labels",
     response_model=list[ShippingLabelResponse],
     status_code=http_status.HTTP_200_OK,
     summary="List shipping labels for an order (RN-07)",

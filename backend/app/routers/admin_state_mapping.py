@@ -23,7 +23,7 @@ router = APIRouter(
     dependencies=[Depends(require_admin)],
 )
 
-DUPLICATE_DETAIL = "Ya existe un mapeo para esa transportadora y ese estado."
+DUPLICATE_DETAIL = "A mapping already exists for this carrier and status."
 
 
 @router.get("", response_model=list[StateMappingRead])
@@ -46,7 +46,7 @@ async def resolve_mapping(
     """Translate a carrier status from cache."""
     canonical = await state_mapping_cache.translate(carrier_id, raw_status)
     if canonical is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay mapeo para ese estado.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No mapping found for this status.")
     return StateMappingResolved(
         carrier_id=carrier_id, raw_status=raw_status.strip(), canonical_status=canonical
     )
@@ -57,7 +57,7 @@ async def create_mapping(
     payload: StateMappingCreate, db: AsyncSession = Depends(get_db)
 ) -> StateMapping:
     if await db.get(Carrier, payload.carrier_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "La transportadora no existe.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Carrier does not exist.")
 
     mapping = StateMapping(**payload.model_dump())
     db.add(mapping)
@@ -78,7 +78,7 @@ async def update_mapping(
 ) -> StateMapping:
     mapping = await db.get(StateMapping, mapping_id)
     if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "El mapeo no existe.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(mapping, field, value)
@@ -96,7 +96,7 @@ async def update_mapping(
 async def delete_mapping(mapping_id: int, db: AsyncSession = Depends(get_db)) -> Response:
     mapping = await db.get(StateMapping, mapping_id)
     if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "El mapeo no existe.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
     await db.delete(mapping)
     await db.commit()
     state_mapping_cache.invalidate()

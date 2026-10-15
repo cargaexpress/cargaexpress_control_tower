@@ -67,7 +67,7 @@ async def test_create_shipping_label_success(client, db_session):
         "status": "CREADO",
     }
 
-    response = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    response = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
 
     assert response.status_code == 201
     body = response.json()
@@ -88,20 +88,20 @@ async def test_create_multiple_shipping_labels_split_order(client, db_session):
 
     # Label 1 (Package 1 / Carrier 1)
     res_1 = await client.post(
-        f"/api/v1/pedidos/{order.order_id}/guias",
+        f"/api/v1/orders/{order.order_id}/shipping-labels",
         json={"tracking_number": "SPLIT-TRK-01", "carrier_id": carrier_1.carrier_id, "weight_kg": 1.25},
     )
     assert res_1.status_code == 201
 
     # Label 2 (Package 2 / Carrier 2)
     res_2 = await client.post(
-        f"/api/v1/pedidos/{order.order_id}/guias",
+        f"/api/v1/orders/{order.order_id}/shipping-labels",
         json={"tracking_number": "SPLIT-TRK-02", "carrier_id": carrier_2.carrier_id, "weight_kg": 3.75},
     )
     assert res_2.status_code == 201
 
     # Verify the order contains both shipping labels
-    list_res = await client.get(f"/api/v1/pedidos/{order.order_id}/guias")
+    list_res = await client.get(f"/api/v1/orders/{order.order_id}/shipping-labels")
     assert list_res.status_code == 200
     shipping_labels = list_res.json()
     assert len(shipping_labels) == 2
@@ -121,7 +121,7 @@ async def test_create_shipping_label_order_not_found(client, db_session):
         "weight_kg": 1.0,
     }
 
-    response = await client.post("/api/v1/pedidos/999999/guias", json=payload)
+    response = await client.post("/api/v1/orders/999999/shipping-labels", json=payload)
     assert response.status_code == 404
     assert "order" in response.json()["detail"].lower()
 
@@ -136,18 +136,18 @@ async def test_get_shipping_labels_success(client, db_session):
 
     # Label for order 1
     await client.post(
-        f"/api/v1/pedidos/{order_1.order_id}/guias",
+        f"/api/v1/orders/{order_1.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ORDER-1", "carrier_id": carrier.carrier_id},
     )
 
     # Label for order 2
     await client.post(
-        f"/api/v1/pedidos/{order_2.order_id}/guias",
+        f"/api/v1/orders/{order_2.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ORDER-2", "carrier_id": carrier.carrier_id},
     )
 
     # Query for order 1: should return only the shipping label for order 1
-    response = await client.get(f"/api/v1/pedidos/{order_1.order_id}/guias")
+    response = await client.get(f"/api/v1/orders/{order_1.order_id}/shipping-labels")
     assert response.status_code == 200
     shipping_labels = response.json()
     assert len(shipping_labels) == 1
@@ -158,7 +158,7 @@ async def test_get_shipping_labels_success(client, db_session):
 @pytest.mark.asyncio
 async def test_get_shipping_labels_order_not_found(client):
     """Query shipping labels of a nonexistent order (returns 404)."""
-    response = await client.get("/api/v1/pedidos/999999/guias")
+    response = await client.get("/api/v1/orders/999999/shipping-labels")
     assert response.status_code == 404
     assert "order" in response.json()["detail"].lower()
 
@@ -172,17 +172,17 @@ async def test_tenant_isolation_forbidden(client, db_session):
     # Attempt to create label in Brand A's order using Brand B's context
     headers_brand_b = {"X-Brand-Id": str(brand_b.brand_id)}
     post_res = await client.post(
-        f"/api/v1/pedidos/{order_a.order_id}/guias",
+        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ISOLATION-TEST", "carrier_id": carrier.carrier_id},
         headers=headers_brand_b,
     )
     assert post_res.status_code == 403
-    assert "no pertenece a la marca" in post_res.json()["detail"]
+    assert "does not belong to brand" in post_res.json()["detail"].lower()
 
     # Create label under legitimate Brand A context
     headers_brand_a = {"X-Brand-Id": str(brand_a.brand_id)}
     valid_post = await client.post(
-        f"/api/v1/pedidos/{order_a.order_id}/guias",
+        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ISOLATION-TEST", "carrier_id": carrier.carrier_id},
         headers=headers_brand_a,
     )
@@ -190,11 +190,11 @@ async def test_tenant_isolation_forbidden(client, db_session):
 
     # Attempt to query labels of Brand A's order using Brand B's context (returns 403)
     get_res = await client.get(
-        f"/api/v1/pedidos/{order_a.order_id}/guias",
+        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
         headers=headers_brand_b,
     )
     assert get_res.status_code == 403
-    assert "no pertenece a la marca" in get_res.json()["detail"]
+    assert "does not belong to brand" in get_res.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -205,10 +205,10 @@ async def test_create_shipping_label_duplicate_tracking_number_returns_409(clien
 
     payload = {"tracking_number": "TRK-DUP-001", "carrier_id": carrier.carrier_id}
 
-    res_1 = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    res_1 = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
     assert res_1.status_code == 201
 
-    res_2 = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    res_2 = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
     assert res_2.status_code == 409
     assert "already registered" in res_2.json()["detail"].lower()
 
@@ -221,6 +221,6 @@ async def test_create_shipping_label_carrier_not_found(client, db_session):
 
     payload = {"tracking_number": "TRK-NO-CARRIER", "carrier_id": 999999}
 
-    response = await client.post(f"/api/v1/pedidos/{order.order_id}/guias", json=payload)
+    response = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
     assert response.status_code == 404
     assert "carrier" in response.json()["detail"].lower()
