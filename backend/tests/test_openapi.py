@@ -49,12 +49,24 @@ async def test_openapi_schema_contains_required_metadata_and_tags():
     assert expected_tags.issubset(tags), f"Missing tags: {expected_tags - tags}"
 
     paths = spec.get("paths", {})
-    assert "/api/v1/health" in paths
-    assert "/api/v1/orders" in paths
-    assert "/api/v1/orders/{order_id}" in paths
-    assert "/api/v1/admin/state-mappings" in paths
-    assert "/api/v1/admin/carrier-state-mappings/{carrier_id}" in paths
-    assert "/docs/api/openapi.json" in paths
+    expected_paths = {
+        "/api/v1/health",
+        "/api/v1/orders",
+        "/api/v1/orders/{order_id}",
+        "/api/v1/orders/{order_id}/status",
+        "/api/v1/orders/{order_id}/shipping-labels",
+        "/api/v1/admin/state-mappings",
+        "/api/v1/admin/state-mappings/resolve",
+        "/api/v1/admin/state-mappings/{mapping_id}",
+        "/api/v1/admin/carrier-state-mappings/{carrier_id}",
+        "/docs/api/openapi.json",
+    }
+    assert expected_paths.issubset(set(paths.keys())), f"Missing paths: {expected_paths - set(paths.keys())}"
+
+    for path, path_item in paths.items():
+        for method, op in path_item.items():
+            if method in {"get", "post", "put", "patch", "delete"}:
+                assert "summary" in op and op["summary"], f"Missing summary in {method.upper()} {path}"
 
 
 @pytest.mark.asyncio

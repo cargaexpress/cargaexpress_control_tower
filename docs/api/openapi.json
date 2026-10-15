@@ -11,12 +11,12 @@
         "tags": [
           "health"
         ],
-        "summary": "Health Check",
-        "description": "Check service availability and report database connection status.\n\nDoes not return 500 if database query fails: always returns 200 with connectivity detail,\nallowing orchestrators (Docker / ALB) to confirm the process is alive.",
+        "summary": "Service health and connectivity probe",
+        "description": "Check service availability and report database connection status. Always returns HTTP 200 with connectivity detail (up/down).",
         "operationId": "health_check_api_v1_health_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Service health status and database connectivity.",
             "content": {
               "application/json": {
                 "schema": {
@@ -783,7 +783,8 @@
         "tags": [
           "orders"
         ],
-        "summary": "Create Order",
+        "summary": "Create a new order with lines and recipient (HU-13)",
+        "description": "Create an order with its mandatory child lines and recipient details. Validates that referenced brand, distribution center, and shipment type exist.",
         "operationId": "create_order_api_v1_orders_post",
         "requestBody": {
           "required": true,
@@ -797,7 +798,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "Order created successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -827,7 +828,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Referenced brand, distribution center, or shipment type not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -855,7 +856,8 @@
         "tags": [
           "orders"
         ],
-        "summary": "List Orders",
+        "summary": "List orders with pagination (HU-13)",
+        "description": "Retrieve a paginated list of orders, including total count and pagination metadata.",
         "operationId": "list_orders_api_v1_orders_get",
         "parameters": [
           {
@@ -884,7 +886,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "List of orders retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -924,7 +926,7 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
+            "description": "Validation error in pagination query parameters."
           },
           "500": {
             "description": "Internal server error.",
@@ -944,7 +946,8 @@
         "tags": [
           "orders"
         ],
-        "summary": "Get Order",
+        "summary": "Retrieve order by ID (HU-13)",
+        "description": "Retrieve full details for a single order by its ID, including recipient and order lines.",
         "operationId": "get_order_api_v1_orders__order_id__get",
         "parameters": [
           {
@@ -959,7 +962,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Order retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -989,7 +992,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Order not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -999,7 +1002,7 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
+            "description": "Validation error in order ID path parameter."
           },
           "500": {
             "description": "Internal server error.",
@@ -1019,7 +1022,8 @@
         "tags": [
           "orders"
         ],
-        "summary": "Update Order Status",
+        "summary": "Update order status (HU-13)",
+        "description": "Update the canonical lifecycle status of an existing order.",
         "operationId": "update_order_status_api_v1_orders__order_id__status_patch",
         "parameters": [
           {
@@ -1044,7 +1048,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Order status updated successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1074,7 +1078,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Order not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1084,7 +1088,7 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
+            "description": "Validation error in order ID or status payload."
           },
           "500": {
             "description": "Internal server error.",

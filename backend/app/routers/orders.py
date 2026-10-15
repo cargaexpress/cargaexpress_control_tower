@@ -23,8 +23,21 @@ from app.services.exceptions import (
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 
-@router.post("", response_model=OrderRead, status_code=http_status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=OrderRead,
+    status_code=http_status.HTTP_201_CREATED,
+    summary="Create a new order with lines and recipient (HU-13)",
+    description="Create an order with its mandatory child lines and recipient details. Validates that referenced brand, distribution center, and shipment type exist.",
+    responses={
+        201: {"description": "Order created successfully.", "model": OrderRead},
+        400: {"description": "Bad request or invalid input.", "model": HTTPErrorResponse},
+        404: {"description": "Referenced brand, distribution center, or shipment type not found.", "model": HTTPErrorResponse},
+        422: {"description": "Validation error in entity or payload."},
+    },
+)
 async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db)) -> OrderRead:
+    """Create a new order alongside line items and recipient details."""
     try:
         order = await order_service.create_order(db, payload)
     except EntityNotFoundError as exc:
@@ -32,30 +45,65 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
     return order
 
 
-@router.get("", response_model=OrderListResponse)
+@router.get(
+    "",
+    response_model=OrderListResponse,
+    status_code=http_status.HTTP_200_OK,
+    summary="List orders with pagination (HU-13)",
+    description="Retrieve a paginated list of orders, including total count and pagination metadata.",
+    responses={
+        200: {"description": "List of orders retrieved successfully.", "model": OrderListResponse},
+        422: {"description": "Validation error in pagination query parameters."},
+    },
+)
 async def list_orders(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ) -> OrderListResponse:
+    """Retrieve orders with pagination."""
     items, total = await order_service.list_orders(db, skip, limit)
     return OrderListResponse(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.get("/{order_id}", response_model=OrderRead)
+@router.get(
+    "/{order_id}",
+    response_model=OrderRead,
+    status_code=http_status.HTTP_200_OK,
+    summary="Retrieve order by ID (HU-13)",
+    description="Retrieve full details for a single order by its ID, including recipient and order lines.",
+    responses={
+        200: {"description": "Order retrieved successfully.", "model": OrderRead},
+        404: {"description": "Order not found.", "model": HTTPErrorResponse},
+        422: {"description": "Validation error in order ID path parameter."},
+    },
+)
 async def get_order(order_id: int, db: AsyncSession = Depends(get_db)) -> OrderRead:
+    """Retrieve an order by its identifier."""
     order = await order_service.get_order(db, order_id)
     if order is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
     return order
 
 
-@router.patch("/{order_id}/status", response_model=OrderRead)
+@router.patch(
+    "/{order_id}/status",
+    response_model=OrderRead,
+    status_code=http_status.HTTP_200_OK,
+    summary="Update order status (HU-13)",
+    description="Update the canonical lifecycle status of an existing order.",
+    responses={
+        200: {"description": "Order status updated successfully.", "model": OrderRead},
+        404: {"description": "Order not found.", "model": HTTPErrorResponse},
+        422: {"description": "Validation error in order ID or status payload."},
+    },
+)
 async def update_order_status(
     order_id: int,
     payload: OrderStatusUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> OrderRead:
+    """Update order status."""
     order = await order_service.update_order_status(db, order_id, payload.status)
     if order is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
