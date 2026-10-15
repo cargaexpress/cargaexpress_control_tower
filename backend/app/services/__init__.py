@@ -4,6 +4,7 @@ from app.services import (
     order_service,
     shipping_label_service,
     state_mapping_cache,
+    state_mapping_service,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "order_service",
     "shipping_label_service",
     "state_mapping_cache",
+    "state_mapping_service",
 ]

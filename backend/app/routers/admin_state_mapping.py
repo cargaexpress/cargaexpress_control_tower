@@ -1,10 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
 from app.schemas.state_mapping import (
     StateMappingCreate,
@@ -13,6 +10,8 @@ from app.schemas.state_mapping import (
     StateMappingUpdate,
 )
 from app.security import require_admin
+from app.services import state_mapping_service
+from app.services.exceptions import DuplicateMappingError, EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
 
 # Protect the entire admin surface; public carrier events do not need this key.
@@ -23,7 +22,8 @@ router = APIRouter(
     dependencies=[Depends(require_admin)],
 )
 
-DUPLICATE_DETAIL = "A mapping already exists for this carrier and status."
+CARRIER_NOT_FOUND = "Carrier does not exist."
+MAPPING_NOT_FOUND = "Mapping does not exist."
 
 
 @router.get("", response_model=list[StateMappingRead])
@@ -32,10 +32,7 @@ async def list_mappings(
     db: AsyncSession = Depends(get_db),
 ) -> list[StateMapping]:
     """Read current persisted mappings."""
-    query = select(StateMapping).order_by(StateMapping.carrier_id, StateMapping.raw_status)
-    if carrier_id is not None:
-        query = query.where(StateMapping.carrier_id == carrier_id)
-    return list((await db.scalars(query)).all())
+    return await state_mapping_service.list_mappings(db, carrier_id)
 
 
 # Declared before /{mapping_id} so "resolve" is not parsed as an id parameter.
@@ -56,48 +53,30 @@ async def resolve_mapping(
 async def create_mapping(
     payload: StateMappingCreate, db: AsyncSession = Depends(get_db)
 ) -> StateMapping:
-    if await db.get(Carrier, payload.carrier_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Carrier does not exist.")
-
-    mapping = StateMapping(**payload.model_dump())
-    db.add(mapping)
     try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_DETAIL)
-    # Invalidate only after commit so failed writes never discard good cached data.
-    state_mapping_cache.invalidate()
-    await db.refresh(mapping)
-    return mapping
+        return await state_mapping_service.create_mapping(db, payload)
+    except EntityNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, CARRIER_NOT_FOUND) from exc
+    except DuplicateMappingError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.patch("/{mapping_id}", response_model=StateMappingRead)
 async def update_mapping(
     mapping_id: int, payload: StateMappingUpdate, db: AsyncSession = Depends(get_db)
 ) -> StateMapping:
-    mapping = await db.get(StateMapping, mapping_id)
-    if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
-
-    for field, value in payload.model_dump(exclude_none=True).items():
-        setattr(mapping, field, value)
     try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_DETAIL)
-    state_mapping_cache.invalidate()
-    await db.refresh(mapping)
-    return mapping
+        return await state_mapping_service.update_mapping(db, mapping_id, payload)
+    except EntityNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, MAPPING_NOT_FOUND) from exc
+    except DuplicateMappingError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.delete("/{mapping_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_mapping(mapping_id: int, db: AsyncSession = Depends(get_db)) -> Response:
-    mapping = await db.get(StateMapping, mapping_id)
-    if mapping is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mapping does not exist.")
-    await db.delete(mapping)
-    await db.commit()
-    state_mapping_cache.invalidate()
+    try:
+        await state_mapping_service.delete_mapping(db, mapping_id)
+    except EntityNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, MAPPING_NOT_FOUND) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
