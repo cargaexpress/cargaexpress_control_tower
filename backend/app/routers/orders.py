@@ -1,16 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models import ShippingLabel
+from app.schemas.guia import GuiaCreate, GuiaResponse, HTTPErrorResponse
 from app.schemas.order import (
     OrderCreate,
     OrderListResponse,
     OrderRead,
     OrderStatusUpdate,
 )
-from app.services import order_service
-from app.services.exceptions import EntityNotFoundError
+from app.services import guia_service, order_service
+from app.services.exceptions import (
+    DuplicateTrackingNumberError,
+    EntityNotFoundError,
+    TenantForbiddenError,
+)
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
 # Routes use Spanish resource naming to match the project's API convention.
@@ -56,3 +62,84 @@ async def update_order_status(
     if order is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
     return order
+
+
+@router.post(
+    "/{order_id}/guias",
+    response_model=GuiaResponse,
+    status_code=http_status.HTTP_201_CREATED,
+    summary="Asociar guía de despacho a un pedido (RN-07)",
+    responses={
+        201: {"description": "Guía creada y asociada exitosamente al pedido", "model": GuiaResponse},
+        400: {"description": "Error de validación o tracking duplicado", "model": HTTPErrorResponse},
+        403: {"description": "Acceso denegado: el pedido no pertenece a la marca (RN-10)", "model": HTTPErrorResponse},
+        404: {"description": "Pedido o transportadora no encontrado", "model": HTTPErrorResponse},
+        409: {"description": "Conflicto por guía de tracking ya existente", "model": HTTPErrorResponse},
+    },
+)
+async def create_guia(
+    order_id: int,
+    payload: GuiaCreate,
+    x_brand_id: int | None = Header(default=None, alias="X-Brand-Id"),
+    db: AsyncSession = Depends(get_db),
+) -> ShippingLabel:
+    """Registra y asocia una nueva guía de despacho al pedido indicado."""
+    try:
+        guia = await guia_service.create_guia_for_order(
+            db=db,
+            order_id=order_id,
+            payload=payload,
+            tenant_brand_id=x_brand_id,
+        )
+    except EntityNotFoundError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except TenantForbiddenError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except DuplicateTrackingNumberError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return guia
+
+
+@router.get(
+    "/{order_id}/guias",
+    response_model=list[GuiaResponse],
+    status_code=http_status.HTTP_200_OK,
+    summary="Listar guías de despacho de un pedido (RN-07)",
+    responses={
+        200: {"description": "Lista de guías asociadas al pedido", "model": list[GuiaResponse]},
+        403: {"description": "Acceso denegado: el pedido no pertenece a la marca (RN-10)", "model": HTTPErrorResponse},
+        404: {"description": "Pedido no encontrado", "model": HTTPErrorResponse},
+    },
+)
+async def get_guias(
+    order_id: int,
+    x_brand_id: int | None = Header(default=None, alias="X-Brand-Id"),
+    db: AsyncSession = Depends(get_db),
+) -> list[ShippingLabel]:
+    """Obtiene el listado de todas las guías de despacho asociadas al pedido indicado."""
+    try:
+        guias = await guia_service.get_guias_by_order(
+            db=db,
+            order_id=order_id,
+            tenant_brand_id=x_brand_id,
+        )
+    except EntityNotFoundError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except TenantForbiddenError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    return guias
