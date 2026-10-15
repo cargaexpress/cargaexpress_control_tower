@@ -76,8 +76,8 @@
         "tags": [
           "admin: state mapping"
         ],
-        "summary": "List Mappings",
-        "description": "Read current persisted mappings.",
+        "summary": "List persisted state mappings (HU-12)",
+        "description": "Retrieve all configured status mappings, optionally filtered by carrier ID.",
         "operationId": "list_mappings_api_v1_admin_state_mappings_get",
         "parameters": [
           {
@@ -116,7 +116,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "List of state mappings retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -140,7 +140,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
               "application/json": {
                 "schema": {
@@ -178,7 +178,8 @@
         "tags": [
           "admin: state mapping"
         ],
-        "summary": "Create Mapping",
+        "summary": "Create a new state mapping (HU-12)",
+        "description": "Register a new single mapping between a carrier's raw status and a canonical status.",
         "operationId": "create_mapping_api_v1_admin_state_mappings_post",
         "parameters": [
           {
@@ -210,7 +211,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "State mapping created successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -230,7 +231,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
               "application/json": {
                 "schema": {
@@ -240,7 +241,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Carrier does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -250,10 +251,20 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
+            "description": "Validation error in payload (e.g. invalid canonical status or blank raw status)."
           },
           "500": {
             "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Mapping already exists for this carrier and status.",
             "content": {
               "application/json": {
                 "schema": {
@@ -270,8 +281,8 @@
         "tags": [
           "admin: state mapping"
         ],
-        "summary": "Resolve Mapping",
-        "description": "Translate a carrier status from cache.",
+        "summary": "Translate raw carrier status to canonical status (HU-12)",
+        "description": "Translate a carrier's raw status to the normalized canonical status using the in-memory cache.",
         "operationId": "resolve_mapping_api_v1_admin_state_mappings_resolve_get",
         "parameters": [
           {
@@ -313,7 +324,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Status resolved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -333,7 +344,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
               "application/json": {
                 "schema": {
@@ -343,7 +354,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "No mapping found for given status.",
             "content": {
               "application/json": {
                 "schema": {
@@ -373,7 +384,8 @@
         "tags": [
           "admin: state mapping"
         ],
-        "summary": "Update Mapping",
+        "summary": "Partially update an existing state mapping (HU-12)",
+        "description": "Modify the raw status or canonical status of an existing mapping by its ID.",
         "operationId": "update_mapping_api_v1_admin_state_mappings__mapping_id__patch",
         "parameters": [
           {
@@ -414,7 +426,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "State mapping updated successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -434,7 +446,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
               "application/json": {
                 "schema": {
@@ -444,7 +456,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Mapping does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -454,10 +466,20 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
+            "description": "Validation error in payload."
           },
           "500": {
             "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Updated raw status conflicts with an existing mapping.",
             "content": {
               "application/json": {
                 "schema": {
@@ -472,7 +494,8 @@
         "tags": [
           "admin: state mapping"
         ],
-        "summary": "Delete Mapping",
+        "summary": "Delete an existing state mapping (HU-12)",
+        "description": "Remove a state mapping record by its primary key ID.",
         "operationId": "delete_mapping_api_v1_admin_state_mappings__mapping_id__delete",
         "parameters": [
           {
@@ -503,7 +526,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "State mapping deleted successfully."
           },
           "400": {
             "description": "Bad request or invalid input.",
@@ -516,7 +539,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
               "application/json": {
                 "schema": {
@@ -526,7 +549,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Mapping does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -556,8 +579,8 @@
         "tags": [
           "admin: carrier state mapping"
         ],
-        "summary": "Get Carrier Mapping",
-        "description": "Retrieve state mappings of a carrier directly as stored in the database.",
+        "summary": "Retrieve state mappings for a specific carrier (HU-15)",
+        "description": "Retrieve all current status mappings configured for the given carrier directly from the database.",
         "operationId": "get_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__get",
         "parameters": [
           {
@@ -589,7 +612,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Carrier state mappings retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -609,7 +632,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
               "application/json": {
                 "schema": {
@@ -619,7 +642,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Carrier not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -647,8 +670,8 @@
         "tags": [
           "admin: carrier state mapping"
         ],
-        "summary": "Update Carrier Mapping",
-        "description": "Replace the full carrier mapping set and apply immediately without restarting.",
+        "summary": "Replace entire state mapping set for a carrier (HU-15)",
+        "description": "Synchronize and replace the complete set of status mappings for a carrier in an atomic transaction.",
         "operationId": "update_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__put",
         "parameters": [
           {
@@ -690,7 +713,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Carrier state mappings synchronized successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -710,7 +733,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
               "application/json": {
                 "schema": {
@@ -720,7 +743,7 @@
             }
           },
           "404": {
-            "description": "Resource not found.",
+            "description": "Carrier not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -730,10 +753,20 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
+            "description": "Validation error in payload (e.g. invalid canonical status or duplicate raw status)."
           },
           "500": {
             "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent update conflict.",
             "content": {
               "application/json": {
                 "schema": {

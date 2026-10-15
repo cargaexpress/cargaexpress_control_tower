@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, status
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -10,9 +9,10 @@ from app.schemas.carrier_state_mapping import (
     CarrierStateMappingResponse,
     CarrierStateMappingUpdate,
 )
+from app.schemas.errors import HTTPErrorResponse
 from app.security import require_admin
 from app.services import carrier_state_mapping_service
-from app.services.exceptions import EntityNotFoundError
+from app.services.exceptions import ConcurrentUpdateConflictError, EntityNotFoundError
 
 router = APIRouter(
     prefix="/api/v1/admin/carrier-state-mappings",
@@ -31,7 +31,17 @@ def _to_response(carrier: Carrier, rows: list[StateMapping]) -> CarrierStateMapp
     )
 
 
-@router.get("/{carrier_id}", response_model=CarrierStateMappingResponse)
+@router.get(
+    "/{carrier_id}",
+    response_model=CarrierStateMappingResponse,
+    summary="Retrieve state mappings for a specific carrier (HU-15)",
+    description="Retrieve all current status mappings configured for the given carrier directly from the database.",
+    responses={
+        200: {"description": "Carrier state mappings retrieved successfully.", "model": CarrierStateMappingResponse},
+        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        404: {"description": "Carrier not found.", "model": HTTPErrorResponse},
+    },
+)
 async def get_carrier_mapping(
     carrier_id: int = Path(gt=0), db: AsyncSession = Depends(get_db)
 ) -> CarrierStateMappingResponse:
@@ -43,7 +53,19 @@ async def get_carrier_mapping(
     return _to_response(carrier, rows)
 
 
-@router.put("/{carrier_id}", response_model=CarrierStateMappingResponse)
+@router.put(
+    "/{carrier_id}",
+    response_model=CarrierStateMappingResponse,
+    summary="Replace entire state mapping set for a carrier (HU-15)",
+    description="Synchronize and replace the complete set of status mappings for a carrier in an atomic transaction.",
+    responses={
+        200: {"description": "Carrier state mappings synchronized successfully.", "model": CarrierStateMappingResponse},
+        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        404: {"description": "Carrier not found.", "model": HTTPErrorResponse},
+        409: {"description": "Concurrent update conflict.", "model": HTTPErrorResponse},
+        422: {"description": "Validation error in payload (e.g. invalid canonical status or duplicate raw status)."},
+    },
+)
 async def update_carrier_mapping(
     payload: CarrierStateMappingUpdate,
     carrier_id: int = Path(gt=0),
@@ -57,11 +79,6 @@ async def update_carrier_mapping(
         )
     except EntityNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, CARRIER_NOT_FOUND) from exc
-    except IntegrityError as exc:
-        # Another concurrent write won the race.
-        await db.rollback()
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "Mapping changed during update; please retry.",
-        ) from exc
+    except ConcurrentUpdateConflictError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return _to_response(carrier, rows)

@@ -1,9 +1,10 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
 from app.repositories import StateMappingRepository
-from app.services.exceptions import EntityNotFoundError
+from app.services.exceptions import ConcurrentUpdateConflictError, EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
 
 # Business and data logic lives here; the router only handles HTTP concerns.
@@ -52,7 +53,12 @@ async def replace_carrier_mapping(
     for removed in existing.values():
         await db.delete(removed)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise ConcurrentUpdateConflictError() from exc
+
     # Invalidate cache only after commit: if writing fails, valid cache is preserved.
     state_mapping_cache.invalidate()
     return carrier, await _read_mappings(db, carrier_id)

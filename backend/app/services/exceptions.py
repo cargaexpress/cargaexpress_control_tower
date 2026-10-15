@@ -30,3 +30,10 @@ class DuplicateMappingError(Exception):
 
     def __init__(self, message: str = "A mapping already exists for this carrier and status.") -> None:
         super().__init__(message)
+
+
+class ConcurrentUpdateConflictError(Exception):
+    """Raised when concurrent operations conflict during a batch update."""
+
+    def __init__(self, message: str = "Mapping changed during update; please retry.") -> None:
+        super().__init__(message)
