@@ -18,7 +18,6 @@ from app.schemas.order import (
 )
 from app.schemas.shipping_label import (
     ShippingLabelCreate,
-    ShippingLabelRead,
     ShippingLabelResponse,
 )
 from app.schemas.state_mapping import (
@@ -44,7 +43,6 @@ __all__ = [
     "OrderRecipientRead",
     "OrderStatusUpdate",
     "ShippingLabelCreate",
-    "ShippingLabelRead",
     "ShippingLabelResponse",
     "StateMappingCreate",
     "StateMappingRead",

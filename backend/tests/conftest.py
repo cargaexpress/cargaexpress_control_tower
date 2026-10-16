@@ -61,11 +61,14 @@ async def db_session():
 
 
 @pytest_asyncio.fixture
-async def client():
+async def client(monkeypatch):
+    api_key = settings.api_key or "test-api-key"
+    monkeypatch.setattr(settings, "brand_api_keys", {api_key: 1})
     default_headers = {
-        "X-API-Key": settings.api_key or "test-api-key",
-        "X-Brand-Id": "1",
+        "X-API-Key": api_key,
     }
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test", headers=default_headers) as ac:
+    async with AsyncClient(
+        transport=transport, base_url="http://test", headers=default_headers
+    ) as ac:
         yield ac

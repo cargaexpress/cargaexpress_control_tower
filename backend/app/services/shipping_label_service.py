@@ -9,7 +9,6 @@ from app.schemas.shipping_label import ShippingLabelCreate
 from app.services.exceptions import (
     DuplicateTrackingNumberError,
     EntityNotFoundError,
-    TenantForbiddenError,
 )
 
 
@@ -32,9 +31,7 @@ async def create_shipping_label_for_order(
         raise EntityNotFoundError("order", order_id)
 
     if tenant_brand_id is not None and order.brand_id != tenant_brand_id:
-        raise TenantForbiddenError(
-            f"Order {order_id} does not belong to brand {tenant_brand_id}"
-        )
+        raise EntityNotFoundError("order", order_id)
 
     carrier = await db.get(Carrier, payload.carrier_id)
     if carrier is None:
@@ -82,9 +79,7 @@ async def get_shipping_labels_by_order(
         raise EntityNotFoundError("order", order_id)
 
     if tenant_brand_id is not None and order.brand_id != tenant_brand_id:
-        raise TenantForbiddenError(
-            f"Order {order_id} does not belong to brand {tenant_brand_id}"
-        )
+        raise EntityNotFoundError("order", order_id)
 
     stmt = (
         select(ShippingLabel)
@@ -93,8 +88,3 @@ async def get_shipping_labels_by_order(
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
-
-
-# Backward-compatible aliases with English naming.
-create_shipping_label_for_order_legacy = create_shipping_label_for_order
-get_shipping_labels_by_order_legacy = get_shipping_labels_by_order

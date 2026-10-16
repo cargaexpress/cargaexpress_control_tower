@@ -1,17 +1,19 @@
 import json
+import sys
 from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-import sys
+from app.config import settings
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.main import app
-from scripts.export_openapi import export_openapi_schema
+from scripts.export_openapi import export_openapi_schema  # noqa: E402
+
+from app.main import app, create_app  # noqa: E402
 
 
 @pytest.mark.asyncio
@@ -21,7 +23,9 @@ async def test_docs_ui_is_available():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/docs")
         assert response.status_code == 200
-        assert "swagger-ui" in response.text.lower() or "html" in response.headers.get("content-type", "")
+        assert "swagger-ui" in response.text.lower() or "html" in response.headers.get(
+            "content-type", ""
+        )
 
 
 @pytest.mark.asyncio
@@ -40,12 +44,51 @@ async def test_openapi_json_endpoint_is_available():
 
 
 @pytest.mark.asyncio
+async def test_openapi_json_route_is_disabled_in_production(monkeypatch):
+    monkeypatch.setattr(settings, "app_env", "production")
+    production_app = create_app()
+
+    transport = ASGITransport(app=production_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/docs/api/openapi.json")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_unknown_route_uses_standard_error_response():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/nonexistent")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found", "error_code": "HTTP_ERROR"}
+
+
+@pytest.mark.asyncio
+async def test_validation_error_preserves_field_details(client):
+    response = await client.get("/api/v1/orders/not-an-integer")
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error_code"] == "VALIDATION_ERROR"
+    assert isinstance(body["detail"], list)
+    assert body["detail"][0]["loc"] == ["path", "order_id"]
+
+
+@pytest.mark.asyncio
 async def test_openapi_schema_contains_required_metadata_and_tags():
     """Verify OpenAPI schema contains required tags and organized core endpoints."""
     spec = app.openapi()
 
     tags = {tag["name"] for tag in spec.get("tags", [])}
-    expected_tags = {"health", "orders", "admin: state mapping", "admin: carrier state mapping", "openapi contract"}
+    expected_tags = {
+        "health",
+        "orders",
+        "admin: state mapping",
+        "admin: carrier state mapping",
+        "openapi contract",
+    }
     assert expected_tags.issubset(tags), f"Missing tags: {expected_tags - tags}"
 
     paths = spec.get("paths", {})
@@ -61,12 +104,16 @@ async def test_openapi_schema_contains_required_metadata_and_tags():
         "/api/v1/admin/carrier-state-mappings/{carrier_id}",
         "/docs/api/openapi.json",
     }
-    assert expected_paths.issubset(set(paths.keys())), f"Missing paths: {expected_paths - set(paths.keys())}"
+    assert expected_paths.issubset(set(paths.keys())), (
+        f"Missing paths: {expected_paths - set(paths.keys())}"
+    )
 
     for path, path_item in paths.items():
         for method, op in path_item.items():
             if method in {"get", "post", "put", "patch", "delete"}:
-                assert "summary" in op and op["summary"], f"Missing summary in {method.upper()} {path}"
+                assert "summary" in op and op["summary"], (
+                    f"Missing summary in {method.upper()} {path}"
+                )
 
 
 @pytest.mark.asyncio

@@ -1,19 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-CanonicalStatus = Literal[
-    "CREATED",
-    "PICKED_UP",
-    "IN_TRANSIT",
-    "OUT_FOR_DELIVERY",
-    "EXCEPTION",
-    "DELIVERED",
-    "RETURNED",
-    "LOST_OR_DAMAGED",
-]
+from app.models.state_mapping import CanonicalStatus
 
 
 class OrderLineCreate(BaseModel):
@@ -38,7 +28,6 @@ class OrderLineCreate(BaseModel):
         description="Quantity ordered for the item.",
         examples=[2],
     )
-
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -59,7 +48,9 @@ class OrderLineRead(BaseModel):
     order_id: int = Field(..., description="ID of the parent order.", examples=[1])
     line_number: int = Field(..., description="Ordinal line number within the order.", examples=[1])
     sku: str = Field(..., description="Unique product SKU.", examples=["SKU-SHIRT-BLUE-M"])
-    description: str | None = Field(default=None, description="Item description.", examples=["Blue cotton shirt"])
+    description: str | None = Field(
+        default=None, description="Item description.", examples=["Blue cotton shirt"]
+    )
     quantity_ordered: int = Field(..., description="Quantity ordered.", examples=[2])
 
 
@@ -120,9 +111,15 @@ class OrderRecipientRead(BaseModel):
 
     order_id: int = Field(..., description="Order ID.", examples=[1])
     full_name: str = Field(..., description="Recipient full name.", examples=["Juan Perez"])
-    email: str | None = Field(default=None, description="Email address.", examples=["juan.perez@example.com"])
-    phone: str | None = Field(default=None, description="Contact phone.", examples=["+573001234567"])
-    address_line: str = Field(..., description="Delivery address.", examples=["Carrera 15 # 93-47 Apto 502"])
+    email: str | None = Field(
+        default=None, description="Email address.", examples=["juan.perez@example.com"]
+    )
+    phone: str | None = Field(
+        default=None, description="Contact phone.", examples=["+573001234567"]
+    )
+    address_line: str = Field(
+        ..., description="Delivery address.", examples=["Carrera 15 # 93-47 Apto 502"]
+    )
     city: str = Field(..., description="Destination city.", examples=["Bogota"])
 
 
@@ -241,13 +238,7 @@ class OrderStatusUpdate(BaseModel):
             return value
         return value.strip().upper()
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "status": "PICKED_UP"
-            }
-        }
-    )
+    model_config = ConfigDict(json_schema_extra={"example": {"status": "PICKED_UP"}})
 
 
 class OrderRead(BaseModel):
@@ -259,10 +250,16 @@ class OrderRead(BaseModel):
     brand_id: int = Field(..., description="ID of the brand owning the order.", examples=[1])
     dc_id: int = Field(..., description="Distribution Center ID.", examples=[1])
     shipment_type_code: str = Field(..., description="Shipment type code.", examples=["STANDARD"])
-    brand_order_ref: str = Field(..., description="Brand external reference.", examples=["ORD-MODA-2026-0001"])
+    brand_order_ref: str = Field(
+        ..., description="Brand external reference.", examples=["ORD-MODA-2026-0001"]
+    )
     destination_country: str = Field(..., description="Destination country.", examples=["CO"])
-    destination_region: str | None = Field(default=None, description="Region/department.", examples=["Cundinamarca"])
-    freight_value: Decimal = Field(..., description="Freight charge value.", examples=[Decimal("15000.00")])
+    destination_region: str | None = Field(
+        default=None, description="Region/department.", examples=["Cundinamarca"]
+    )
+    freight_value: Decimal = Field(
+        ..., description="Freight charge value.", examples=[Decimal("15000.00")]
+    )
     status: str = Field(..., description="Current order status.", examples=["CREATED"])
     created_at: datetime = Field(
         ...,
@@ -279,7 +276,9 @@ class OrderListResponse(BaseModel):
     items: list[OrderRead] = Field(..., description="List of orders on the current page.")
     total: int = Field(..., ge=0, description="Total count of matching orders.", examples=[100])
     skip: int = Field(..., ge=0, description="Offset applied to the query.", examples=[0])
-    limit: int = Field(..., gt=0, description="Maximum number of records returned per page.", examples=[20])
+    limit: int = Field(
+        ..., gt=0, description="Maximum number of records returned per page.", examples=[20]
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -291,8 +290,3 @@ class OrderListResponse(BaseModel):
             }
         }
     )
-
-
-# Backward-compatible aliases with English naming.
-OrderCreateLegacy = OrderCreate
-OrderReadLegacy = OrderRead

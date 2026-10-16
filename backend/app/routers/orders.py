@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import ShippingLabel
-from app.security import get_tenant_brand_id, require_api_key
 from app.schemas.errors import HTTPErrorResponse
 from app.schemas.order import (
     OrderCreate,
@@ -13,15 +12,18 @@ from app.schemas.order import (
     OrderStatusUpdate,
 )
 from app.schemas.shipping_label import ShippingLabelCreate, ShippingLabelResponse
+from app.security import get_current_brand, require_api_key
 from app.services import order_service, shipping_label_service
 from app.services.exceptions import (
+    DuplicateOrderReferenceError,
     DuplicateTrackingNumberError,
     EntityNotFoundError,
-    TenantForbiddenError,
 )
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
-router = APIRouter(prefix="/api/v1/orders", tags=["orders"], dependencies=[Depends(require_api_key)])
+router = APIRouter(
+    prefix="/api/v1/orders", tags=["orders"], dependencies=[Depends(require_api_key)]
+)
 
 
 @router.post(
@@ -33,17 +35,30 @@ router = APIRouter(prefix="/api/v1/orders", tags=["orders"], dependencies=[Depen
     responses={
         201: {"description": "Order created successfully.", "model": OrderRead},
         400: {"description": "Bad request or invalid input.", "model": HTTPErrorResponse},
-        404: {"description": "Referenced brand, distribution center, or shipment type not found.", "model": HTTPErrorResponse},
+        404: {
+            "description": "Referenced brand, distribution center, or shipment type not found.",
+            "model": HTTPErrorResponse,
+        },
+        409: {
+            "description": "Order reference already exists for this brand.",
+            "model": HTTPErrorResponse,
+        },
         422: {"description": "Validation error in entity or payload."},
     },
 )
-async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db)) -> OrderRead:
+async def create_order(
+    payload: OrderCreate,
+    tenant_brand_id: int = Depends(get_current_brand),
+    db: AsyncSession = Depends(get_db),
+) -> OrderRead:
     """Create a new order alongside line items and recipient details."""
     try:
-        order = await order_service.create_order(db, payload)
+        order = await order_service.create_order(db, payload, tenant_brand_id)
+    except DuplicateOrderReferenceError as exc:
+        raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except EntityNotFoundError as exc:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return order
+    return OrderRead.model_validate(order)
 
 
 @router.get(
@@ -58,13 +73,19 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
     },
 )
 async def list_orders(
+    tenant_brand_id: int = Depends(get_current_brand),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ) -> OrderListResponse:
     """Retrieve orders with pagination."""
-    items, total = await order_service.list_orders(db, skip, limit)
-    return OrderListResponse(items=items, total=total, skip=skip, limit=limit)
+    items, total = await order_service.list_orders(db, tenant_brand_id, skip, limit)
+    return OrderListResponse(
+        items=[OrderRead.model_validate(item) for item in items],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -79,12 +100,16 @@ async def list_orders(
         422: {"description": "Validation error in order ID path parameter."},
     },
 )
-async def get_order(order_id: int, db: AsyncSession = Depends(get_db)) -> OrderRead:
+async def get_order(
+    order_id: int,
+    tenant_brand_id: int = Depends(get_current_brand),
+    db: AsyncSession = Depends(get_db),
+) -> OrderRead:
     """Retrieve an order by its identifier."""
-    order = await order_service.get_order(db, order_id)
+    order = await order_service.get_order(db, order_id, tenant_brand_id)
     if order is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
-    return order
+    return OrderRead.model_validate(order)
 
 
 @router.patch(
@@ -102,13 +127,14 @@ async def get_order(order_id: int, db: AsyncSession = Depends(get_db)) -> OrderR
 async def update_order_status(
     order_id: int,
     payload: OrderStatusUpdate,
+    tenant_brand_id: int = Depends(get_current_brand),
     db: AsyncSession = Depends(get_db),
 ) -> OrderRead:
     """Update order status."""
-    order = await order_service.update_order_status(db, order_id, payload.status)
+    order = await order_service.update_order_status(db, order_id, payload.status, tenant_brand_id)
     if order is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
-    return order
+    return OrderRead.model_validate(order)
 
 
 @router.post(
@@ -117,17 +143,25 @@ async def update_order_status(
     status_code=http_status.HTTP_201_CREATED,
     summary="Associate shipping label with an order (RN-07)",
     responses={
-        201: {"description": "Shipping label created and associated successfully", "model": ShippingLabelResponse},
-        400: {"description": "Validation error or duplicate tracking number", "model": HTTPErrorResponse},
-        403: {"description": "Access denied: order does not belong to brand (RN-10)", "model": HTTPErrorResponse},
+        201: {
+            "description": "Shipping label created and associated successfully",
+            "model": ShippingLabelResponse,
+        },
+        400: {
+            "description": "Validation error or duplicate tracking number",
+            "model": HTTPErrorResponse,
+        },
         404: {"description": "Order or carrier not found", "model": HTTPErrorResponse},
-        409: {"description": "Conflict: tracking number already exists", "model": HTTPErrorResponse},
+        409: {
+            "description": "Conflict: tracking number already exists",
+            "model": HTTPErrorResponse,
+        },
     },
 )
 async def create_shipping_label(
     order_id: int,
     payload: ShippingLabelCreate,
-    x_brand_id: int = Depends(get_tenant_brand_id),
+    tenant_brand_id: int = Depends(get_current_brand),
     db: AsyncSession = Depends(get_db),
 ) -> ShippingLabel:
     """Register and associate a new shipping label with the specified order."""
@@ -136,16 +170,11 @@ async def create_shipping_label(
             db=db,
             order_id=order_id,
             payload=payload,
-            tenant_brand_id=x_brand_id,
+            tenant_brand_id=tenant_brand_id,
         )
     except EntityNotFoundError as exc:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except TenantForbiddenError as exc:
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
     except DuplicateTrackingNumberError as exc:
@@ -162,14 +191,16 @@ async def create_shipping_label(
     status_code=http_status.HTTP_200_OK,
     summary="List shipping labels for an order (RN-07)",
     responses={
-        200: {"description": "List of shipping labels associated with order", "model": list[ShippingLabelResponse]},
-        403: {"description": "Access denied: order does not belong to brand (RN-10)", "model": HTTPErrorResponse},
+        200: {
+            "description": "List of shipping labels associated with order",
+            "model": list[ShippingLabelResponse],
+        },
         404: {"description": "Order not found", "model": HTTPErrorResponse},
     },
 )
 async def get_shipping_labels(
     order_id: int,
-    x_brand_id: int = Depends(get_tenant_brand_id),
+    tenant_brand_id: int = Depends(get_current_brand),
     db: AsyncSession = Depends(get_db),
 ) -> list[ShippingLabel]:
     """Retrieve all shipping labels associated with the specified order."""
@@ -177,16 +208,11 @@ async def get_shipping_labels(
         shipping_labels = await shipping_label_service.get_shipping_labels_by_order(
             db=db,
             order_id=order_id,
-            tenant_brand_id=x_brand_id,
+            tenant_brand_id=tenant_brand_id,
         )
     except EntityNotFoundError as exc:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except TenantForbiddenError as exc:
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
     return shipping_labels

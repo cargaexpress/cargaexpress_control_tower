@@ -1,12 +1,14 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class HTTPErrorResponse(BaseModel):
     """Standard error response schema for the API."""
 
-    detail: str = Field(
+    detail: str | list[dict[str, Any]] = Field(
         ...,
-        description="Detailed explanatory error message.",
+        description="Detailed error message or structured request-validation errors.",
         examples=["Requested resource was not found."],
     )
     error_code: str | None = Field(

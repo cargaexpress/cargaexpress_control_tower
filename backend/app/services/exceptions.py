@@ -25,10 +25,22 @@ class DuplicateTrackingNumberError(Exception):
         super().__init__(f"Tracking number '{tracking_number}' is already registered")
 
 
+class DuplicateOrderReferenceError(Exception):
+    """Raised when an order reference is already registered for its brand."""
+
+    def __init__(self, brand_order_ref: str) -> None:
+        self.brand_order_ref = brand_order_ref
+        super().__init__(
+            f"Order reference '{brand_order_ref}' is already registered for this brand"
+        )
+
+
 class DuplicateMappingError(Exception):
     """Raised when a state mapping violates uniqueness for (carrier_id, raw_status)."""
 
-    def __init__(self, message: str = "A mapping already exists for this carrier and status.") -> None:
+    def __init__(
+        self, message: str = "A mapping already exists for this carrier and status."
+    ) -> None:
         super().__init__(message)
 
 
