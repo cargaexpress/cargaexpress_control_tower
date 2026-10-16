@@ -1,5 +1,7 @@
 from decimal import Decimal
+
 import pytest
+
 from app.models.brand import Brand
 from app.models.carrier import Carrier
 from app.models.distribution_center import DistributionCenter
@@ -84,19 +86,29 @@ async def test_create_shipping_label_success(client, db_session):
 async def test_create_multiple_shipping_labels_split_order(client, db_session):
     """Register two or more shipping labels for the same order (split order scenario for CA-03)."""
     brand_a, _, dc, st, carrier_1, carrier_2 = await _seed_test_context(db_session)
-    order = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="SPLIT-ORDER-99")
+    order = await _create_test_order(
+        db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="SPLIT-ORDER-99"
+    )
 
     # Label 1 (Package 1 / Carrier 1)
     res_1 = await client.post(
         f"/api/v1/orders/{order.order_id}/shipping-labels",
-        json={"tracking_number": "SPLIT-TRK-01", "carrier_id": carrier_1.carrier_id, "weight_kg": 1.25},
+        json={
+            "tracking_number": "SPLIT-TRK-01",
+            "carrier_id": carrier_1.carrier_id,
+            "weight_kg": 1.25,
+        },
     )
     assert res_1.status_code == 201
 
     # Label 2 (Package 2 / Carrier 2)
     res_2 = await client.post(
         f"/api/v1/orders/{order.order_id}/shipping-labels",
-        json={"tracking_number": "SPLIT-TRK-02", "carrier_id": carrier_2.carrier_id, "weight_kg": 3.75},
+        json={
+            "tracking_number": "SPLIT-TRK-02",
+            "carrier_id": carrier_2.carrier_id,
+            "weight_kg": 3.75,
+        },
     )
     assert res_2.status_code == 201
 
@@ -131,8 +143,12 @@ async def test_get_shipping_labels_success(client, db_session):
     """Query shipping labels associated with an order and ensure only labels for that order ID are returned."""
     brand_a, _, dc, st, carrier, _ = await _seed_test_context(db_session)
 
-    order_1 = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-1")
-    order_2 = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-2")
+    order_1 = await _create_test_order(
+        db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-1"
+    )
+    order_2 = await _create_test_order(
+        db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-2"
+    )
 
     # Label for order 1
     await client.post(
@@ -164,43 +180,64 @@ async def test_get_shipping_labels_order_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_tenant_isolation_forbidden(client, db_session):
-    """Attempt to register or query shipping labels of an order belonging to another brand (returns 403)."""
+async def test_tenant_isolation_uses_api_key_and_hides_other_brand_orders(
+    client, db_session, monkeypatch
+):
+    """A brand credential cannot access another brand's order or labels."""
     brand_a, brand_b, dc, st, carrier, _ = await _seed_test_context(db_session)
-    order_a = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-BRAND-A")
-
-    # Attempt to create label in Brand A's order using Brand B's context
-    headers_brand_b = {"X-Brand-Id": str(brand_b.brand_id)}
-    post_res = await client.post(
-        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
-        json={"tracking_number": "TRK-ISOLATION-TEST", "carrier_id": carrier.carrier_id},
-        headers=headers_brand_b,
+    order_a = await _create_test_order(
+        db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-BRAND-A"
     )
-    assert post_res.status_code == 403
-    assert "does not belong to brand" in post_res.json()["detail"].lower()
+    order_b = await _create_test_order(
+        db_session, brand_b.brand_id, dc.dc_id, st.shipment_type_code, ref="ORD-BRAND-B"
+    )
+    api_key_a = client.headers["X-API-Key"]
+    api_key_b = "brand-b-test-key"
+    monkeypatch.setattr(
+        "app.config.settings.brand_api_keys",
+        {api_key_a: brand_a.brand_id, api_key_b: brand_b.brand_id},
+    )
 
-    # Create label under legitimate Brand A context
-    headers_brand_a = {"X-Brand-Id": str(brand_a.brand_id)}
-    valid_post = await client.post(
-        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
+    # A forged tenant header cannot grant access to Brand B's order.
+    headers_brand_a = {"X-API-Key": api_key_a, "X-Brand-Id": str(brand_b.brand_id)}
+    list_res = await client.get("/api/v1/orders", headers=headers_brand_a)
+    assert list_res.status_code == 200
+    assert [item["order_id"] for item in list_res.json()["items"]] == [order_a.order_id]
+    assert list_res.json()["total"] == 1
+
+    get_res = await client.get(f"/api/v1/orders/{order_b.order_id}", headers=headers_brand_a)
+    assert get_res.status_code == 404
+    patch_res = await client.patch(
+        f"/api/v1/orders/{order_b.order_id}/status",
+        json={"status": "PICKED_UP"},
+        headers=headers_brand_a,
+    )
+    assert patch_res.status_code == 404
+
+    post_res = await client.post(
+        f"/api/v1/orders/{order_b.order_id}/shipping-labels",
         json={"tracking_number": "TRK-ISOLATION-TEST", "carrier_id": carrier.carrier_id},
         headers=headers_brand_a,
     )
-    assert valid_post.status_code == 201
-
-    # Attempt to query labels of Brand A's order using Brand B's context (returns 403)
-    get_res = await client.get(
-        f"/api/v1/orders/{order_a.order_id}/shipping-labels",
-        headers=headers_brand_b,
+    assert post_res.status_code == 404
+    label_list_res = await client.get(
+        f"/api/v1/orders/{order_b.order_id}/shipping-labels",
+        headers=headers_brand_a,
     )
-    assert get_res.status_code == 403
-    assert "does not belong to brand" in get_res.json()["detail"].lower()
+    assert label_list_res.status_code == 404
+
+    # The credential associated with Brand B can access its own order.
+    own_order_res = await client.get(
+        f"/api/v1/orders/{order_b.order_id}",
+        headers={"X-API-Key": api_key_b},
+    )
+    assert own_order_res.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_create_shipping_label_duplicate_tracking_number_returns_409(client, db_session):
     """Validate that an already assigned tracking number cannot be reused (409 Conflict)."""
-    brand_a, _, dc, st, carrier, _ = await _seed_test_context(db_session)
+    brand_a, _, dc, st, carrier, other_carrier = await _seed_test_context(db_session)
     order = await _create_test_order(db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code)
 
     payload = {"tracking_number": "TRK-DUP-001", "carrier_id": carrier.carrier_id}
@@ -208,7 +245,10 @@ async def test_create_shipping_label_duplicate_tracking_number_returns_409(clien
     res_1 = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
     assert res_1.status_code == 201
 
-    res_2 = await client.post(f"/api/v1/orders/{order.order_id}/shipping-labels", json=payload)
+    duplicate_payload = {**payload, "carrier_id": other_carrier.carrier_id}
+    res_2 = await client.post(
+        f"/api/v1/orders/{order.order_id}/shipping-labels", json=duplicate_payload
+    )
     assert res_2.status_code == 409
     assert "already registered" in res_2.json()["detail"].lower()
 
