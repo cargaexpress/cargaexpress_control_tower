@@ -9,7 +9,7 @@ Alembic y PostgreSQL.
 - Documentación interactiva de la API en `http://localhost:8000/docs`.
 - Health check en `GET /api/v1/health`.
 - Modelos y migraciones para 11 tablas WMS más `state_mapping`.
-- Revisión Alembic actual: `c4a1209b7e6f`.
+- Revisión Alembic actual: `f6b2a9d14c83`.
 - Seed inicial de tres transportadoras simuladas y sus mapeos canónicos; no hay
   órdenes de ejemplo.
 - **HU-12 — Mapeo de estados:** API administrativa con caché invalidable y
@@ -20,8 +20,8 @@ Alembic y PostgreSQL.
   `backend/tests/test_orders.py`.
 - **RN-07 — Pedidos Divididos en Múltiples Guías:** Endpoints para asociar (`POST`)
   y listar (`GET`) guías vinculadas a un pedido bajo `/api/v1/orders/{order_id}/shipping-labels`,
-  con soporte de aislamiento multitenant (RN-10 con header `X-Brand-Id`), unicidad
-  de códigos de rastreo y pruebas en `backend/tests/test_order_shipping_labels.py`.
+  con aislamiento multitenant derivado de `X-API-Key` y `BRAND_API_KEYS`; el
+  header `X-Brand-Id` no determina el tenant. `tracking_number` es único globalmente.
 - Las reglas para impedir retrocesos desde estados terminales y registrar
   anomalías (RN-02) todavía no están implementadas.
 
@@ -70,6 +70,9 @@ DB_PORT=5432
 APP_ENV=development
 SQL_ECHO=false
 ADMIN_API_KEY=
+API_KEY=
+BRAND_API_KEYS={}
+LOG_LEVEL=INFO
 STATE_MAPPING_CACHE_TTL_SECONDS=300
 ```
 
@@ -77,8 +80,16 @@ Reemplaza `change_me_local_only` por una contraseña propia. No guardes
 credenciales reales en el repositorio; `.env` está ignorado por Git.
 `POSTGRES_USER` y `POSTGRES_PASSWORD` son obligatorias. Las demás variables son
 opcionales y tienen valores predeterminados en `docker-compose.yml`.
+`API_KEY` configura la clave compartida. Para los endpoints de pedidos y guías,
+configura `BRAND_API_KEYS` como un objeto JSON que asocia cada clave API con su
+`brand_id`, por ejemplo `{"<clave-segura-de-marca-a>":1,"<clave-segura-de-marca-b>":2}`.
+El tenant se obtiene de `X-API-Key`; ni `X-Brand-Id` ni el `brand_id` enviado en
+el cuerpo pueden cambiarlo. `LOG_LEVEL` acepta `DEBUG`, `INFO`, `WARNING`,
+`ERROR` o `CRITICAL` y su valor predeterminado es `INFO`.
 Configura `ADMIN_API_KEY` con una clave propia para habilitar los endpoints
 administrativos; si está vacía, estos responden `503`.
+En producción, `API_KEY`, `ADMIN_API_KEY` y cada clave de `BRAND_API_KEYS` deben
+tener al menos 32 caracteres y no comenzar con `change_me`.
 
 ### 2. Levantar todo con un comando
 
@@ -108,7 +119,7 @@ docker compose exec backend alembic current
 Debe mostrar:
 
 ```text
-c4a1209b7e6f (head)
+f6b2a9d14c83 (head)
 ```
 
 Comprobar el estado del API:
@@ -231,6 +242,14 @@ Los modelos SQLAlchemy están en `backend/app/models/`; las migraciones, en
 `backend/alembic/versions/`. Alembic registra esos modelos desde
 `backend/alembic/env.py`.
 
+La migración `f6b2a9d14c83` agrega unicidad global a
+`shipping_labels.tracking_number` y unicidad por marca a
+`(orders.brand_id, orders.brand_order_ref)`. También crea índices para
+`orders.brand_id`, `orders.status`, `shipping_labels.order_id` y
+`shipping_labels.carrier_id`. Antes de crear las restricciones, la migración
+falla con instrucciones claras si encuentra duplicados existentes; deduplica
+esos datos y vuelve a ejecutar la migración.
+
 ## Comandos útiles
 
 ```powershell
@@ -252,7 +271,10 @@ docker compose --profile test up --build --abort-on-container-exit --exit-code-f
 
 Docker construye una imagen de pruebas con las dependencias de desarrollo,
 inicia una PostgreSQL aislada para tests, restablece sus migraciones y ejecuta
-`pytest`. No borra ni modifica la base de datos normal del proyecto.
+`pytest` para `backend/tests/` y las pruebas raíz de `tests/`, incluyendo los
+simuladores. Antes de pytest ejecuta `alembic upgrade head` y `alembic check`
+para detectar drift entre las migraciones y los modelos. No borra ni modifica
+la base de datos normal del proyecto.
 Las dependencias de prueba no se incluyen en la imagen del backend de producción.
 
 Para detener y además borrar los datos persistidos:
@@ -275,10 +297,23 @@ uv run uvicorn app.main:app --reload
 ```
 
 Configura `backend/.env` con la URL apropiada y asegúrate de tener PostgreSQL
-disponible. Para pruebas:
+disponible. Desde `backend`, ejecuta las comprobaciones de lint, formato y tipos:
 
 ```powershell
-uv run pytest -v
+uv sync --frozen
+uv run ruff check --config pyproject.toml app tests ../simulators ../tests ../scripts
+uv run ruff format --config pyproject.toml --check app tests ../simulators ../tests ../scripts
+uv run mypy app
+```
+
+Para pruebas locales, configura `DATABASE_URL` y `TEST_DATABASE_URL` para una
+base PostgreSQL **aislada de pruebas**; ambas deben apuntar a esa base para
+aplicar las migraciones y ejecutar los tests:
+
+```powershell
+uv run alembic upgrade head
+uv run alembic check
+uv run pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80 tests ../tests
 ```
 
 ## Estructura principal
@@ -287,16 +322,23 @@ uv run pytest -v
 .
 ├── backend/
 │   ├── app/
-│   │   └── models/
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── routers/
+│   │   ├── schemas/
+│   │   └── services/
 │   ├── alembic/
 │   │   └── versions/
+│   ├── tests/
 │   ├── Dockerfile
-│   ├── .dockerignore
 │   ├── pyproject.toml
 │   └── uv.lock
+├── simulators/
+├── tests/
+├── scripts/
+├── docs/
+│   └── api/
+│       └── openapi.json
 ├── docker-compose.yml
 └── README.md
 ```
-
-`.dockerignore` evita enviar al contexto de build archivos locales como
-entornos virtuales, secretos, cachés y pruebas.

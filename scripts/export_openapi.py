@@ -21,7 +21,9 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 # Minimal environment variables to initialize Settings() without error when no .env is loaded
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://cargaexpress:cargaexpress@localhost:5432/cargaexpress")
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+asyncpg://cargaexpress:cargaexpress@localhost:5432/cargaexpress"
+)
 
 from app.main import app  # noqa: E402
 

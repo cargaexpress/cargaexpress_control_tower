@@ -6,6 +6,22 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/docs/api/openapi.json": {
+      "get": {
+        "summary": "Docs Api Openapi Json",
+        "operationId": "docs_api_openapi_json_docs_api_openapi_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health": {
       "get": {
         "tags": [
@@ -24,46 +40,35 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Bad request or invalid input.",
+          }
+        }
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness probe",
+        "description": "Returns 200 only when the database is reachable.",
+        "operationId": "readiness_check_api_v1_ready_get",
+        "responses": {
+          "200": {
+            "description": "The service is ready to serve traffic.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
           },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
+          "503": {
+            "description": "The database is not reachable.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -98,7 +103,7 @@
             }
           },
           {
-            "name": "x-admin-token",
+            "name": "X-Admin-Token",
             "in": "header",
             "required": false,
             "schema": {
@@ -129,16 +134,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
@@ -149,25 +144,12 @@
               }
             }
           },
-          "404": {
-            "description": "Resource not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -183,7 +165,7 @@
         "operationId": "create_mapping_api_v1_admin_state_mappings_post",
         "parameters": [
           {
-            "name": "x-admin-token",
+            "name": "X-Admin-Token",
             "in": "header",
             "required": false,
             "schema": {
@@ -220,16 +202,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
@@ -250,19 +222,6 @@
               }
             }
           },
-          "422": {
-            "description": "Validation error in payload (e.g. invalid canonical status or blank raw status)."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "409": {
             "description": "Mapping already exists for this carrier and status.",
             "content": {
@@ -272,6 +231,9 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation error in payload (e.g. invalid canonical status or blank raw status)."
           }
         }
       }
@@ -306,7 +268,7 @@
             }
           },
           {
-            "name": "x-admin-token",
+            "name": "X-Admin-Token",
             "in": "header",
             "required": false,
             "schema": {
@@ -333,16 +295,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
@@ -364,14 +316,11 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -398,7 +347,7 @@
             }
           },
           {
-            "name": "x-admin-token",
+            "name": "X-Admin-Token",
             "in": "header",
             "required": false,
             "schema": {
@@ -435,16 +384,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
@@ -465,19 +404,6 @@
               }
             }
           },
-          "422": {
-            "description": "Validation error in payload."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "409": {
             "description": "Updated raw status conflicts with an existing mapping.",
             "content": {
@@ -487,6 +413,9 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation error in payload."
           }
         }
       },
@@ -508,7 +437,7 @@
             }
           },
           {
-            "name": "x-admin-token",
+            "name": "X-Admin-Token",
             "in": "header",
             "required": false,
             "schema": {
@@ -527,16 +456,6 @@
         "responses": {
           "204": {
             "description": "State mapping deleted successfully."
-          },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
           },
           "401": {
             "description": "Unauthorized access (missing or invalid X-Admin-Token).",
@@ -559,14 +478,11 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -594,7 +510,7 @@
             }
           },
           {
-            "name": "x-admin-token",
+            "name": "X-Admin-Token",
             "in": "header",
             "required": false,
             "schema": {
@@ -621,16 +537,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
@@ -652,14 +558,11 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -685,7 +588,7 @@
             }
           },
           {
-            "name": "x-admin-token",
+            "name": "X-Admin-Token",
             "in": "header",
             "required": false,
             "schema": {
@@ -722,16 +625,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Unauthorized access (missing or invalid X-Admin-Token).",
             "content": {
@@ -752,19 +645,6 @@
               }
             }
           },
-          "422": {
-            "description": "Validation error in payload (e.g. invalid canonical status or duplicate raw status)."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "409": {
             "description": "Concurrent update conflict.",
             "content": {
@@ -774,6 +654,9 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation error in payload (e.g. invalid canonical status or duplicate raw status)."
           }
         }
       }
@@ -786,6 +669,24 @@
         "summary": "Create a new order with lines and recipient (HU-13)",
         "description": "Create an order with its mandatory child lines and recipient details. Validates that referenced brand, distribution center, and shipment type exist.",
         "operationId": "create_order_api_v1_orders_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -817,16 +718,6 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Referenced brand, distribution center, or shipment type not found.",
             "content": {
@@ -837,11 +728,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
+          "409": {
+            "description": "Order reference already exists for this brand.",
             "content": {
               "application/json": {
                 "schema": {
@@ -849,6 +737,9 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation error in entity or payload."
           }
         }
       },
@@ -882,6 +773,22 @@
               "default": 50,
               "title": "Limit"
             }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
           }
         ],
         "responses": {
@@ -895,48 +802,8 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "422": {
             "description": "Validation error in pagination query parameters."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -958,6 +825,22 @@
               "type": "integer",
               "title": "Order Id"
             }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
           }
         ],
         "responses": {
@@ -967,26 +850,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrderRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
                 }
               }
             }
@@ -1003,16 +866,6 @@
           },
           "422": {
             "description": "Validation error in order ID path parameter."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -1033,6 +886,22 @@
             "schema": {
               "type": "integer",
               "title": "Order Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
             }
           }
         ],
@@ -1057,26 +926,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Order not found.",
             "content": {
@@ -1089,16 +938,6 @@
           },
           "422": {
             "description": "Validation error in order ID or status payload."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -1122,19 +961,19 @@
             }
           },
           {
-            "name": "X-Brand-Id",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "X-Brand-Id"
+              "title": "X-Api-Key"
             }
           }
         ],
@@ -1169,41 +1008,8 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Order or carrier not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access denied: order does not belong to brand (RN-10)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1218,6 +1024,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1242,19 +1058,19 @@
             }
           },
           {
-            "name": "X-Brand-Id",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "X-Brand-Id"
+              "title": "X-Api-Key"
             }
           }
         ],
@@ -1273,26 +1089,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Order not found",
             "content": {
@@ -1304,87 +1100,11 @@
             }
           },
           "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access denied: order does not belong to brand (RN-10)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/docs/api/openapi.json": {
-      "get": {
-        "tags": [
-          "openapi contract"
-        ],
-        "summary": "Export OpenAPI specification in JSON format",
-        "description": "Returns full application OpenAPI 3.1 serialized schema.",
-        "operationId": "get_openapi_spec_docs_api_openapi_json_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request or invalid input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing or invalid credentials).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Resource not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation error in entity or payload."
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1559,9 +1279,20 @@
       "HTTPErrorResponse": {
         "properties": {
           "detail": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            ],
             "title": "Detail",
-            "description": "Detailed explanatory error message.",
+            "description": "Detailed error message or structured request-validation errors.",
             "examples": [
               "Requested resource was not found."
             ]
@@ -1592,6 +1323,19 @@
           "detail": "Requested resource was not found in the system.",
           "error_code": "NOT_FOUND"
         }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "HealthResponse": {
         "properties": {
@@ -1695,6 +1439,16 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "CREATED",
+              "PICKED_UP",
+              "IN_TRANSIT",
+              "OUT_FOR_DELIVERY",
+              "EXCEPTION",
+              "DELIVERED",
+              "RETURNED",
+              "LOST_OR_DAMAGED"
+            ],
             "title": "Status",
             "description": "Initial operational status of the order.",
             "default": "CREATED",
@@ -2041,6 +1795,7 @@
           "destination_country",
           "freight_value",
           "status",
+          "created_at",
           "order_lines",
           "recipient"
         ],
@@ -2207,6 +1962,16 @@
         "properties": {
           "status": {
             "type": "string",
+            "enum": [
+              "CREATED",
+              "PICKED_UP",
+              "IN_TRANSIT",
+              "OUT_FOR_DELIVERY",
+              "EXCEPTION",
+              "DELIVERED",
+              "RETURNED",
+              "LOST_OR_DAMAGED"
+            ],
             "title": "Status",
             "description": "New operational status of the order.",
             "examples": [
@@ -2283,25 +2048,22 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "CREATED",
+              "PICKED_UP",
+              "IN_TRANSIT",
+              "OUT_FOR_DELIVERY",
+              "EXCEPTION",
+              "DELIVERED",
+              "RETURNED",
+              "LOST_OR_DAMAGED"
+            ],
             "title": "Status",
             "description": "Initial canonical status of the shipping label according to RN-01.",
-            "default": "CREADO",
+            "default": "CREATED",
             "examples": [
-              "CREADO"
+              "CREATED"
             ]
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata",
-            "description": "Optional initial metadata for the label."
           }
         },
         "type": "object",
@@ -2351,7 +2113,7 @@
             "title": "Status",
             "description": "Current canonical status of the label in logistics cycle.",
             "examples": [
-              "CREADO"
+              "CREATED"
             ]
           },
           "weight_kg": {
@@ -2592,6 +2354,46 @@
           "canonical_status": "OUT_FOR_DELIVERY",
           "raw_status": "En ruta de entrega"
         }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   },
@@ -2614,7 +2416,7 @@
     },
     {
       "name": "openapi contract",
-      "description": "Download and interactive inspection of OpenAPI / Swagger contract."
+      "description": "OpenAPI metadata and contract validation for the platform API surface."
     }
   ]
 }
