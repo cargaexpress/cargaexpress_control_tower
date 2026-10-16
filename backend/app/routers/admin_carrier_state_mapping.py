@@ -37,8 +37,14 @@ def _to_response(carrier: Carrier, rows: list[StateMapping]) -> CarrierStateMapp
     summary="Retrieve state mappings for a specific carrier (HU-15)",
     description="Retrieve all current status mappings configured for the given carrier directly from the database.",
     responses={
-        200: {"description": "Carrier state mappings retrieved successfully.", "model": CarrierStateMappingResponse},
-        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        200: {
+            "description": "Carrier state mappings retrieved successfully.",
+            "model": CarrierStateMappingResponse,
+        },
+        401: {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "model": HTTPErrorResponse,
+        },
         404: {"description": "Carrier not found.", "model": HTTPErrorResponse},
     },
 )
@@ -59,11 +65,19 @@ async def get_carrier_mapping(
     summary="Replace entire state mapping set for a carrier (HU-15)",
     description="Synchronize and replace the complete set of status mappings for a carrier in an atomic transaction.",
     responses={
-        200: {"description": "Carrier state mappings synchronized successfully.", "model": CarrierStateMappingResponse},
-        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        200: {
+            "description": "Carrier state mappings synchronized successfully.",
+            "model": CarrierStateMappingResponse,
+        },
+        401: {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "model": HTTPErrorResponse,
+        },
         404: {"description": "Carrier not found.", "model": HTTPErrorResponse},
         409: {"description": "Concurrent update conflict.", "model": HTTPErrorResponse},
-        422: {"description": "Validation error in payload (e.g. invalid canonical status or duplicate raw status)."},
+        422: {
+            "description": "Validation error in payload (e.g. invalid canonical status or duplicate raw status)."
+        },
     },
 )
 async def update_carrier_mapping(

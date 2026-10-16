@@ -34,7 +34,10 @@ MAPPING_NOT_FOUND = "Mapping does not exist."
     description="Retrieve all configured status mappings, optionally filtered by carrier ID.",
     responses={
         200: {"description": "List of state mappings retrieved successfully."},
-        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        401: {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "model": HTTPErrorResponse,
+        },
     },
 )
 async def list_mappings(
@@ -53,7 +56,10 @@ async def list_mappings(
     description="Translate a carrier's raw status to the normalized canonical status using the in-memory cache.",
     responses={
         200: {"description": "Status resolved successfully.", "model": StateMappingResolved},
-        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        401: {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "model": HTTPErrorResponse,
+        },
         404: {"description": "No mapping found for given status.", "model": HTTPErrorResponse},
     },
 )
@@ -77,10 +83,18 @@ async def resolve_mapping(
     description="Register a new single mapping between a carrier's raw status and a canonical status.",
     responses={
         201: {"description": "State mapping created successfully.", "model": StateMappingRead},
-        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        401: {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "model": HTTPErrorResponse,
+        },
         404: {"description": "Carrier does not exist.", "model": HTTPErrorResponse},
-        409: {"description": "Mapping already exists for this carrier and status.", "model": HTTPErrorResponse},
-        422: {"description": "Validation error in payload (e.g. invalid canonical status or blank raw status)."},
+        409: {
+            "description": "Mapping already exists for this carrier and status.",
+            "model": HTTPErrorResponse,
+        },
+        422: {
+            "description": "Validation error in payload (e.g. invalid canonical status or blank raw status)."
+        },
     },
 )
 async def create_mapping(
@@ -101,9 +115,15 @@ async def create_mapping(
     description="Modify the raw status or canonical status of an existing mapping by its ID.",
     responses={
         200: {"description": "State mapping updated successfully.", "model": StateMappingRead},
-        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        401: {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "model": HTTPErrorResponse,
+        },
         404: {"description": "Mapping does not exist.", "model": HTTPErrorResponse},
-        409: {"description": "Updated raw status conflicts with an existing mapping.", "model": HTTPErrorResponse},
+        409: {
+            "description": "Updated raw status conflicts with an existing mapping.",
+            "model": HTTPErrorResponse,
+        },
         422: {"description": "Validation error in payload."},
     },
 )
@@ -125,7 +145,10 @@ async def update_mapping(
     description="Remove a state mapping record by its primary key ID.",
     responses={
         204: {"description": "State mapping deleted successfully."},
-        401: {"description": "Unauthorized access (missing or invalid X-Admin-Token).", "model": HTTPErrorResponse},
+        401: {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "model": HTTPErrorResponse,
+        },
         404: {"description": "Mapping does not exist.", "model": HTTPErrorResponse},
     },
 )

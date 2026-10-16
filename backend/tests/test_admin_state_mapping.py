@@ -12,11 +12,12 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
-from tests.conftest import TestSessionLocal as AsyncSessionLocal, test_engine as engine
 from app.main import app
 from app.models.carrier import Carrier
 from app.models.state_mapping import StateMapping
 from app.services.state_mapping_cache import state_mapping_cache
+from tests.conftest import TestSessionLocal as AsyncSessionLocal
+from tests.conftest import test_engine as engine
 
 URL = "/api/v1/admin/state-mappings"
 ADMIN = {"X-Admin-Token": "test-admin-key"}
@@ -92,7 +93,11 @@ async def resolve(client, carrier_id, source_status):
 async def test_changes_are_reflected_without_restarting(client, carrier_id):
     created = await client.post(
         URL,
-        json={"carrier_id": carrier_id, "raw_status": " SHIPPED ", "canonical_status": "in_transit"},
+        json={
+            "carrier_id": carrier_id,
+            "raw_status": " SHIPPED ",
+            "canonical_status": "in_transit",
+        },
         headers=ADMIN,
     )
     assert created.status_code == 201
@@ -124,10 +129,14 @@ async def test_create_validations(client, carrier_id):
     duplicate = await client.post(URL, json=payload, headers=ADMIN)
     assert duplicate.status_code == 409
 
-    unknown_carrier = await client.post(URL, json={**payload, "carrier_id": 999_999_999}, headers=ADMIN)
+    unknown_carrier = await client.post(
+        URL, json={**payload, "carrier_id": 999_999_999}, headers=ADMIN
+    )
     assert unknown_carrier.status_code == 404
 
-    bad_canonical = await client.post(URL, json={**payload, "canonical_status": "NOPE"}, headers=ADMIN)
+    bad_canonical = await client.post(
+        URL, json={**payload, "canonical_status": "NOPE"}, headers=ADMIN
+    )
     assert bad_canonical.status_code == 422
     obsolete_canonical = await client.post(
         URL, json={**payload, "canonical_status": "CANCELLED"}, headers=ADMIN
@@ -175,7 +184,9 @@ async def test_update_to_an_existing_source_status_is_a_conflict(client, carrier
 
 
 async def test_patch_and_delete_of_missing_mapping_return_404(client, db_ready):
-    assert (await client.patch(f"{URL}/999999999", json={"canonical_status": "CREATED"}, headers=ADMIN)).status_code == 404
+    assert (
+        await client.patch(f"{URL}/999999999", json={"canonical_status": "CREATED"}, headers=ADMIN)
+    ).status_code == 404
     assert (await client.delete(f"{URL}/999999999", headers=ADMIN)).status_code == 404
 
 
@@ -196,4 +207,6 @@ async def test_list_reads_from_the_database_and_filters_by_carrier(client, carri
 
     assert [m["raw_status"] for m in response.json()] == ["ONLY"]
     async with AsyncSessionLocal() as session:
-        assert (await session.scalars(select(StateMapping).where(StateMapping.carrier_id == carrier_id))).all()
+        assert (
+            await session.scalars(select(StateMapping).where(StateMapping.carrier_id == carrier_id))
+        ).all()

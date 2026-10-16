@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TYPE_CHECKING, Literal, get_args
 
 from sqlalchemy import (
     BigInteger,
@@ -13,9 +14,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
+if TYPE_CHECKING:
+    from app.models.carrier import Carrier
+
 # This shared catalog is enforced in both API validation and the database.
 # Strings plus a CHECK constraint avoid a DB enum migration for catalog changes.
-CANONICAL_STATUSES: tuple[str, ...] = (
+CanonicalStatus = Literal[
     "CREATED",
     "PICKED_UP",
     "IN_TRANSIT",
@@ -24,7 +28,8 @@ CANONICAL_STATUSES: tuple[str, ...] = (
     "DELIVERED",
     "RETURNED",
     "LOST_OR_DAMAGED",
-)
+]
+CANONICAL_STATUSES: tuple[str, ...] = get_args(CanonicalStatus)
 
 _CANONICAL_STATUS_VALUES = ", ".join(f"'{status}'" for status in CANONICAL_STATUSES)
 

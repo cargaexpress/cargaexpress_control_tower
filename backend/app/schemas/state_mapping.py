@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -114,14 +114,16 @@ class StateMappingRead(BaseModel):
     id: int = Field(..., description="Mapping record ID.", examples=[1])
     carrier_id: int = Field(..., description="Associated carrier ID.", examples=[1])
     raw_status: str = Field(..., description="Source raw status.", examples=["En reparto"])
-    canonical_status: str = Field(..., description="Standardized canonical status.", examples=["OUT_FOR_DELIVERY"])
+    canonical_status: str = Field(
+        ..., description="Standardized canonical status.", examples=["OUT_FOR_DELIVERY"]
+    )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Record creation date and time.",
         examples=["2026-10-13T10:00:00Z"],
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Date and time of last update.",
         examples=["2026-10-13T10:00:00Z"],
     )
@@ -132,7 +134,11 @@ class StateMappingResolved(BaseModel):
 
     carrier_id: int = Field(..., description="Queried carrier ID.", examples=[1])
     raw_status: str = Field(..., description="Received raw status.", examples=["En reparto"])
-    canonical_status: str = Field(..., description="Corresponding canonical status from active mapping.", examples=["OUT_FOR_DELIVERY"])
+    canonical_status: str = Field(
+        ...,
+        description="Corresponding canonical status from active mapping.",
+        examples=["OUT_FOR_DELIVERY"],
+    )
 
     model_config = ConfigDict(
         json_schema_extra={

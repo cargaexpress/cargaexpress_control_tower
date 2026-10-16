@@ -13,9 +13,7 @@ from app.services.exceptions import DuplicateMappingError, EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
 
 
-async def list_mappings(
-    db: AsyncSession, carrier_id: int | None = None
-) -> list[StateMapping]:
+async def list_mappings(db: AsyncSession, carrier_id: int | None = None) -> list[StateMapping]:
     """Retrieve persisted mappings, optionally filtered by carrier."""
     return await StateMappingRepository.list_by_carrier(db, carrier_id)
 

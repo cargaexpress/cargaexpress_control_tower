@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -79,9 +79,11 @@ class CarrierStateMappingRead(BaseModel):
 
     id: int = Field(..., description="Mapping record ID.", examples=[1])
     raw_status: str = Field(..., description="Source raw status.", examples=["En reparto"])
-    canonical_status: str = Field(..., description="Normalized canonical status.", examples=["OUT_FOR_DELIVERY"])
+    canonical_status: str = Field(
+        ..., description="Normalized canonical status.", examples=["OUT_FOR_DELIVERY"]
+    )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Date and time of last update.",
         examples=["2026-10-13T10:00:00Z"],
     )

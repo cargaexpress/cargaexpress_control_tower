@@ -120,7 +120,9 @@ async def test_get_always_shows_what_is_in_the_database_even_with_a_warm_cache(
 async def test_put_replaces_the_whole_mapping(client, db_session, carrier_id):
     await _seed(db_session, carrier_id, {"A": "CREATED", "B": "IN_TRANSIT", "C": "DELIVERED"})
 
-    response = await _put(client, carrier_id, {"B": "DELIVERED", "C": "DELIVERED", "D": "EXCEPTION"})
+    response = await _put(
+        client, carrier_id, {"B": "DELIVERED", "C": "DELIVERED", "D": "EXCEPTION"}
+    )
 
     assert response.status_code == 200
     expected = {"B": "DELIVERED", "C": "DELIVERED", "D": "EXCEPTION"}  # A disappears
@@ -133,7 +135,10 @@ async def test_put_keeps_ids_of_unchanged_entries_and_ignores_other_carriers(
 ):
     await _seed(db_session, carrier_id, {"A": "CREATED", "B": "IN_TRANSIT"})
     await _seed(db_session, other_carrier_id, {"A": "DELIVERED"})
-    before = {m["raw_status"]: m["id"] for m in (await client.get(f"{BASE}/{carrier_id}", headers=ADMIN)).json()["mappings"]}
+    before = {
+        m["raw_status"]: m["id"]
+        for m in (await client.get(f"{BASE}/{carrier_id}", headers=ADMIN)).json()["mappings"]
+    }
 
     await _put(client, carrier_id, {"A": "CREATED", "B": "DELIVERED"})
 
@@ -150,9 +155,9 @@ async def test_put_is_idempotent(client, carrier_id):
     second = await _put(client, carrier_id, mappings)
 
     assert first.status_code == second.status_code == 200
-    assert [(m["id"], m["raw_status"], m["canonical_status"]) for m in first.json()["mappings"]] == [
-        (m["id"], m["raw_status"], m["canonical_status"]) for m in second.json()["mappings"]
-    ]
+    assert [
+        (m["id"], m["raw_status"], m["canonical_status"]) for m in first.json()["mappings"]
+    ] == [(m["id"], m["raw_status"], m["canonical_status"]) for m in second.json()["mappings"]]
 
 
 async def test_put_normalizes_spaces_and_case(client, carrier_id):
@@ -176,19 +181,33 @@ async def test_put_unknown_carrier_returns_404(client):
     "body",
     [
         {"mappings": [{"raw_status": "A", "canonical_status": "NOPE"}]},
-        {"mappings": [{"raw_status": "A", "canonical_status": "CANCELLED"}]},  # no longer in catalog
+        {
+            "mappings": [{"raw_status": "A", "canonical_status": "CANCELLED"}]
+        },  # no longer in catalog
         {"mappings": [{"raw_status": "   ", "canonical_status": "CREATED"}]},
         {"mappings": [{"raw_status": "x" * 101, "canonical_status": "CREATED"}]},
-        {"mappings": [
-            {"raw_status": "A", "canonical_status": "CREATED"},
-            {"raw_status": " A ", "canonical_status": "DELIVERED"},
-        ]},
+        {
+            "mappings": [
+                {"raw_status": "A", "canonical_status": "CREATED"},
+                {"raw_status": " A ", "canonical_status": "DELIVERED"},
+            ]
+        },
         {"mappings": []},
         {},
     ],
-    ids=["invalid-canonical", "obsolete-canonical", "empty-raw", "too-long-raw", "duplicate-raw", "empty-list", "missing-mappings"],
+    ids=[
+        "invalid-canonical",
+        "obsolete-canonical",
+        "empty-raw",
+        "too-long-raw",
+        "duplicate-raw",
+        "empty-list",
+        "missing-mappings",
+    ],
 )
-async def test_put_with_invalid_body_returns_422_and_changes_nothing(client, db_session, carrier_id, body):
+async def test_put_with_invalid_body_returns_422_and_changes_nothing(
+    client, db_session, carrier_id, body
+):
     await _seed(db_session, carrier_id, {"KEEP": "CREATED"})
 
     response = await client.put(f"{BASE}/{carrier_id}", json=body, headers=ADMIN)
@@ -209,11 +228,17 @@ async def test_non_positive_or_non_numeric_carrier_id_returns_422(client, bad_id
 
 @pytest.mark.parametrize("method", ["get", "put"])
 async def test_admin_token_is_required(client, carrier_id, monkeypatch, method):
-    kwargs = {"json": {"mappings": [{"raw_status": "A", "canonical_status": "CREATED"}]}} if method == "put" else {}
+    kwargs = (
+        {"json": {"mappings": [{"raw_status": "A", "canonical_status": "CREATED"}]}}
+        if method == "put"
+        else {}
+    )
     url = f"{BASE}/{carrier_id}"
 
     assert (await client.request(method, url, **kwargs)).status_code == 401
-    assert (await client.request(method, url, headers={"X-Admin-Token": "invalid-token"}, **kwargs)).status_code == 401
+    assert (
+        await client.request(method, url, headers={"X-Admin-Token": "invalid-token"}, **kwargs)
+    ).status_code == 401
 
     monkeypatch.setattr(settings, "admin_api_key", "")  # no key configured
     assert (await client.request(method, url, headers=ADMIN, **kwargs)).status_code == 503
@@ -222,7 +247,9 @@ async def test_admin_token_is_required(client, carrier_id, monkeypatch, method):
 # ---------- RIWI-75: change is reflected without restarting the service ----------
 
 
-async def test_put_change_is_reflected_without_restarting_the_service(client, db_session, carrier_id):
+async def test_put_change_is_reflected_without_restarting_the_service(
+    client, db_session, carrier_id
+):
     """The same application, the same process, and the same cache instance from start to finish."""
     await _seed(db_session, carrier_id, {"SENT": "IN_TRANSIT", "LOST": "EXCEPTION"})
 
@@ -249,9 +276,13 @@ async def test_put_change_is_reflected_without_restarting_the_service(client, db
     assert await state_mapping_cache.translate(carrier_id, "LOST") is None
 
     # ...in HU-12 endpoint resolving via cache...
-    resolved = await client.get(RESOLVE, params={"carrier_id": carrier_id, "raw_status": "SENT"}, headers=ADMIN)
+    resolved = await client.get(
+        RESOLVE, params={"carrier_id": carrier_id, "raw_status": "SENT"}, headers=ADMIN
+    )
     assert resolved.json()["canonical_status"] == "DELIVERED"
-    lost = await client.get(RESOLVE, params={"carrier_id": carrier_id, "raw_status": "LOST"}, headers=ADMIN)
+    lost = await client.get(
+        RESOLVE, params={"carrier_id": carrier_id, "raw_status": "LOST"}, headers=ADMIN
+    )
     assert lost.status_code == 404
 
     # ...and in GET endpoint.

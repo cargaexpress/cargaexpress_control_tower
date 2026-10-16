@@ -14,7 +14,9 @@ async def _read_mappings(db: AsyncSession, carrier_id: int) -> list[StateMapping
     return await StateMappingRepository.get_mappings_for_carrier(db, carrier_id)
 
 
-async def get_carrier_mapping(db: AsyncSession, carrier_id: int) -> tuple[Carrier, list[StateMapping]]:
+async def get_carrier_mapping(
+    db: AsyncSession, carrier_id: int
+) -> tuple[Carrier, list[StateMapping]]:
     """Retrieve current state mappings for a carrier directly from the database (bypassing cache).
 
     Raises EntityNotFoundError if the carrier does not exist.
