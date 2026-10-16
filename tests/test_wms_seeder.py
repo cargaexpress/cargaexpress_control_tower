@@ -2,10 +2,10 @@
 
 import pytest
 import pytest_asyncio
+from simulators.seed.seed_wms import SeedConfig, WMSSeeder
+from sqlalchemy import BigInteger, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy import select, func
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy import BigInteger
 
 from app.database import Base
 from app.models.brand import Brand
@@ -13,7 +13,6 @@ from app.models.carrier import Carrier
 from app.models.order import Order
 from app.models.shipping_label import ShippingLabel
 from app.models.state_mapping import StateMapping
-from simulators.seed.seed_wms import SeedConfig, WMSSeeder
 
 
 @compiles(BigInteger, "sqlite")

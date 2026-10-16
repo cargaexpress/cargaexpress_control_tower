@@ -38,9 +38,11 @@ COPY backend/app ./app
 COPY backend/alembic ./alembic
 COPY backend/alembic.ini ./
 COPY backend/tests ./tests
+COPY tests ./root_tests
+COPY simulators ./simulators
 COPY scripts ./scripts
 
-CMD ["python", "-m", "pytest", "-v"]
+CMD ["python", "-m", "pytest", "-v", "tests", "root_tests"]
 
 # ---------- Stage 3: runtime image ----------
 FROM python:3.12-slim AS runtime
@@ -64,6 +66,6 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3).status == 200 else 1)"
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/ready', timeout=3).status == 200 else 1)"
 
 CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

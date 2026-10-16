@@ -1,11 +1,11 @@
 """Reproducible batch event file generator for Type C carriers (Source F5)."""
 
 import csv
-from datetime import datetime, timezone
 import hashlib
-from pathlib import Path
 import random
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import openpyxl
 
@@ -34,13 +34,13 @@ class TypeCSimulator:
     def generate_events(
         self,
         num_rows: int = 100,
-        universe_guides: Optional[List[str]] = None,
-        base_datetime: Optional[datetime] = None,
-    ) -> List[Dict[str, Any]]:
+        universe_guides: list[str] | None = None,
+        base_datetime: datetime | None = None,
+    ) -> list[dict[str, Any]]:
         """Generate structured event list, applying defect injection if applicable."""
         if base_datetime is None:
             # Fixed and deterministic base datetime (UTC)
-            base_datetime = datetime(2026, 10, 1, 8, 0, 0, tzinfo=timezone.utc)
+            base_datetime = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
 
         # Determine universe of legitimate waybills
         events_per_guide = max(1, len(self.config.status_flow))
@@ -53,10 +53,15 @@ class TypeCSimulator:
         else:
             guides = [f"WMS-TRK-{self.config.carrier_id}-{i + 1:05d}" for i in range(num_guides)]
 
-        raw_events: List[Dict[str, Any]] = []
+        raw_events: list[dict[str, Any]] = []
 
         hubs_c1 = ["BOGOTA_HUB", "MEDELLIN_HUB", "CALI_HUB", "BARRANQUILLA_HUB"]
-        sucursales_c2 = ["Principal Bogotá", "Centro Medellín", "Occidente Cali", "Caribe Barranquilla"]
+        sucursales_c2 = [
+            "Principal Bogotá",
+            "Centro Medellín",
+            "Occidente Cali",
+            "Caribe Barranquilla",
+        ]
         centers_c3 = ["DC-01", "DC-02", "DC-03", "DC-04"]
 
         for guide_idx, guide in enumerate(guides):
@@ -67,7 +72,7 @@ class TypeCSimulator:
                     break
 
                 event_epoch = guide_start_time + (step_idx * 7200)  # +2 hours per status
-                event_dt = datetime.fromtimestamp(event_epoch, tz=timezone.utc)
+                event_dt = datetime.fromtimestamp(event_epoch, tz=UTC)
                 formatted_dt = event_dt.strftime("%Y-%m-%d %H:%M:%S")
 
                 if self.config.carrier_id == 1:
@@ -79,7 +84,11 @@ class TypeCSimulator:
                         "hub_city": hubs_c1[(guide_idx + step_idx) % len(hubs_c1)],
                     }
                 elif self.config.carrier_id == 2:
-                    obs = "Operación normal" if step_idx < len(self.config.status_flow) - 1 else "Completado"
+                    obs = (
+                        "Operación normal"
+                        if step_idx < len(self.config.status_flow) - 1
+                        else "Completado"
+                    )
                     row = {
                         "numero_guia": guide,
                         "estado_operativo": raw_status,
@@ -122,7 +131,7 @@ class TypeCSimulator:
 
         return final_events
 
-    def write_csv(self, events: List[Dict[str, Any]], output_path: Path) -> Path:
+    def write_csv(self, events: list[dict[str, Any]], output_path: Path) -> Path:
         """Write events to deterministic CSV file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -139,7 +148,7 @@ class TypeCSimulator:
 
         return output_path
 
-    def write_xlsx(self, events: List[Dict[str, Any]], output_path: Path) -> Path:
+    def write_xlsx(self, events: list[dict[str, Any]], output_path: Path) -> Path:
         """Write events to deterministic Excel (.xlsx) file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -162,9 +171,9 @@ class TypeCSimulator:
         self,
         output_dir: Path | str,
         num_rows: int = 100,
-        file_format: Optional[str] = None,
-        filename_prefix: Optional[str] = None,
-        universe_guides: Optional[List[str]] = None,
+        file_format: str | None = None,
+        filename_prefix: str | None = None,
+        universe_guides: list[str] | None = None,
     ) -> Path:
         """Generate dataset and write it in the specified format (csv or xlsx)."""
         target_dir = Path(output_dir)

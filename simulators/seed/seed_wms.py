@@ -8,13 +8,11 @@ Ensures initialization or synchronization of:
 5. Test orders (Orders), lines, recipients, and shipping labels (ShippingLabels).
 """
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal
 import os
 import random
-from typing import Any, Dict, List, Optional
-import uuid
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -26,7 +24,7 @@ from simulators.type_c.catalogs import CARRIERS_REGISTRY
 class SeedConfig:
     seed: int = 42
     orders_count: int = 20
-    carriers_to_seed: List[int] = None
+    carriers_to_seed: list[int] = None
 
     def __post_init__(self):
         if self.carriers_to_seed is None:
@@ -36,12 +34,12 @@ class SeedConfig:
 class WMSSeeder:
     """Idempotent seeder executor on PostgreSQL / WMS."""
 
-    def __init__(self, session: AsyncSession, config: Optional[SeedConfig] = None) -> None:
+    def __init__(self, session: AsyncSession, config: SeedConfig | None = None) -> None:
         self.session = session
         self.config = config or SeedConfig()
         self.rng = random.Random(self.config.seed)
 
-    async def seed_shipment_types(self) -> Dict[str, str]:
+    async def seed_shipment_types(self) -> dict[str, str]:
         """Seed standard shipment types if they do not exist."""
         from app.models.shipment_type import ShipmentType
 
@@ -62,7 +60,7 @@ class WMSSeeder:
         await self.session.flush()
         return created
 
-    async def seed_distribution_centers(self) -> Dict[str, int]:
+    async def seed_distribution_centers(self) -> dict[str, int]:
         """Seed distribution centers if they do not exist."""
         from app.models.distribution_center import DistributionCenter
 
@@ -88,7 +86,7 @@ class WMSSeeder:
             dc_ids[code] = obj.dc_id
         return dc_ids
 
-    async def seed_brands(self) -> Dict[str, int]:
+    async def seed_brands(self) -> dict[str, int]:
         """Seed client brands if they do not exist."""
         from app.models.brand import Brand
 
@@ -109,12 +107,12 @@ class WMSSeeder:
             brand_ids[name] = obj.brand_id
         return brand_ids
 
-    async def seed_carriers_and_mappings(self) -> Dict[int, int]:
+    async def seed_carriers_and_mappings(self) -> dict[int, int]:
         """Seed Type C carriers and their canonical status mappings (HU-12 / RN-01)."""
         from app.models.carrier import Carrier
         from app.models.state_mapping import StateMapping
 
-        carrier_db_ids: Dict[int, int] = {}
+        carrier_db_ids: dict[int, int] = {}
 
         for c_id in self.config.carriers_to_seed:
             cfg = CARRIERS_REGISTRY[c_id]
@@ -156,17 +154,17 @@ class WMSSeeder:
 
     async def seed_orders_and_labels(
         self,
-        brand_ids: Dict[str, int],
-        dc_ids: Dict[str, int],
-        carrier_db_ids: Dict[int, int],
-    ) -> List[str]:
+        brand_ids: dict[str, int],
+        dc_ids: dict[str, int],
+        carrier_db_ids: dict[int, int],
+    ) -> list[str]:
         """Generate deterministic test orders and shipping labels for file ingestion testing."""
         from app.models.order import Order
         from app.models.order_line import OrderLine
         from app.models.order_recipient import OrderRecipient
         from app.models.shipping_label import ShippingLabel
 
-        generated_tracking_numbers: List[str] = []
+        generated_tracking_numbers: list[str] = []
         brand_id_list = list(brand_ids.values())
         dc_id_list = list(dc_ids.values())
         carrier_items = list(carrier_db_ids.items())  # [(1, db_id1), (2, db_id2), ...]
@@ -234,7 +232,7 @@ class WMSSeeder:
         await self.session.commit()
         return generated_tracking_numbers
 
-    async def execute_full_seed(self) -> Dict[str, Any]:
+    async def execute_full_seed(self) -> dict[str, Any]:
         """Execute full idempotent seeding pipeline."""
         st = await self.seed_shipment_types()
         dcs = await self.seed_distribution_centers()
@@ -253,7 +251,9 @@ class WMSSeeder:
         }
 
 
-async def run_seed(database_url: Optional[str] = None, config: Optional[SeedConfig] = None) -> Dict[str, Any]:
+async def run_seed(
+    database_url: str | None = None, config: SeedConfig | None = None
+) -> dict[str, Any]:
     """Convenience function to run the seed against a PostgreSQL database."""
     db_url = database_url or os.getenv("DATABASE_URL")
     if not db_url:

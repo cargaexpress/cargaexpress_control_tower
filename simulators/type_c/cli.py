@@ -1,10 +1,10 @@
 """CLI to execute Type C simulated carrier generator with defect injection."""
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
-from simulators.type_c.catalogs import CARRIERS_REGISTRY, get_carrier_config
+from simulators.type_c.catalogs import get_carrier_config
 from simulators.type_c.generator import TypeCSimulator, compute_file_sha256
 
 

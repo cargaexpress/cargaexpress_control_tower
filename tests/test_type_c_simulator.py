@@ -1,22 +1,12 @@
 """Unit tests for Type C File Simulator with Defect Injection (F5, Sec 5.2 and 5.3)."""
 
 import csv
-from datetime import datetime
-from pathlib import Path
 import re
+from pathlib import Path
 
 import openpyxl
-import pytest
-
-from simulators.type_c.catalogs import CARRIERS_REGISTRY, get_carrier_config
+from simulators.type_c.catalogs import get_carrier_config
 from simulators.type_c.cli import main as cli_main
-from simulators.type_c.corruption import (
-    inject_duplicate_rows,
-    inject_header_and_summary_rows,
-    inject_mixed_date_formats,
-    inject_nonexistent_guides,
-    inject_out_of_sequence_events,
-)
 from simulators.type_c.generator import TypeCSimulator, compute_file_sha256
 
 
@@ -34,7 +24,9 @@ class TestTypeCSimulator:
         hash1 = compute_file_sha256(file1)
         hash2 = compute_file_sha256(file2)
 
-        assert hash1 == hash2, "Executions with the same seed must produce the exact byte-to-byte SHA-256 hash"
+        assert hash1 == hash2, (
+            "Executions with the same seed must produce the exact byte-to-byte SHA-256 hash"
+        )
         assert file1.read_text(encoding="utf-8") == file2.read_text(encoding="utf-8")
 
     def test_reproducibility_different_seeds(self, tmp_path: Path):
@@ -52,7 +44,7 @@ class TestTypeCSimulator:
         sim = TypeCSimulator(carrier=1, seed=42, error_rate=0.0)
         csv_file = sim.generate_file(output_dir=tmp_path, num_rows=50, file_format="csv")
 
-        with open(csv_file, mode="r", encoding="utf-8") as f:
+        with open(csv_file, encoding="utf-8") as f:
             reader = list(csv.reader(f))
 
         header = reader[0]
@@ -65,18 +57,22 @@ class TestTypeCSimulator:
         for row in data_rows:
             assert row != header, "Must not have repeated headers in clean generation"
             assert not any("TOTAL REGISTROS" in str(col) for col in row), "Must not have total row"
-            assert not any(str(col).startswith("FAKE_WAYBILL") for col in row), "Must not have fake waybills"
+            assert not any(str(col).startswith("FAKE_WAYBILL") for col in row), (
+                "Must not have fake waybills"
+            )
 
             # Validate standard ISO datetime format: YYYY-MM-DD HH:MM:SS
             ts_str = row[sim.config.columns.index(sim.config.timestamp_col)]
-            assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", ts_str), f"Date must match standard ISO: {ts_str}"
+            assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", ts_str), (
+                f"Date must match standard ISO: {ts_str}"
+            )
 
     def test_corrupted_structure_injection(self, tmp_path: Path):
         """With error_rate > 0, resulting file contains repeated headers and summary footer."""
         sim = TypeCSimulator(carrier=1, seed=42, error_rate=0.2)
         csv_file = sim.generate_file(output_dir=tmp_path, num_rows=60, file_format="csv")
 
-        with open(csv_file, mode="r", encoding="utf-8") as f:
+        with open(csv_file, encoding="utf-8") as f:
             content = f.read()
 
         # Verify summary footer row presence
@@ -104,7 +100,9 @@ class TestTypeCSimulator:
 
         # Validate pattern matches day/month/year hour:minute
         for dt_str in slash_dates:
-            assert re.match(r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}$", dt_str), f"Corrupted date must match format: {dt_str}"
+            assert re.match(r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}$", dt_str), (
+                f"Corrupted date must match format: {dt_str}"
+            )
 
     def test_fake_guides_and_duplicates_injected(self):
         """Validate presence of fake waybills and duplicate records with error_rate > 0."""
@@ -112,12 +110,18 @@ class TestTypeCSimulator:
         events = sim.generate_events(num_rows=80)
 
         # 1. Fake waybills
-        fake_guides = [row for row in events if str(row.get("waybill_no", "")).startswith("FAKE_WAYBILL_")]
+        fake_guides = [
+            row for row in events if str(row.get("waybill_no", "")).startswith("FAKE_WAYBILL_")
+        ]
         assert len(fake_guides) > 0, "Must have injected nonexistent waybills"
 
         # 2. Duplicate rows (exclude repeated headers or footers)
-        tracking_values = [row.get("waybill_no") for row in events if "TOTAL" not in str(row.get("waybill_no"))]
-        assert len(tracking_values) > len(set(tracking_values)), "Must have repeated/duplicate waybills in events"
+        tracking_values = [
+            row.get("waybill_no") for row in events if "TOTAL" not in str(row.get("waybill_no"))
+        ]
+        assert len(tracking_values) > len(set(tracking_values)), (
+            "Must have repeated/duplicate waybills in events"
+        )
 
     def test_xlsx_format_generation(self, tmp_path: Path):
         """Validate Excel (.xlsx) file format generation."""
@@ -139,7 +143,9 @@ class TestTypeCSimulator:
         """Verify that all 3 carriers can be simulated correctly with their catalogs."""
         for c_id in [1, 2, 3]:
             config = get_carrier_config(c_id)
-            assert len(config.status_catalog) >= 6, f"Carrier {c_id} must have at least 6 statuses in catalog"
+            assert len(config.status_catalog) >= 6, (
+                f"Carrier {c_id} must have at least 6 statuses in catalog"
+            )
 
             sim = TypeCSimulator(carrier=c_id, seed=100 + c_id, error_rate=0.0)
             target_path = sim.generate_file(output_dir=tmp_path / f"c_{c_id}", num_rows=30)
@@ -148,14 +154,22 @@ class TestTypeCSimulator:
     def test_cli_execution(self, tmp_path: Path, capsys):
         """Verify CLI command execution with arguments."""
         out_dir = tmp_path / "cli_output"
-        exit_code = cli_main([
-            "--seed", "42",
-            "--carrier", "1",
-            "--output-dir", str(out_dir),
-            "--rows", "25",
-            "--error-rate", "0.1",
-            "--format", "csv",
-        ])
+        exit_code = cli_main(
+            [
+                "--seed",
+                "42",
+                "--carrier",
+                "1",
+                "--output-dir",
+                str(out_dir),
+                "--rows",
+                "25",
+                "--error-rate",
+                "0.1",
+                "--format",
+                "csv",
+            ]
+        )
 
         assert exit_code == 0
         captured = capsys.readouterr()

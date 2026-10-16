@@ -1,7 +1,6 @@
 """Catalogs and configurations for Type C carriers (Source F5)."""
 
 from dataclasses import dataclass
-from typing import Dict, List
 
 
 @dataclass(frozen=True)
@@ -12,12 +11,12 @@ class CarrierConfig:
     code: str
     name: str
     default_format: str  # "csv" or "xlsx"
-    columns: List[str]
+    columns: list[str]
     tracking_col: str
     status_col: str
     timestamp_col: str
-    status_catalog: Dict[str, str]  # {raw_status: canonical_status}
-    status_flow: List[str]  # Typical expected raw_status sequence
+    status_catalog: dict[str, str]  # {raw_status: canonical_status}
+    status_flow: list[str]  # Typical expected raw_status sequence
 
 
 # Carrier 1: TransExpress Logistics (Technical English, CSV)
@@ -124,7 +123,7 @@ CARRIER_3_CONFIG = CarrierConfig(
     ],
 )
 
-CARRIERS_REGISTRY: Dict[int, CarrierConfig] = {
+CARRIERS_REGISTRY: dict[int, CarrierConfig] = {
     1: CARRIER_1_CONFIG,
     2: CARRIER_2_CONFIG,
     3: CARRIER_3_CONFIG,
@@ -145,12 +144,16 @@ def get_carrier_config(carrier_id: int | str) -> CarrierConfig:
         else:
             try:
                 c_id = int(carrier_id)
-            except ValueError:
-                raise ValueError(f"Invalid carrier identifier: '{carrier_id}'. Valid options: 1, 2, 3.")
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid carrier identifier: '{carrier_id}'. Valid options: 1, 2, 3."
+                ) from exc
     else:
         c_id = carrier_id
 
     if c_id not in CARRIERS_REGISTRY:
-        raise ValueError(f"Type C carrier with ID {c_id} is not registered. Valid options: 1, 2, 3.")
+        raise ValueError(
+            f"Type C carrier with ID {c_id} is not registered. Valid options: 1, 2, 3."
+        )
 
     return CARRIERS_REGISTRY[c_id]

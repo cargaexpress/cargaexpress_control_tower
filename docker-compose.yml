@@ -35,6 +35,8 @@ services:
       SQL_ECHO: ${SQL_ECHO:-false}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       API_KEY: ${API_KEY:-}
+      BRAND_API_KEYS: '${BRAND_API_KEYS:-{}}'
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@db:5432/${POSTGRES_DB:-cargaexpress}
     ports:
@@ -56,10 +58,12 @@ services:
       SQL_ECHO: ${SQL_ECHO:-false}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       API_KEY: ${API_KEY:-}
+      BRAND_API_KEYS: '${BRAND_API_KEYS:-{}}'
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@test-db:5432/cargaexpress_test
       TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@test-db:5432/cargaexpress_test
-    command: ["sh", "-c", "alembic downgrade base && alembic upgrade head && python -m pytest -v"]
+    command: ["sh", "-c", "alembic downgrade base && alembic upgrade head && alembic check && python -m pytest -v"]
     depends_on:
       test-db:
         condition: service_healthy

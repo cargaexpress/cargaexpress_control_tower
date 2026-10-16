@@ -8,18 +8,18 @@ Implements 5 types of deliberate anomalies:
 5. Duplicate rows.
 """
 
+import random
 from copy import deepcopy
 from datetime import datetime
-import random
-from typing import Any, Dict, List
+from typing import Any
 
 
 def inject_nonexistent_guides(
-    rows: List[Dict[str, Any]],
+    rows: list[dict[str, Any]],
     tracking_col: str,
     rng: random.Random,
     error_rate: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Inject fictional waybill numbers that do not exist in the WMS."""
     if not rows or error_rate <= 0:
         return rows
@@ -36,13 +36,13 @@ def inject_nonexistent_guides(
 
 
 def inject_out_of_sequence_events(
-    rows: List[Dict[str, Any]],
+    rows: list[dict[str, Any]],
     tracking_col: str,
     status_col: str,
     timestamp_col: str,
     rng: random.Random,
     error_rate: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Generate out-of-sequence temporal events (e.g. delivered before transit or swapped timestamps)."""
     if not rows or error_rate <= 0:
         return rows
@@ -50,7 +50,7 @@ def inject_out_of_sequence_events(
     result = deepcopy(rows)
 
     # Group indices by tracking_col
-    guides_map: Dict[str, List[int]] = {}
+    guides_map: dict[str, list[int]] = {}
     for idx, row in enumerate(result):
         guide = str(row.get(tracking_col, ""))
         guides_map.setdefault(guide, []).append(idx)
@@ -75,11 +75,11 @@ def inject_out_of_sequence_events(
 
 
 def inject_mixed_date_formats(
-    rows: List[Dict[str, Any]],
+    rows: list[dict[str, Any]],
     timestamp_col: str,
     rng: random.Random,
     error_rate: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Interleave ambiguous date formats: DD/MM/YYYY HH:MM and MM/DD/YYYY HH:MM."""
     if not rows or error_rate <= 0:
         return rows
@@ -114,10 +114,10 @@ def inject_mixed_date_formats(
 
 
 def inject_duplicate_rows(
-    rows: List[Dict[str, Any]],
+    rows: list[dict[str, Any]],
     rng: random.Random,
     error_rate: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Duplicate complete records within the events list."""
     if not rows or error_rate <= 0:
         return rows
@@ -136,11 +136,11 @@ def inject_duplicate_rows(
 
 
 def inject_header_and_summary_rows(
-    rows: List[Dict[str, Any]],
-    columns: List[str],
+    rows: list[dict[str, Any]],
+    columns: list[str],
     rng: random.Random,
     error_rate: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Insert repeated intermediate header rows and footer/summary rows (e.g. TOTAL REGISTROS: N)."""
     if not rows or error_rate <= 0:
         return rows
@@ -170,14 +170,14 @@ def inject_header_and_summary_rows(
 
 
 def apply_all_corruptions(
-    rows: List[Dict[str, Any]],
-    columns: List[str],
+    rows: list[dict[str, Any]],
+    columns: list[str],
     tracking_col: str,
     status_col: str,
     timestamp_col: str,
     rng: random.Random,
     error_rate: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Apply the 5 deliberate anomaly types deterministically based on error_rate."""
     if error_rate <= 0.0:
         return rows
@@ -186,7 +186,9 @@ def apply_all_corruptions(
     step1 = inject_nonexistent_guides(rows, tracking_col, rng, error_rate)
 
     # 2. Out-of-sequence events
-    step2 = inject_out_of_sequence_events(step1, tracking_col, status_col, timestamp_col, rng, error_rate)
+    step2 = inject_out_of_sequence_events(
+        step1, tracking_col, status_col, timestamp_col, rng, error_rate
+    )
 
     # 3. Mixed date formats
     step3 = inject_mixed_date_formats(step2, timestamp_col, rng, error_rate)

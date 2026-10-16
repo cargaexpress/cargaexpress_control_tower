@@ -19,7 +19,10 @@ router = APIRouter(prefix="/api/v1", tags=["health"])
     summary="Service health and connectivity probe",
     description="Check service availability and report database connection status. Always returns HTTP 200 with connectivity detail (up/down).",
     responses={
-        200: {"description": "Service health status and database connectivity.", "model": HealthResponse},
+        200: {
+            "description": "Service health status and database connectivity.",
+            "model": HealthResponse,
+        },
     },
 )
 async def health_check(db: AsyncSession = Depends(get_db)) -> HealthResponse:
@@ -51,5 +54,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)) -> HealthResponse:
         await db.execute(text("SELECT 1"))
     except Exception as exc:
         logger.exception("Database readiness check failed")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database is not reachable.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database is not reachable."
+        ) from exc
     return HealthResponse(status="ok", database="up")
