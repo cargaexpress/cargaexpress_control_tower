@@ -2,20 +2,6 @@ from datetime import date
 
 import pytest
 import pytest_asyncio
-from app.database import Base
-from app.models.brand import Brand
-from app.models.carrier import Carrier
-from app.models.distribution_center import DistributionCenter
-from app.models.order import Order
-from app.models.order_line import OrderLine
-from app.models.order_recipient import OrderRecipient
-from app.models.shipment_type import ShipmentType
-from app.models.shipping_label import ShippingLabel
-from app.models.state_mapping import CANONICAL_STATUSES
-from sqlalchemy import BigInteger, func, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.ext.compiler import compiles
-
 from simulators.seed.guards import (
     SeedGuardError,
     guard_app_environment,
@@ -28,6 +14,20 @@ from simulators.seed.orders_seed import (
     seed_reference_data,
 )
 from simulators.seed.settings import SeedSettings
+from sqlalchemy import BigInteger, func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.compiler import compiles
+
+from app.database import Base
+from app.models.brand import Brand
+from app.models.carrier import Carrier
+from app.models.distribution_center import DistributionCenter
+from app.models.order import Order
+from app.models.order_line import OrderLine
+from app.models.order_recipient import OrderRecipient
+from app.models.shipment_type import ShipmentType
+from app.models.shipping_label import ShippingLabel
+from app.models.state_mapping import CANONICAL_STATUSES
 
 
 @compiles(BigInteger, "sqlite")

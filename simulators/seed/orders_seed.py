@@ -6,6 +6,9 @@ from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import insert, select, text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
 from app.models.brand import Brand
 from app.models.carrier import Carrier
 from app.models.distribution_center import DistributionCenter
@@ -15,9 +18,6 @@ from app.models.order_recipient import OrderRecipient
 from app.models.shipment_type import ShipmentType
 from app.models.shipping_label import ShippingLabel
 from app.models.state_mapping import CANONICAL_STATUSES
-from sqlalchemy import insert, select, text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-
 from simulators.seed.guards import SEED_PREFIX, SeedGuardError
 from simulators.seed.settings import SeedSettings
 
