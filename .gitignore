@@ -9,14 +9,29 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Python & Venv
+# Python, virtual environments & tooling caches
 .venv/
+venv/
+env/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.tox/
 .coverage
+htmlcov/
+*.egg-info/
 *$py.class
 
-# Data outputs
+# Local runtime and production data
 data/
-
+logs/
+uploads/
+storage/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.dump
