@@ -61,4 +61,3 @@ class InvalidStatusTransitionError(Exception):
             message or f"Invalid status transition from '{current_status}' to '{new_status}'"
         )
         super().__init__(self.message)
-

@@ -145,9 +145,7 @@ async def test_update_order_status_valid_transition(client, db_session):
     created = await client.post("/api/v1/orders", json=payload)
     order_id = created.json()["order_id"]
 
-    response = await client.patch(
-        f"/api/v1/orders/{order_id}/status", json={"status": "PICKED_UP"}
-    )
+    response = await client.patch(f"/api/v1/orders/{order_id}/status", json={"status": "PICKED_UP"})
 
     assert response.status_code == 200
     assert response.json()["status"] == "PICKED_UP"
@@ -159,9 +157,7 @@ async def test_update_order_status_disallowed_transition_returns_422(client, db_
     created = await client.post("/api/v1/orders", json=payload)
     order_id = created.json()["order_id"]
 
-    response = await client.patch(
-        f"/api/v1/orders/{order_id}/status", json={"status": "DELIVERED"}
-    )
+    response = await client.patch(f"/api/v1/orders/{order_id}/status", json={"status": "DELIVERED"})
 
     assert response.status_code == 422
     assert "Invalid status transition" in response.json()["detail"]
@@ -186,8 +182,6 @@ async def test_update_order_status_terminal_delivered_rejects_transition_returns
 
 
 async def test_update_order_status_not_found(client):
-    response = await client.patch(
-        "/api/v1/orders/999999/status", json={"status": "PICKED_UP"}
-    )
+    response = await client.patch("/api/v1/orders/999999/status", json={"status": "PICKED_UP"})
 
     assert response.status_code == 404

@@ -133,7 +133,9 @@ async def update_order_status(
 ) -> OrderRead:
     """Update order status."""
     try:
-        order = await order_service.update_order_status(db, order_id, payload.status, tenant_brand_id)
+        order = await order_service.update_order_status(
+            db, order_id, payload.status, tenant_brand_id
+        )
     except InvalidStatusTransitionError as exc:
         raise HTTPException(
             status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
