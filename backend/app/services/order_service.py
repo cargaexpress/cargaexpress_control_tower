@@ -10,11 +10,35 @@ from app.models.order_line import OrderLine
 from app.models.order_recipient import OrderRecipient
 from app.models.shipment_type import ShipmentType
 from app.schemas.order import OrderCreate
-from app.services.exceptions import DuplicateOrderReferenceError, EntityNotFoundError
+from app.services.exceptions import (
+    DuplicateOrderReferenceError,
+    EntityNotFoundError,
+    InvalidStatusTransitionError,
+)
 
 # Eager-load child records to return complete orders without per-row queries.
 # Service functions isolate persistence from HTTP handling for reuse and testing.
 _ORDER_LOAD_OPTIONS = (selectinload(Order.order_lines), selectinload(Order.recipient))
+
+# Catálogo de estados terminales y transiciones permitidas (RN-02 y ADR-002)
+TERMINAL_STATUSES: set[str] = {
+    "DELIVERED",
+    "CANCELLED",
+    "RETURNED",
+    "LOST_OR_DAMAGED",
+}
+
+VALID_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "CREATED": {"PICKED_UP", "CANCELLED"},
+    "PICKED_UP": {"IN_TRANSIT", "CANCELLED"},
+    "IN_TRANSIT": {"OUT_FOR_DELIVERY", "EXCEPTION", "LOST_OR_DAMAGED"},
+    "OUT_FOR_DELIVERY": {"DELIVERED", "EXCEPTION", "RETURNED"},
+    "EXCEPTION": {"IN_TRANSIT", "OUT_FOR_DELIVERY", "RETURNED", "LOST_OR_DAMAGED"},
+    "DELIVERED": set(),
+    "RETURNED": set(),
+    "CANCELLED": set(),
+    "LOST_OR_DAMAGED": set(),
+}
 
 
 async def _get_or_404(db: AsyncSession, model, pk_value, entity_name: str):
@@ -42,7 +66,7 @@ async def create_order(db: AsyncSession, payload: OrderCreate, tenant_brand_id: 
         destination_country=payload.destination_country,
         destination_region=payload.destination_region,
         freight_value=payload.freight_value,
-        status=payload.status,
+        status=payload.status.upper(),
     )
 
     for index, line in enumerate(payload.order_lines, start=1):
@@ -111,7 +135,26 @@ async def update_order_status(
     order = await get_order(db, order_id, tenant_brand_id)
     if order is None:
         return None
-    order.status = new_status
+
+    current_status = order.status.upper()
+    target_status = new_status.upper()
+
+    if current_status in TERMINAL_STATUSES:
+        raise InvalidStatusTransitionError(
+            current_status=order.status,
+            new_status=new_status,
+            message=f"Order is in terminal status '{order.status}' and cannot transition to '{new_status}'",
+        )
+
+    allowed_transitions = VALID_STATUS_TRANSITIONS.get(current_status, set())
+    if target_status not in allowed_transitions:
+        raise InvalidStatusTransitionError(
+            current_status=order.status,
+            new_status=new_status,
+            message=f"Invalid status transition from '{order.status}' to '{new_status}'",
+        )
+
+    order.status = target_status
     await db.commit()
     await db.refresh(order, attribute_names=["order_lines", "recipient"])
     return order

@@ -49,3 +49,16 @@ class ConcurrentUpdateConflictError(Exception):
 
     def __init__(self, message: str = "Mapping changed during update; please retry.") -> None:
         super().__init__(message)
+
+
+class InvalidStatusTransitionError(Exception):
+    """Se lanza cuando una transición de estado de orden no es válida según RN-02 y ADR-002."""
+
+    def __init__(self, current_status: str, new_status: str, message: str | None = None) -> None:
+        self.current_status = current_status
+        self.new_status = new_status
+        self.message = (
+            message or f"Invalid status transition from '{current_status}' to '{new_status}'"
+        )
+        super().__init__(self.message)
+

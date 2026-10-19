@@ -18,6 +18,7 @@ from app.services.exceptions import (
     DuplicateOrderReferenceError,
     DuplicateTrackingNumberError,
     EntityNotFoundError,
+    InvalidStatusTransitionError,
 )
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
@@ -131,7 +132,13 @@ async def update_order_status(
     db: AsyncSession = Depends(get_db),
 ) -> OrderRead:
     """Update order status."""
-    order = await order_service.update_order_status(db, order_id, payload.status, tenant_brand_id)
+    try:
+        order = await order_service.update_order_status(db, order_id, payload.status, tenant_brand_id)
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     if order is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
     return OrderRead.model_validate(order)
