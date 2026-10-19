@@ -17,7 +17,7 @@ async def _seed_reference_data(db_session):
     return brand, dc, shipment_type
 
 
-def _order_payload(brand_id, dc_id, shipment_type_code):
+def _order_payload(brand_id, dc_id, shipment_type_code, status="CREATED"):
     return {
         "brand_id": brand_id,
         "dc_id": dc_id,
@@ -26,7 +26,7 @@ def _order_payload(brand_id, dc_id, shipment_type_code):
         "destination_country": "CO",
         "destination_region": "Atlantico",
         "freight_value": "45000.00",
-        "status": "created",
+        "status": status,
         "order_lines": [
             {"sku": "SKU-1", "description": "Item 1", "quantity_ordered": 2},
             {"sku": "SKU-2", "description": None, "quantity_ordered": 1},
@@ -139,7 +139,7 @@ async def test_list_orders_paginated(client, db_session):
     assert body["limit"] == 1
 
 
-async def test_update_order_status(client, db_session):
+async def test_update_order_status_valid_transition(client, db_session):
     brand, dc, shipment_type = await _seed_reference_data(db_session)
     payload = _order_payload(brand.brand_id, dc.dc_id, shipment_type.shipment_type_code)
     created = await client.post("/api/v1/orders", json=payload)
@@ -149,6 +149,36 @@ async def test_update_order_status(client, db_session):
 
     assert response.status_code == 200
     assert response.json()["status"] == "PICKED_UP"
+
+
+async def test_update_order_status_disallowed_transition_returns_422(client, db_session):
+    brand, dc, shipment_type = await _seed_reference_data(db_session)
+    payload = _order_payload(brand.brand_id, dc.dc_id, shipment_type.shipment_type_code)
+    created = await client.post("/api/v1/orders", json=payload)
+    order_id = created.json()["order_id"]
+
+    response = await client.patch(f"/api/v1/orders/{order_id}/status", json={"status": "DELIVERED"})
+
+    assert response.status_code == 422
+    assert "Invalid status transition" in response.json()["detail"]
+
+
+async def test_update_order_status_terminal_delivered_rejects_transition_returns_422(
+    client, db_session
+):
+    brand, dc, shipment_type = await _seed_reference_data(db_session)
+    payload = _order_payload(
+        brand.brand_id, dc.dc_id, shipment_type.shipment_type_code, status="DELIVERED"
+    )
+    created = await client.post("/api/v1/orders", json=payload)
+    order_id = created.json()["order_id"]
+
+    response = await client.patch(
+        f"/api/v1/orders/{order_id}/status", json={"status": "IN_TRANSIT"}
+    )
+
+    assert response.status_code == 422
+    assert "terminal status" in response.json()["detail"]
 
 
 async def test_update_order_status_not_found(client):

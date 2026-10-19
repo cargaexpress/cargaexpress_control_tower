@@ -1,3 +1,15 @@
+import os
+
+# Configurar valores aislados por defecto para el entorno de pruebas antes de instanciar settings/engine
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql+asyncpg://cargaexpress:change_me_local_only@localhost:5432/cargaexpress_test",
+)
+os.environ.setdefault(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://cargaexpress:change_me_local_only@localhost:5432/cargaexpress_test",
+)
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -27,6 +39,7 @@ app.dependency_overrides[get_db] = _override_get_db
 async def setup_test_database():
     """Prepare an isolated schema."""
     async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
     await test_engine.dispose()

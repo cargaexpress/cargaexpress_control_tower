@@ -16,9 +16,13 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    database_url: str
+    database_url: str = (
+        "postgresql+asyncpg://cargaexpress:change_me_local_only@localhost:5432/cargaexpress"
+    )
     sql_echo: bool = False
-    test_database_url: str | None = None
+    test_database_url: str | None = (
+        "postgresql+asyncpg://cargaexpress:change_me_local_only@localhost:5432/cargaexpress_test"
+    )
     admin_api_key: str = ""
     api_key: str = ""
     brand_api_keys: dict[str, int] = Field(default_factory=dict)
@@ -55,4 +59,4 @@ class Settings(BaseSettings):
         return self
 
 
-settings = Settings()  # type: ignore[call-arg]
+settings = Settings()
