@@ -10,7 +10,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
-    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-pandas openpyxl psycopg2-binary httpx}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT: 300
+    AIRFLOW__WEBSERVER__WORKERS: 2
     CONTROL_TOWER_API_URL: ${CONTROL_TOWER_API_URL:-http://backend:8000}
     ADMIN_API_KEY: ${ADMIN_API_KEY:-}
   volumes:
@@ -37,10 +39,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-AIRFLOW_RABBITMQ_COOKIE}
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia
     healthcheck:
-      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -70,18 +73,12 @@ services:
   airflow-init:
     <<: *airflow-common
     container_name: airflow_init
+    environment:
+      <<: *airflow-common-env
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
     command: >
-      bash -c "
-        airflow db migrate &&
-        airflow users create \
-          --username $${_AIRFLOW_WWW_USER_USERNAME:-admin} \
-          --firstname Admin \
-          --lastname CargaExpress \
-          --role Admin \
-          --email admin@cargaexpress.local \
-          --password $${_AIRFLOW_WWW_USER_PASSWORD:-admin} || true
-      "
-    user: "0:0"
+      bash -c "airflow db migrate && airflow users create --username $${_AIRFLOW_WWW_USER_USERNAME:-admin} --firstname Admin --lastname CargaExpress --role Admin --email admin@cargaexpress.local --password $${_AIRFLOW_WWW_USER_PASSWORD:-admin} || true"
+    user: "${AIRFLOW_UID:-50000}:0"
     restart: "no"
     networks:
       - cargaexpress
@@ -133,11 +130,14 @@ services:
   airflow-worker:
     <<: *airflow-common
     container_name: airflow_worker
+    environment:
+      <<: *airflow-common-env
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-pandas openpyxl}
     command: celery worker
     healthcheck:
       test:
         - "CMD-SHELL"
-        - 'celery --app $(test -f /opt/airflow/airflow/executors/celery_executor.py && echo "airflow.executors.celery_executor" || echo "airflow.providers.celery.executors.celery_executor") inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor inspect ping -d "celery@$${HOSTNAME}"'
+        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
       interval: 30s
       timeout: 10s
       retries: 5
