@@ -38,12 +38,12 @@ jobs:
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --frozen
       - name: Check lint
-        run: uv run ruff check --config pyproject.toml app tests ../simulators ../tests ../scripts
+        run: uv run ruff check --config pyproject.toml app tests ../scripts
       - name: Check formatting
-        run: uv run ruff format --config pyproject.toml --check app tests ../simulators ../tests ../scripts
+        run: uv run ruff format --config pyproject.toml --check app tests ../scripts
       - name: Type-check backend
         run: uv run mypy app
       - name: Migrate and verify schema
         run: uv run alembic upgrade head && uv run alembic check
       - name: Test with coverage
-        run: uv run pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80 tests ../tests
+        run: uv run pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80 tests

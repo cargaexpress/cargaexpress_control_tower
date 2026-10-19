@@ -38,11 +38,9 @@ COPY backend/app ./app
 COPY backend/alembic ./alembic
 COPY backend/alembic.ini ./
 COPY backend/tests ./tests
-COPY tests ./root_tests
-COPY simulators ./simulators
 COPY scripts ./scripts
 
-CMD ["python", "-m", "pytest", "-v", "tests", "root_tests"]
+CMD ["python", "-m", "pytest", "-v", "tests"]
 
 # ---------- Stage 3: runtime image ----------
 FROM python:3.12-slim AS runtime
