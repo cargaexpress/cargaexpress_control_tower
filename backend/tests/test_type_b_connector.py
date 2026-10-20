@@ -301,3 +301,37 @@ async def test_type_b_sync_api_endpoint(client, db_session, monkeypatch):
     assert len(res["results"]) == 1
     assert res["results"][0]["carrier"] == "SimCarrier A"
     assert res["results"][0]["normalized"] == 5
+
+
+@pytest.mark.asyncio
+async def test_type_b_sync_all_carriers(db_session):
+    """Test sync_all_carriers loops over the dictionary of carriers."""
+    service = TypeBConnectorService()
+
+    async def mock_sync(db, carrier_name, base_url, page_size):
+        from app.services.type_b_connector import CarrierSyncSummary
+
+        return CarrierSyncSummary(carrier=carrier_name, status="completed", total_fetched=10)
+
+    service.sync_carrier = mock_sync
+
+    carriers_map = {
+        "Carrier 1": "http://carrier1:8001",
+        "Carrier 2": "http://carrier2:8002",
+    }
+    summaries = await service.sync_all_carriers(db_session, carriers_map=carriers_map)
+    assert len(summaries) == 2
+    assert summaries[0].carrier == "Carrier 1"
+    assert summaries[1].carrier == "Carrier 2"
+
+
+def test_type_b_parse_event_time_helpers():
+    from app.services.type_b_connector import _parse_event_time
+
+    assert _parse_event_time(None) is None
+    assert _parse_event_time("") is None
+    assert _parse_event_time("not-a-date") is None
+
+    dt = _parse_event_time("2026-03-29T10:00:00Z")
+    assert dt is not None
+    assert dt.year == 2026
