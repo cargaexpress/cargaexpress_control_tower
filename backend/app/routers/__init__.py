@@ -4,6 +4,7 @@ from app.routers import (
     health,
     orders,
     type_b_sync,
+    type_c_ingestion,
     webhooks,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "health",
     "orders",
     "type_b_sync",
+    "type_c_ingestion",
     "webhooks",
 ]

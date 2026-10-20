@@ -6,6 +6,7 @@ from app.models.order import Order
 from app.models.order_line import OrderLine
 from app.models.order_recipient import OrderRecipient
 from app.models.picking_task import PickingTask
+from app.models.processed_file import ProcessedFile
 from app.models.shipment_type import ShipmentType
 from app.models.shipping_label import ShippingLabel
 from app.models.shipping_label_item import ShippingLabelItem
@@ -21,6 +22,7 @@ __all__ = [
     "OrderLine",
     "OrderRecipient",
     "PickingTask",
+    "ProcessedFile",
     "ShipmentType",
     "ShippingLabel",
     "ShippingLabelItem",
