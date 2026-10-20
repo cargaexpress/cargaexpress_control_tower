@@ -283,3 +283,68 @@ async def test_type_c_upload_api_endpoint(client, db_session):
     assert body["filename"] == "upload_test.csv"
     assert body["valid_rows_processed"] == 1
     assert body["already_processed"] is False
+
+
+@pytest.mark.asyncio
+async def test_type_c_unsupported_file_extension(db_session):
+    service = TypeCConnectorService()
+    res = await service.process_file_content(
+        db=db_session,
+        filename="unsupported.pdf",
+        content=b"%PDF-1.4...",
+        carrier_name="TransExpress Logistics",
+    )
+    assert res.status == "failed"
+    assert "Unsupported file extension" in res.message
+
+
+@pytest.mark.asyncio
+async def test_type_c_missing_required_columns(db_session):
+    service = TypeCConnectorService()
+    res = await service.process_file_content(
+        db=db_session,
+        filename="missing_cols.csv",
+        content=b"col_a,col_b\nval_a,val_b\n",
+        carrier_name="TransExpress Logistics",
+    )
+    assert res.status == "failed"
+    assert "Missing required columns" in res.message
+
+
+@pytest.mark.asyncio
+async def test_type_c_empty_csv(db_session):
+    service = TypeCConnectorService()
+    res = await service.process_file_content(
+        db=db_session,
+        filename="empty.csv",
+        content=b"",
+        carrier_name="TransExpress Logistics",
+    )
+    assert res.status == "completed"
+    assert "File is empty" in res.message
+
+
+def test_parse_mixed_datetime_formats():
+    from datetime import UTC, datetime
+
+    from app.services.type_c_connector import parse_mixed_datetime
+
+    # Datetime object directly with UTC
+    now = datetime(2026, 3, 29, 10, 0, 0, tzinfo=UTC)
+    assert parse_mixed_datetime(now) == now
+
+    # ISO format
+    iso_dt = parse_mixed_datetime("2026-03-29T15:30:00")
+    assert iso_dt is not None
+    assert iso_dt.year == 2026
+
+    # DD/MM/YYYY
+    dmy_dt = parse_mixed_datetime("29/03/2026 15:30:00")
+    assert dmy_dt is not None
+    assert dmy_dt.day == 29
+
+    # Empty / None
+    assert parse_mixed_datetime(None) is None
+    assert parse_mixed_datetime("") is None
+    assert parse_mixed_datetime("   ") is None
+    assert parse_mixed_datetime("unparseable-date") is None

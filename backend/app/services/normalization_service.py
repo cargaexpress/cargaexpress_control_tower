@@ -188,7 +188,7 @@ async def normalize_and_apply_event(
     order = await db.get(Order, label.order_id)
     if order is not None:
         if canonical_status in ("IN_TRANSIT", "OUT_FOR_DELIVERY"):
-            if order.status.upper() in ("CREATED", "PICKED_UP"):
+            if order.status.upper() in ("CREATED", "PICKED_UP", "IN_TRANSIT"):
                 order.status = canonical_status
         elif canonical_status == "DELIVERED":
             # RN-07: Un pedido cumple el SLA solo si todas sus guías se entregan dentro del plazo
