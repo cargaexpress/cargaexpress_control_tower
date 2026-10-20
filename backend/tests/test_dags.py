@@ -162,3 +162,38 @@ def test_dag_type_b_structure_and_decorators():
     # RIWI-138: Retries with exponential backoff
     assert '"retries": 3' in content
     assert '"retry_exponential_backoff": True' in content
+
+
+def test_dag_distributed_validation_structure_and_decorators():
+    """Verify that dag_distributed_validation.py fulfills HU-30 / RIWI-147 requirements."""
+    dag_file = DAGS_DIR / "dag_distributed_validation.py"
+    assert dag_file.is_file(), f"Missing DAG file: {dag_file}"
+
+    tree = ast.parse(dag_file.read_text(encoding="utf-8"))
+
+    imports = [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    ]
+    assert "PythonOperator" not in imports
+    assert "dag" in imports
+    assert "task" in imports
+
+    decorator_names = [
+        d.id
+        if isinstance(d, ast.Name)
+        else d.func.id
+        if isinstance(d, ast.Call) and isinstance(d.func, ast.Name)
+        else ""
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+        for d in node.decorator_list
+    ]
+    assert "dag" in decorator_names
+    assert "task" in decorator_names
+
+    content = dag_file.read_text(encoding="utf-8")
+    assert '"dag_distributed_validation"' in content
+    assert '"distributed"' in content
