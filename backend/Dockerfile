@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1
 #
 # CargaExpress backend Dockerfile (FastAPI + Python 3.12 + uv).
+# Multi-stage build separating dependency resolution/installation from final runtime.
 # Runtime configuration is injected via environment variables at container start.
 
-# ---------- Stage 1: install dependencies ----------
+# ---------- Stage 1: builder (resolve and install dependencies) ----------
 FROM python:3.12-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /usr/local/bin/uv
@@ -18,7 +19,7 @@ COPY backend/pyproject.toml backend/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
-# ---------- Stage 2: test image ----------
+# ---------- Stage 2: test image (optional test target) ----------
 FROM python:3.12-slim AS test
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /usr/local/bin/uv
@@ -42,8 +43,8 @@ COPY scripts ./scripts
 
 CMD ["python", "-m", "pytest", "-v", "tests"]
 
-# ---------- Stage 3: runtime image ----------
-FROM python:3.12-slim AS runtime
+# ---------- Stage 3: final runtime image (production) ----------
+FROM python:3.12-slim AS final
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

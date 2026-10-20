@@ -101,3 +101,11 @@ This extension is optional and is intended to make database inspection easier du
 To connect, use the PostgreSQL connection settings defined in the project's environment variables.
 
 Note: Database migrations are managed through Alembic. To review migration history and schema changes, check the migration files in the project.
+
+## Backend Containerization & Docker Optimization
+
+The backend uses a multi-stage Dockerfile (`backend/Dockerfile`) optimized for production environments:
+- **Multi-Stage Build**: Separates dependency installation (`builder` using `uv`) from the lightweight runtime image (`final` based on `python:3.12-slim`).
+- **Security Hardening**: Executes under non-root user `appuser` (UID 1000) and completely excludes `uv`, `gcc`, and build tools from the final image.
+- **Image Optimization**: Reduces container disk size from 488 MB (single-stage) down to 299 MB (-38.7%), with compressed size reduced by ~50% (~69.6 MB).
+- Detailed documentation, build commands, and benchmarks are available in [backend/README.md](backend/README.md).
