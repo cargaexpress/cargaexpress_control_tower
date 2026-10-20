@@ -50,8 +50,12 @@ async def clean_tables():
     """Keep test records independent across tests and reset identity sequences."""
     yield
     async with test_engine.begin() as conn:
+        is_sqlite = "sqlite" in str(test_engine.url)
         for table in reversed(Base.metadata.sorted_tables):
-            await conn.execute(text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE'))
+            if is_sqlite:
+                await conn.execute(text(f'DELETE FROM "{table.name}"'))
+            else:
+                await conn.execute(text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE'))
 
 
 @pytest_asyncio.fixture(autouse=True)

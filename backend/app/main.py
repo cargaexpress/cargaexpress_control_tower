@@ -7,7 +7,13 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.routers import admin_carrier_state_mapping, admin_state_mapping, health, orders
+from app.routers import (
+    admin_carrier_state_mapping,
+    admin_state_mapping,
+    health,
+    orders,
+    webhooks,
+)
 from app.schemas.errors import HTTPErrorResponse
 
 logging.basicConfig(level=getattr(logging, settings.log_level))
@@ -21,6 +27,10 @@ openapi_tags = [
     {
         "name": "orders",
         "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels.",
+    },
+    {
+        "name": "webhooks",
+        "description": "Carrier webhook receiver for push tracking events (F3 / RNF-01).",
     },
     {
         "name": "admin: carrier state mapping",
@@ -84,6 +94,7 @@ def create_app() -> FastAPI:
             return JSONResponse(application.openapi())
 
     application.include_router(health.router)
+    application.include_router(webhooks.router)
     application.include_router(admin_state_mapping.router)
     application.include_router(admin_carrier_state_mapping.router)
     application.include_router(orders.router)

@@ -10,6 +10,7 @@ from app.models.shipment_type import ShipmentType
 from app.models.shipping_label import ShippingLabel
 from app.models.shipping_label_item import ShippingLabelItem
 from app.models.state_mapping import StateMapping
+from app.models.tracking_anomaly import TrackingAnomaly
 
 __all__ = [
     "Brand",
@@ -24,4 +25,5 @@ __all__ = [
     "ShippingLabel",
     "ShippingLabelItem",
     "StateMapping",
+    "TrackingAnomaly",
 ]
