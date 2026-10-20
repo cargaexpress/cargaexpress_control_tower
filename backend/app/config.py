@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     state_mapping_cache_ttl_seconds: int = Field(default=300, gt=0)
 
+    # Type B Carriers API Configuration (F4)
+    type_b_carriers_urls: dict[str, str] = Field(
+        default_factory=lambda: {
+            "SimCarrier A": "http://localhost:8001",
+            "SimCarrier B": "http://localhost:8002",
+            "SimCarrier C": "http://localhost:8003",
+            "SimCarrier D": "http://localhost:8004",
+        }
+    )
+    type_b_max_retries: int = 3
+    type_b_retry_base_delay_seconds: float = 0.5
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, value: str) -> str:

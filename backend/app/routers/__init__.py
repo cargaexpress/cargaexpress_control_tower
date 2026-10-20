@@ -3,6 +3,7 @@ from app.routers import (
     admin_state_mapping,
     health,
     orders,
+    type_b_sync,
     webhooks,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "admin_state_mapping",
     "health",
     "orders",
+    "type_b_sync",
     "webhooks",
 ]

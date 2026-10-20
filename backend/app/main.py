@@ -12,6 +12,7 @@ from app.routers import (
     admin_state_mapping,
     health,
     orders,
+    type_b_sync,
     webhooks,
 )
 from app.schemas.errors import HTTPErrorResponse
@@ -31,6 +32,10 @@ openapi_tags = [
     {
         "name": "webhooks",
         "description": "Carrier webhook receiver for push tracking events (F3 / RNF-01).",
+    },
+    {
+        "name": "connectors: type b",
+        "description": "Polling connectors and synchronization hooks for Type B carriers (F4).",
     },
     {
         "name": "admin: carrier state mapping",
@@ -95,6 +100,7 @@ def create_app() -> FastAPI:
 
     application.include_router(health.router)
     application.include_router(webhooks.router)
+    application.include_router(type_b_sync.router)
     application.include_router(admin_state_mapping.router)
     application.include_router(admin_carrier_state_mapping.router)
     application.include_router(orders.router)
