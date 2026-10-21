@@ -39,6 +39,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@db:5432/${POSTGRES_DB:-cargaexpress}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

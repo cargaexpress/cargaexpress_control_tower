@@ -1,23 +1,55 @@
+# ruff: noqa: E402
 import os
 
 # Configurar valores aislados por defecto para el entorno de pruebas antes de instanciar settings/engine
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql+asyncpg://cargaexpress:change_me_local_only@localhost:5432/cargaexpress_test",
-)
-os.environ.setdefault(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://cargaexpress:change_me_local_only@localhost:5432/cargaexpress_test",
-)
+# Si no hay TEST_DATABASE_URL ni DATABASE_URL especificados externamente (e.g. entorno local sin Docker),
+# usamos sqlite+aiosqlite para permitir que las pruebas se ejecuten sin dependencias externas.
+# En CI (GitHub Actions), estas variables siempre están definidas apuntando a postgresql.
+if not os.environ.get("TEST_DATABASE_URL") and not os.environ.get("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///test_suite.db"
+    os.environ["TEST_DATABASE_URL"] = "sqlite+aiosqlite:///test_suite.db"
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import BigInteger, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.compiler import compiles
 
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
+from app.services.rabbitmq_service import QueuedWebhookMessage, get_rabbitmq_service
+
+
+@compiles(BigInteger, "sqlite")
+def _compile_bigint_sqlite(type_, compiler, **kw):
+    return "INTEGER"
+
+
+class InMemoryRabbitMQService:
+    """Mock in-memory RabbitMQ publisher for isolated, ultra-fast test runs."""
+
+    def __init__(self) -> None:
+        self.published_messages: list[QueuedWebhookMessage] = []
+
+    async def publish_webhook_event(
+        self, carrier_slug: str, event, content_type: str = "application/json"
+    ) -> QueuedWebhookMessage:
+        msg = QueuedWebhookMessage(
+            message_id=f"msg-mock-{len(self.published_messages) + 1}",
+            carrier_slug=carrier_slug,
+            tracking_number=event.tracking_number,
+            raw_status=event.raw_status,
+            event_id=event.event_id,
+            occurred_at=event.occurred_at.isoformat() if event.occurred_at else None,
+            location=event.location,
+            content_type=content_type,
+            enqueued_at="2026-10-20T12:00:00Z",
+            retry_count=0,
+        )
+        self.published_messages.append(msg)
+        return msg
+
 
 # Refuse to run against an unspecified DB, preventing tests from touching runtime data.
 if not settings.test_database_url:
@@ -68,6 +100,15 @@ async def bind_cache_to_test_db(monkeypatch):
     state_mapping_cache.invalidate()
     yield
     state_mapping_cache.invalidate()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def default_mock_rabbitmq():
+    """Inject in-memory RabbitMQ publisher for all API tests."""
+    fake = InMemoryRabbitMQService()
+    app.dependency_overrides[get_rabbitmq_service] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_rabbitmq_service, None)
 
 
 @pytest_asyncio.fixture
