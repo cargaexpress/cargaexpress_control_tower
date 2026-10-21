@@ -13,6 +13,7 @@ from app.models.shipment_type import ShipmentType
 from app.models.shipping_label import ShippingLabel
 from app.models.state_mapping import StateMapping
 from app.models.tracking_anomaly import TrackingAnomaly
+from app.services.event_consumer import process_queued_event
 from app.services.state_mapping_cache import state_mapping_cache
 
 
@@ -204,7 +205,9 @@ async def _seed_test_infrastructure(db_session):
 
 
 @pytest.mark.asyncio
-async def test_webhook_alpha_flat_json_normalizes_to_canonical_status(client, db_session):
+async def test_webhook_alpha_flat_json_normalizes_to_canonical_status(
+    client, db_session, default_mock_rabbitmq
+):
     """Subtask 2 & 4: Raw Alpha flat JSON -> Canonical status on shipping label."""
     await _seed_test_infrastructure(db_session)
     payload = {
@@ -221,12 +224,18 @@ async def test_webhook_alpha_flat_json_normalizes_to_canonical_status(client, db
         headers={"Content-Type": "application/json"},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     res_body = response.json()
-    assert res_body["status"] == "processed"
-    assert res_body["canonical_status"] == "IN_TRANSIT"
-    assert res_body["current_status"] == "IN_TRANSIT"
-    assert res_body["is_anomaly"] is False
+    assert res_body["status"] == "queued"
+    assert res_body["carrier"] == "SimCarrier Alpha"
+    assert res_body["tracking_number"] == "TRK-ALPHA-001"
+
+    # Simulate background consumer processing
+    assert len(default_mock_rabbitmq.published_messages) == 1
+    consumed = await process_queued_event(default_mock_rabbitmq.published_messages[-1], db_session)
+    assert consumed.canonical_status == "IN_TRANSIT"
+    assert consumed.new_status == "IN_TRANSIT"
+    assert consumed.is_anomaly is False
 
     # Verify persisted in database
     refreshed = (
@@ -238,7 +247,9 @@ async def test_webhook_alpha_flat_json_normalizes_to_canonical_status(client, db
 
 
 @pytest.mark.asyncio
-async def test_webhook_beta_nested_json_normalizes_to_canonical_status(client, db_session):
+async def test_webhook_beta_nested_json_normalizes_to_canonical_status(
+    client, db_session, default_mock_rabbitmq
+):
     """Subtask 2 & 4: Raw Beta nested JSON with numeric code 300 -> Canonical IN_TRANSIT."""
     await _seed_test_infrastructure(db_session)
     payload = {
@@ -254,10 +265,13 @@ async def test_webhook_beta_nested_json_normalizes_to_canonical_status(client, d
         headers={"Content-Type": "application/json"},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     res_body = response.json()
-    assert res_body["canonical_status"] == "IN_TRANSIT"
-    assert res_body["current_status"] == "IN_TRANSIT"
+    assert res_body["status"] == "queued"
+
+    consumed = await process_queued_event(default_mock_rabbitmq.published_messages[-1], db_session)
+    assert consumed.canonical_status == "IN_TRANSIT"
+    assert consumed.new_status == "IN_TRANSIT"
 
     refreshed = (
         await db_session.execute(
@@ -268,7 +282,9 @@ async def test_webhook_beta_nested_json_normalizes_to_canonical_status(client, d
 
 
 @pytest.mark.asyncio
-async def test_webhook_gamma_spanish_json_normalizes_to_canonical_status(client, db_session):
+async def test_webhook_gamma_spanish_json_normalizes_to_canonical_status(
+    client, db_session, default_mock_rabbitmq
+):
     """Subtask 2 & 4: Raw Gamma Spanish JSON ('En reparto') -> Canonical OUT_FOR_DELIVERY."""
     await _seed_test_infrastructure(db_session)
     payload = {
@@ -285,10 +301,13 @@ async def test_webhook_gamma_spanish_json_normalizes_to_canonical_status(client,
         headers={"Content-Type": "application/json; charset=utf-8"},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     res_body = response.json()
-    assert res_body["canonical_status"] == "OUT_FOR_DELIVERY"
-    assert res_body["current_status"] == "OUT_FOR_DELIVERY"
+    assert res_body["status"] == "queued"
+
+    consumed = await process_queued_event(default_mock_rabbitmq.published_messages[-1], db_session)
+    assert consumed.canonical_status == "OUT_FOR_DELIVERY"
+    assert consumed.new_status == "OUT_FOR_DELIVERY"
 
     refreshed = (
         await db_session.execute(
@@ -300,7 +319,7 @@ async def test_webhook_gamma_spanish_json_normalizes_to_canonical_status(client,
 
 @pytest.mark.asyncio
 async def test_webhook_rn02_delivered_status_cannot_be_reverted_and_records_anomaly(
-    client, db_session
+    client, db_session, default_mock_rabbitmq
 ):
     """Subtask 3: RN-02 & CA-01.
 
@@ -319,11 +338,14 @@ async def test_webhook_rn02_delivered_status_cannot_be_reverted_and_records_anom
 
     response = await client.post("/api/v1/webhooks/alpha", json=payload)
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     res_body = response.json()
-    assert res_body["is_anomaly"] is True
-    assert res_body["current_status"] == "DELIVERED"
-    assert "RN-02" in res_body["anomaly_reason"]
+    assert res_body["status"] == "queued"
+
+    consumed = await process_queued_event(default_mock_rabbitmq.published_messages[-1], db_session)
+    assert consumed.is_anomaly is True
+    assert consumed.new_status == "DELIVERED"
+    assert "RN-02" in consumed.anomaly_reason
 
     # 1. Verify label status is still DELIVERED
     refreshed_label = (
@@ -347,7 +369,9 @@ async def test_webhook_rn02_delivered_status_cannot_be_reverted_and_records_anom
 
 
 @pytest.mark.asyncio
-async def test_webhook_non_existent_tracking_number_records_anomaly(client, db_session):
+async def test_webhook_non_existent_tracking_number_records_anomaly(
+    client, db_session, default_mock_rabbitmq
+):
     """Quality defect 5.3: Unknown tracking numbers record anomaly."""
     await _seed_test_infrastructure(db_session)
     payload = {
@@ -358,10 +382,13 @@ async def test_webhook_non_existent_tracking_number_records_anomaly(client, db_s
 
     response = await client.post("/api/v1/webhooks/alpha", json=payload)
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     res_body = response.json()
-    assert res_body["is_anomaly"] is True
-    assert res_body["anomaly_reason"] == "UNKNOWN_TRACKING_NUMBER"
+    assert res_body["status"] == "queued"
+
+    consumed = await process_queued_event(default_mock_rabbitmq.published_messages[-1], db_session)
+    assert consumed.is_anomaly is True
+    assert consumed.anomaly_reason == "UNKNOWN_TRACKING_NUMBER"
 
     anomaly = (
         await db_session.execute(

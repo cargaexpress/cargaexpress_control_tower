@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     type_b_max_retries: int = 3
     type_b_retry_base_delay_seconds: float = 0.5
 
+    # RabbitMQ Message Broker Configuration (RNF-01 / Webhook Queue)
+    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    rabbitmq_exchange: str = "eventos_exchange"
+    rabbitmq_queue: str = "eventos_transportadora"
+    rabbitmq_retry_queue: str = "eventos_transportadora.retry"
+    rabbitmq_dlq_queue: str = "eventos_transportadora.dlq"
+    rabbitmq_retry_ttl_ms: int = 5000
+    rabbitmq_max_retries: int = 3
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, value: str) -> str:

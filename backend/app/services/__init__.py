@@ -1,17 +1,29 @@
 from app.services import (
     carrier_state_mapping_service,
+    event_consumer,
     exceptions,
+    normalization_service,
     order_service,
+    rabbitmq_service,
     shipping_label_service,
     state_mapping_cache,
     state_mapping_service,
+    type_b_connector,
+    type_c_connector,
+    webhook_decoders,
 )
 
 __all__ = [
     "carrier_state_mapping_service",
+    "event_consumer",
     "exceptions",
+    "normalization_service",
     "order_service",
+    "rabbitmq_service",
     "shipping_label_service",
     "state_mapping_cache",
     "state_mapping_service",
+    "type_b_connector",
+    "type_c_connector",
+    "webhook_decoders",
 ]
