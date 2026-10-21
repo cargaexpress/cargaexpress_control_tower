@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     rabbitmq_dlq_queue: str = "eventos_transportadora.dlq"
     rabbitmq_retry_ttl_ms: int = 5000
     rabbitmq_max_retries: int = 3
+    rabbitmq_prefetch_count: int = 10
 
     @field_validator("log_level")
     @classmethod
