@@ -89,7 +89,7 @@ class TypeBConnectorService:
             try:
                 response = await client.get(url, params=params, timeout=10.0)
 
-                # HTTP 429 Too Many Requests -> Subtarea 3: Rate limit handling
+                # HTTP 429 Too Many Requests -> Subtask 3: Rate limit handling
                 if response.status_code == 429:
                     summary.rate_limits_encountered += 1
                     if attempt == self.max_retries:
@@ -188,7 +188,7 @@ class TypeBConnectorService:
 
                 summary.total_fetched += len(events)
 
-                # Subtarea 2: Reutilizar el servicio de normalización
+                # Subtask 2: Reuse normalization service
                 for raw_event in events:
                     tracking_number = str(raw_event.get("tracking_number", "")).strip()
                     raw_status = str(raw_event.get("status", "")).strip()

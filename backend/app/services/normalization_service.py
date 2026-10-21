@@ -14,7 +14,7 @@ from app.services.state_mapping_cache import state_mapping_cache
 
 logger = logging.getLogger("cargaexpress.normalization")
 
-# Regla de negocio RN-02: Estados finales que no pueden ser reemplazados
+# Business rule RN-02: Terminal states cannot be replaced
 TERMINAL_STATUSES: set[str] = {
     "DELIVERED",
     "RETURNED",
@@ -77,14 +77,14 @@ async def normalize_and_apply_event(
     clean_tracking = tracking_number.strip()
     clean_raw_status = raw_status.strip()
 
-    # 1. Resolver transportadora
+    # 1. Resolve carrier
     carrier = await find_carrier_by_slug_or_id(db, carrier_identifier)
     if carrier is None:
         raise EntityNotFoundError("carrier", carrier_identifier)
 
     carrier_id = carrier.carrier_id
 
-    # 2. Traducir estado al catálogo canónico (RN-01 usando cache en memoria)
+    # 2. Translate status to canonical catalog (RN-01 using in-memory cache)
     canonical_status = await state_mapping_cache.translate(carrier_id, clean_raw_status)
     if canonical_status is None:
         logger.warning(
@@ -97,12 +97,12 @@ async def normalize_and_apply_event(
 
     canonical_status = canonical_status.upper()
 
-    # 3. Buscar la guía de envío (ShippingLabel)
+    # 3. Look up shipping label
     stmt = select(ShippingLabel).where(ShippingLabel.tracking_number == clean_tracking)
     label = (await db.execute(stmt)).scalar_one_or_none()
 
     if label is None:
-        # Guía reportada por la transportadora que no existe en el WMS (Defecto sección 5.3)
+        # Tracking number reported by carrier does not exist in WMS (Defect section 5.3)
         anomaly = TrackingAnomaly(
             carrier_id=carrier_id,
             tracking_number=clean_tracking,
@@ -130,7 +130,7 @@ async def normalize_and_apply_event(
 
     current_status = label.status.upper()
 
-    # 4. Regla RN-02: Un estado final no puede ser reemplazado por un estado no final
+    # 4. Rule RN-02: A terminal state cannot be replaced by a non-terminal state
     if current_status in TERMINAL_STATUSES:
         if canonical_status != current_status:
             logger.info(
@@ -168,7 +168,7 @@ async def normalize_and_apply_event(
                 message="Event processed: terminal status preserved and anomaly recorded.",
             )
 
-        # Si ya está en ese mismo estado terminal (idempotente), no es anomalía
+        # If already in target terminal state (idempotent), not an anomaly
         return NormalizationResult(
             success=True,
             carrier_id=carrier_id,
@@ -181,7 +181,7 @@ async def normalize_and_apply_event(
             message="Status already at target terminal state.",
         )
 
-    # 5. Aplicar transición normal a la guía
+    # 5. Apply standard status transition to shipping label
     label.status = canonical_status
 
     # 6. Propagar a la orden si corresponde
@@ -191,7 +191,7 @@ async def normalize_and_apply_event(
             if order.status.upper() in ("CREATED", "PICKED_UP", "IN_TRANSIT"):
                 order.status = canonical_status
         elif canonical_status == "DELIVERED":
-            # RN-07: Un pedido cumple el SLA solo si todas sus guías se entregan dentro del plazo
+            # RN-07: Order meets SLA only if all of its shipping labels are delivered on time
             labels_stmt = select(ShippingLabel).where(ShippingLabel.order_id == order.order_id)
             all_labels = (await db.execute(labels_stmt)).scalars().all()
             if all(

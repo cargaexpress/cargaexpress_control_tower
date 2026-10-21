@@ -20,7 +20,7 @@ from app.services.exceptions import (
 # Service functions isolate persistence from HTTP handling for reuse and testing.
 _ORDER_LOAD_OPTIONS = (selectinload(Order.order_lines), selectinload(Order.recipient))
 
-# Catálogo de estados terminales y transiciones permitidas (RN-02 y ADR-002)
+# Catalog of terminal states and permitted transitions (RN-02 and ADR-002)
 TERMINAL_STATUSES: set[str] = {
     "DELIVERED",
     "CANCELLED",

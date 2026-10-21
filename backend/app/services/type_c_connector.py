@@ -16,7 +16,7 @@ from app.services.normalization_service import normalize_and_apply_event
 
 logger = logging.getLogger("cargaexpress.type_c_connector")
 
-# Palabras clave que identifican filas de totales o resúmenes (Defecto 5.3)
+# Keywords identifying total or summary rows (Defect 5.3)
 SUMMARY_KEYWORDS = {
     "TOTAL",
     "SUBTOTAL",
@@ -28,7 +28,7 @@ SUMMARY_KEYWORDS = {
     "FIN DE ARCHIVO",
 }
 
-# Nombres posibles para mapear columnas heterogéneas
+# Possible column names for heterogeneous header mapping
 TRACKING_COL_CANDIDATES = {
     "tracking_number",
     "tracking",
@@ -217,7 +217,7 @@ class TypeCConnectorService:
             file_hash=file_hash,
         )
 
-        # 1. Subtarea 3: Marcar y verificar archivos ya procesados (Idempotencia CT-08)
+        # 1. Subtask 3: Check and record already processed files (Idempotency CT-08)
         if await self.is_file_already_processed(db, filename, file_hash):
             logger.info("File %s (hash=%s) was already processed. Skipping.", filename, file_hash)
             result.already_processed = True
@@ -225,7 +225,7 @@ class TypeCConnectorService:
             result.message = f"File '{filename}' has already been processed."
             return result
 
-        # 2. Subtarea 1: Lectura de CSV / Excel
+        # 2. Subtask 1: Parse CSV / Excel
         lower_fn = filename.lower()
         if lower_fn.endswith(".xlsx") or lower_fn.endswith(".xls"):
             raw_rows = extract_rows_from_excel(content)
@@ -254,17 +254,17 @@ class TypeCConnectorService:
         status_idx = col_indices["status"]
         timestamp_idx = col_indices.get("timestamp")
 
-        # 4. Procesar y limpiar filas (Limpieza de totales y cabeceras repetidas)
+        # 4. Process and clean rows (filtering totals and repeated headers)
         for row_idx, row in enumerate(raw_rows[1:], start=2):
             result.total_rows_read += 1
 
-            # Defecto 5.3: Saltar filas de totales o pie de reporte
+            # Defect 5.3: Skip total and summary footer rows
             if is_summary_or_total_row(row):
                 result.total_rows_skipped += 1
                 logger.debug("Skipped total/summary row %d: %s", row_idx, row)
                 continue
 
-            # Defecto 5.3: Saltar cabeceras repetidas dentro del lote
+            # Defect 5.3: Skip repeated header rows mid-batch
             if is_repeated_header(row, col_indices):
                 result.header_rows_skipped += 1
                 result.total_rows_skipped += 1
@@ -288,7 +288,7 @@ class TypeCConnectorService:
                 result.errors += 1
                 continue
 
-            # 5. Subtarea 2: Reutilizar el servicio de normalización (RN-01, RN-02, RN-07)
+            # 5. Subtask 2: Reuse normalization service (RN-01, RN-02, RN-07)
             try:
                 norm_res = await normalize_and_apply_event(
                     db=db,
@@ -306,7 +306,7 @@ class TypeCConnectorService:
                 )
                 result.errors += 1
 
-        # 6. Registrar archivo procesado en base de datos para no repetirlo (Subtarea 3)
+        # 6. Record processed file in database to ensure deduplication (Subtask 3)
         processed_file_record = ProcessedFile(
             filename=filename,
             file_hash=file_hash,

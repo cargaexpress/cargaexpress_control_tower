@@ -139,7 +139,7 @@ async def test_type_c_csv_reader_cleans_defects_and_normalizes(db_session):
     assert result.header_rows_skipped == 1
     assert result.total_rows_skipped == 2  # 1 cabecera repetida + 1 fila de totales
 
-    # Verificar que las guías se actualizaron en la BD (Subtarea 2)
+    # Verify shipping labels were updated in database (Subtask 2)
     l1 = (
         await db_session.execute(
             select(ShippingLabel).where(ShippingLabel.tracking_number == "TRK-TYPEC-001")
@@ -196,7 +196,7 @@ async def test_type_c_marks_processed_files_to_prevent_duplicates(db_session):
 
     service = TypeCConnectorService()
 
-    # Primer procesamiento: Debe completarse con éxito
+    # First execution: Should complete successfully
     result_1 = await service.process_file_content(
         db=db_session,
         filename="unique_batch_001.csv",
@@ -206,7 +206,7 @@ async def test_type_c_marks_processed_files_to_prevent_duplicates(db_session):
     assert result_1.status == "completed"
     assert result_1.already_processed is False
 
-    # Verificar que quedó registrado en la tabla processed_files
+    # Verify record was stored in processed_files table
     record = (
         await db_session.execute(
             select(ProcessedFile).where(ProcessedFile.filename == "unique_batch_001.csv")
@@ -254,7 +254,7 @@ async def test_type_c_enforces_rn02_anomaly_on_delivered_status(db_session):
     ).scalar_one()
     assert label.status == "DELIVERED"
 
-    # Verificar que se registró la anomalía en tracking_anomalies
+    # Verify anomaly was recorded in tracking_anomalies table
     anomaly = (
         await db_session.execute(
             select(TrackingAnomaly).where(TrackingAnomaly.tracking_number == "TRK-TYPEC-DELIVERED")

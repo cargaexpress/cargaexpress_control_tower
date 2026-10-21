@@ -52,7 +52,7 @@ class ConcurrentUpdateConflictError(Exception):
 
 
 class InvalidStatusTransitionError(Exception):
-    """Se lanza cuando una transición de estado de orden no es válida según RN-02 y ADR-002."""
+    """Raised when an order status transition is invalid according to RN-02 and ADR-002."""
 
     def __init__(self, current_status: str, new_status: str, message: str | None = None) -> None:
         self.current_status = current_status

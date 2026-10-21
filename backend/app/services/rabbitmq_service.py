@@ -124,15 +124,15 @@ class RabbitMQService:
         )
 
         # 2. Dead-Letter Queue (DLQ)
-        # Recibe mensajes que agotaron reintentos o son irrecuperables
+        # Dead-Letter Queue: receives messages that exhausted retries or are non-recoverable
         dlq = await channel.declare_queue(
             self.dlq_queue_name,
             durable=True,
         )
         await dlq.bind(exchange, routing_key="eventos.dlq")
 
-        # 3. Retry Queue con TTL
-        # Retiene el mensaje durante `retry_ttl_ms` y al expirar lo re-enruta a la cola principal
+        # 3. Retry Queue with TTL
+        # Holds message for retry_ttl_ms and dead-letters back to main queue upon expiration
         retry_queue = await channel.declare_queue(
             self.retry_queue_name,
             durable=True,
@@ -144,8 +144,8 @@ class RabbitMQService:
         )
         await retry_queue.bind(exchange, routing_key="eventos.retry")
 
-        # 4. Cola principal `eventos_transportadora`
-        # Si un mensaje es rechazado sin requeue, viaja automáticamente al DLQ
+        # 4. Main queue eventos_transportadora
+        # Rejected messages without requeue automatically route to DLQ
         main_queue = await channel.declare_queue(
             self.main_queue_name,
             durable=True,

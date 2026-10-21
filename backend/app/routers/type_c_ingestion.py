@@ -17,7 +17,7 @@ async def upload_type_c_file(
     file: UploadFile = File(...),
     carrier_name: str = Form(
         ...,
-        description="Name of the Type C carrier (e.g. TransExpress Logistics, Rápido Andino, Logística 360).",
+        description="Name of the Type C carrier (e.g. TransExpress Logistics, Rapido Andino, Logistica 360).",
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:

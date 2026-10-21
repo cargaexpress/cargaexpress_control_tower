@@ -322,7 +322,7 @@ async def test_worker_e2e_eventual_normalization(client, db_session, default_moc
     """Subtask 4: Publish a sample message to webhook and verify worker eventually normalizes it."""
     await _seed_infrastructure(db_session)
 
-    # 1. Transportadora posts webhook
+    # 1. Carrier posts webhook
     payload = {
         "event_id": "EVT-E2E-999",
         "tracking_number": "TRK-ALPHA-001",

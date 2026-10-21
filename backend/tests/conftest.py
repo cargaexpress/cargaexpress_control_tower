@@ -1,10 +1,10 @@
 # ruff: noqa: E402
 import os
 
-# Configurar valores aislados por defecto para el entorno de pruebas antes de instanciar settings/engine
-# Si no hay TEST_DATABASE_URL ni DATABASE_URL especificados externamente (e.g. entorno local sin Docker),
-# usamos sqlite+aiosqlite para permitir que las pruebas se ejecuten sin dependencias externas.
-# En CI (GitHub Actions), estas variables siempre están definidas apuntando a postgresql.
+# Set default isolated values for test environment before instantiating settings/engine
+# If neither TEST_DATABASE_URL nor DATABASE_URL is explicitly set (e.g. running locally without Docker),
+# use sqlite+aiosqlite to allow frictionless local test runs.
+# In CI (GitHub Actions), these variables are always explicitly defined pointing to PostgreSQL.
 if not os.environ.get("TEST_DATABASE_URL") and not os.environ.get("DATABASE_URL"):
     os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///test_suite.db"
     os.environ["TEST_DATABASE_URL"] = "sqlite+aiosqlite:///test_suite.db"

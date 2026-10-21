@@ -47,7 +47,7 @@ async def receive_carrier_webhook(
             detail="Empty webhook body",
         )
 
-    # 1. Validar y decodificar el formato de la transportadora
+    # 1. Validate and decode carrier payload format
     try:
         event = decode_carrier_payload(carrier_slug, content_type, body)
     except WebhookDecodeError as exc:
@@ -57,7 +57,7 @@ async def receive_carrier_webhook(
             detail=f"Invalid webhook payload: {exc}",
         ) from exc
 
-    # 2. Validar que la transportadora exista en el sistema (404 si no existe)
+    # 2. Verify carrier exists in database (404 if not found)
     carrier = await find_carrier_by_slug_or_id(db, carrier_slug)
     if carrier is None:
         raise HTTPException(
@@ -65,7 +65,7 @@ async def receive_carrier_webhook(
             detail=f"Carrier '{carrier_slug}' is not registered in the system",
         )
 
-    # 3. Publicar en la cola RabbitMQ de forma asíncrona (RNF-01)
+    # 3. Asynchronously publish to RabbitMQ queue (RNF-01)
     try:
         queued_msg: QueuedWebhookMessage = await rmq.publish_webhook_event(
             carrier_slug=carrier.name,
