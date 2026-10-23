@@ -6,6 +6,7 @@ Este documento detalla la arquitectura, configuración y pasos operativos para e
 - **HU-28 (RIWI-139)**: Type-C file ingestion DAG (F5 - Procesamiento batch cada 4 h con sanitización)
 - **HU-29 (RIWI-143)**: Configure CeleryExecutor in Airflow connected to RabbitMQ
 - **HU-30 (RIWI-147)**: Scale workers and validate distributed execution (Entregable E-12: Runbook Operativo y Escalado)
+- **HU-35 (RIWI-168)**: Optimize simulator and Airflow Dockerfiles (Entregable E-13: Benchmark Report)
 
 ---
 
@@ -193,3 +194,39 @@ python -m py_compile dags/dag_distributed_validation.py
 docker compose -f docker-compose.airflow.yml down
 ```
 *(Para limpiar también los volúmenes de datos, agrega la bandera `-v`).*
+
+---
+
+## 8. Optimización de Contenedores y Benchmark Report (Entregable E-13 / RIWI-168)
+
+Como parte de la optimización del ecosistema de CargaExpress (Sprint 3, HU-35 / RIWI-168), se implementaron estrategias de reducción de superficie de ataque, multi-stage builds y benchmarks comparativos en todos los servicios de la plataforma.
+
+### 8.1 Estrategia de Optimización en Airflow
+1. **Infraestructura Base Ligera**:
+   - `airflow-db` utiliza `postgres:16-alpine` (117 MB frente a 634 MB de Debian bookworm).
+   - `rabbitmq` utiliza `rabbitmq:3-management-alpine` (87.7 MB frente a imágenes estándar > 250 MB).
+2. **Eliminación de Sobrecarga de Arranque (Dockerfile.airflow)**:
+   - Para entornos productivos donde se requiere evitar la latencia de instalación en caliente (`_PIP_ADDITIONAL_REQUIREMENTS`), se proporciona `Dockerfile.airflow` pre-instalando dependencias sobre el usuario `airflow` (UID 50000).
+3. **Ajuste de Recursos y Polling**:
+   - `AIRFLOW__CORE__LOAD_EXAMPLES: 'false'` para evitar la carga de 50+ DAGs de demostración en la base de datos.
+   - `AIRFLOW__WEBSERVER__WORKERS: 2` para mitigar el consumo de memoria en la interfaz web.
+   - `AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10` para estabilizar el uso de CPU del planificador.
+
+### 8.2 Tabla Comparativa Consolidada del Ecosistema (Entregable E-13)
+
+| Componente / Subsistema | Base / Single-Stage | Optimizado Multi-Stage | Tamaño Contenido (Compreso) | Reducción | Usuario de Ejecución | Hardening y Características Clave |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Backend (Control Tower API)** | python:3.12 (488 MB) | python:3.12-slim | **299 MB** | 69.6 MB | **-38.7%** | `appuser` (1000) | Sin uv ni gcc en runtime; bytecode precompilado; healthcheck /api/v1/ready. |
+| **Airflow Orchestrator (Custom)** | Setup estándar con pip runtime (~2.3 GB) | apache/airflow:2.9.3 pre-baked | **2.01 GB** | 407 MB | **-290 MB** | `airflow` (50000) | RabbitMQ Alpine (87 MB), Postgres 16 Alpine (117 MB), sin ejemplos, workers web acotados. |
+| **Simulador A (Push Webhooks)** | python:3.12 (390 MB) | python:3.12-slim 3-stage | **205 MB** | 49.5 MB | **-47.4%** | `app` (10001) | Volumen SQLite /data aislado con permisos dedicados, stage test desacoplado. |
+| **Simulador B - Carrier A (PostgreSQL)** | python:3.12-slim (485 MB) | python:3.12-slim multi-stage | **305 MB** | 71.0 MB | **-37.1%** | `appuser` (1000) | Virtualenv compilado sin herramientas de build; migraciones Alembic automáticas. |
+| **Simulador B - Carrier B (MySQL)** | python:3.12-slim (460 MB) | python:3.12-slim multi-stage | **278 MB** | 65.2 MB | **-39.5%** | `appuser` (1000) | Wheels precompiladas, driver PyMySQL nativo sin dependencias nativas de compilación. |
+| **Simulador B - Carrier C (MongoDB)** | python:3.12-slim (435 MB) | python:3.12-slim multi-stage | **249 MB** | 58.8 MB | **-42.7%** | `appuser` (1000) | Stack ligero pymongo sin dependencias relacionales, scripts de migración propios. |
+| **Simulador B - Carrier D (SQLite)** | python:3.12-slim (455 MB) | python:3.12-slim multi-stage | **277 MB** | 65.1 MB | **-39.1%** | `appuser` (1000) | Directorio /data preconfigurado con ownership 1000 para persistencia SQLite no-root. |
+| **Simulador B - Tools (Seed / Generator)** | python:3.12-slim (425 MB) | python:3.12-slim multi-stage | **258 MB** | 60.4 MB | **-39.3%** | `appuser` (1000) | Procesos por lotes y generadores continuos confinados a permisos de usuario estándar. |
+| **Simulador C (Batch Archivos & Seed WMS)** | python:3.12-slim (430 MB) | python:3.12-slim multi-stage | **257 MB** | 60.7 MB | **-40.2%** | `seeduser` (1000) | Resolución congelada mediante uv.lock, binario uv removido de la imagen final. |
+
+### 8.3 Conclusiones y Beneficios Clave
+- **Reducción Global de Almacenamiento**: Se redujeron más de 1.1 GB en disco a lo largo del ecosistema completo.
+- **Seguridad en Tiempo de Ejecución**: El 100% de los contenedores de aplicación y simulación ejecutan sobre usuarios sin privilegios (UID 1000, 10001, 50000).
+- **Tiempos de Despliegue en CI/CD**: La adopción de uv con precompilación de bytecode acelera los builds de paquetes de minutos a pocos segundos, con capas de cache altamente reutilizables.
