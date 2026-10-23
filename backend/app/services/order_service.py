@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -9,13 +10,35 @@ from app.models.order_line import OrderLine
 from app.models.order_recipient import OrderRecipient
 from app.models.shipment_type import ShipmentType
 from app.schemas.order import OrderCreate
-from app.services.exceptions import EntityNotFoundError
+from app.services.exceptions import (
+    DuplicateOrderReferenceError,
+    EntityNotFoundError,
+    InvalidStatusTransitionError,
+)
 
 # Eager-load child records to return complete orders without per-row queries.
 # Service functions isolate persistence from HTTP handling for reuse and testing.
-# Carga relaciones por adelantado para evitar consultas adicionales por pedido.
-# El servicio separa persistencia de HTTP para facilitar reutilización y pruebas.
 _ORDER_LOAD_OPTIONS = (selectinload(Order.order_lines), selectinload(Order.recipient))
+
+# Catalog of terminal states and permitted transitions (RN-02 and ADR-002)
+TERMINAL_STATUSES: set[str] = {
+    "DELIVERED",
+    "CANCELLED",
+    "RETURNED",
+    "LOST_OR_DAMAGED",
+}
+
+VALID_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "CREATED": {"PICKED_UP", "CANCELLED"},
+    "PICKED_UP": {"IN_TRANSIT", "CANCELLED"},
+    "IN_TRANSIT": {"OUT_FOR_DELIVERY", "EXCEPTION", "LOST_OR_DAMAGED"},
+    "OUT_FOR_DELIVERY": {"DELIVERED", "EXCEPTION", "RETURNED"},
+    "EXCEPTION": {"IN_TRANSIT", "OUT_FOR_DELIVERY", "RETURNED", "LOST_OR_DAMAGED"},
+    "DELIVERED": set(),
+    "RETURNED": set(),
+    "CANCELLED": set(),
+    "LOST_OR_DAMAGED": set(),
+}
 
 
 async def _get_or_404(db: AsyncSession, model, pk_value, entity_name: str):
@@ -25,26 +48,25 @@ async def _get_or_404(db: AsyncSession, model, pk_value, entity_name: str):
     return obj
 
 
-async def create_order(db: AsyncSession, payload: OrderCreate) -> Order:
-    """
-    Crea un pedido junto con sus líneas y su destinatario (relación 1:1 obligatoria).
+async def create_order(db: AsyncSession, payload: OrderCreate, tenant_brand_id: int) -> Order:
+    """Create an order with its lines and recipient (mandatory 1:1 relation).
 
-    Antes de insertar, valida que brand_id, dc_id y shipment_type_code existan;
-    si alguno no existe, lanza EntityNotFoundError (el router la traduce a 404).
+    Uses the authenticated tenant brand and validates the remaining references;
+    raises EntityNotFoundError if any reference is missing (translated to 404 by router).
     """
-    await _get_or_404(db, Brand, payload.brand_id, "brand")
+    await _get_or_404(db, Brand, tenant_brand_id, "brand")
     await _get_or_404(db, DistributionCenter, payload.dc_id, "distribution_center")
     await _get_or_404(db, ShipmentType, payload.shipment_type_code, "shipment_type")
 
     order = Order(
-        brand_id=payload.brand_id,
+        brand_id=tenant_brand_id,
         dc_id=payload.dc_id,
         shipment_type_code=payload.shipment_type_code,
         brand_order_ref=payload.brand_order_ref,
         destination_country=payload.destination_country,
         destination_region=payload.destination_region,
         freight_value=payload.freight_value,
-        status=payload.status,
+        status=payload.status.upper(),
     )
 
     for index, line in enumerate(payload.order_lines, start=1):
@@ -66,28 +88,38 @@ async def create_order(db: AsyncSession, payload: OrderCreate) -> Order:
     )
 
     db.add(order)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise DuplicateOrderReferenceError(payload.brand_order_ref) from exc
     await db.refresh(order, attribute_names=["order_lines", "recipient"])
     return order
 
 
-async def get_order(db: AsyncSession, order_id: int) -> Order | None:
-    stmt = select(Order).where(Order.order_id == order_id).options(*_ORDER_LOAD_OPTIONS)
+async def get_order(db: AsyncSession, order_id: int, tenant_brand_id: int) -> Order | None:
+    stmt = (
+        select(Order)
+        .where(Order.order_id == order_id, Order.brand_id == tenant_brand_id)
+        .options(*_ORDER_LOAD_OPTIONS)
+    )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
 
-async def list_orders(db: AsyncSession, skip: int, limit: int) -> tuple[list[Order], int]:
+async def list_orders(
+    db: AsyncSession, tenant_brand_id: int, skip: int, limit: int
+) -> tuple[list[Order], int]:
     # Stable ordering makes offset/limit pagination deterministic.
-    # El orden estable hace predecible la paginación por desplazamiento.
     items_stmt = (
         select(Order)
+        .where(Order.brand_id == tenant_brand_id)
         .options(*_ORDER_LOAD_OPTIONS)
         .order_by(Order.order_id)
         .offset(skip)
         .limit(limit)
     )
-    total_stmt = select(func.count()).select_from(Order)
+    total_stmt = select(func.count()).select_from(Order).where(Order.brand_id == tenant_brand_id)
 
     items_result = await db.execute(items_stmt)
     total_result = await db.execute(total_stmt)
@@ -97,11 +129,32 @@ async def list_orders(db: AsyncSession, skip: int, limit: int) -> tuple[list[Ord
     return items, total
 
 
-async def update_order_status(db: AsyncSession, order_id: int, new_status: str) -> Order | None:
-    order = await get_order(db, order_id)
+async def update_order_status(
+    db: AsyncSession, order_id: int, new_status: str, tenant_brand_id: int
+) -> Order | None:
+    order = await get_order(db, order_id, tenant_brand_id)
     if order is None:
         return None
-    order.status = new_status
+
+    current_status = order.status.upper()
+    target_status = new_status.upper()
+
+    if current_status in TERMINAL_STATUSES:
+        raise InvalidStatusTransitionError(
+            current_status=order.status,
+            new_status=new_status,
+            message=f"Order is in terminal status '{order.status}' and cannot transition to '{new_status}'",
+        )
+
+    allowed_transitions = VALID_STATUS_TRANSITIONS.get(current_status, set())
+    if target_status not in allowed_transitions:
+        raise InvalidStatusTransitionError(
+            current_status=order.status,
+            new_status=new_status,
+            message=f"Invalid status transition from '{order.status}' to '{new_status}'",
+        )
+
+    order.status = target_status
     await db.commit()
     await db.refresh(order, attribute_names=["order_lines", "recipient"])
     return order

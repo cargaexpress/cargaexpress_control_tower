@@ -1,4 +1,4 @@
-"""crear tabla state_mapping
+"""Create state_mapping table
 
 Revision ID: a3f1c9d27b45
 Revises: dee4876a63bd

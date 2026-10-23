@@ -1,4 +1,4 @@
-"""crear tablas WMS (brands, orders, order_lines, shipping_labels, etc.)
+"""Create WMS tables (brands, orders, order_lines, shipping_labels, etc.)
 
 Revision ID: dee4876a63bd
 Revises: 

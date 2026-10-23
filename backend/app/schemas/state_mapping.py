@@ -1,34 +1,48 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.state_mapping import CANONICAL_STATUSES
 
 
-# Normalize carrier text and reject blank values before they reach persistence.
-# Normaliza el texto recibido y rechaza valores vacíos antes de guardarlos.
-def _clean_raw_status(value: str) -> str:
+def clean_raw_status(value: str) -> str:
     value = value.strip()
     if not value:
-        raise ValueError("raw_status no puede estar vacío")
+        raise ValueError("raw_status cannot be empty")
     return value
 
 
-def _clean_canonical(value: str) -> str:
+def clean_canonical_status(value: str) -> str:
     value = value.strip().upper()
     if value not in CANONICAL_STATUSES:
-        raise ValueError(f"canonical_status debe ser uno de: {', '.join(CANONICAL_STATUSES)}")
+        raise ValueError(f"canonical_status must be one of: {', '.join(CANONICAL_STATUSES)}")
     return value
 
 
-# Separate create, partial-update, and read contracts keep API validation explicit.
-# PATCH allows omitted fields but rejects an empty update below.
-# Esquemas distintos hacen explícitas las validaciones de alta, edición y lectura.
-# PATCH admite campos omitidos, pero rechaza una edición sin cambios.
+_clean_raw_status = clean_raw_status
+_clean_canonical = clean_canonical_status
+
+
 class StateMappingCreate(BaseModel):
-    carrier_id: int = Field(gt=0)
-    raw_status: str = Field(max_length=100)
-    canonical_status: str
+    """Payload to create a new mapping from a carrier status to a canonical status."""
+
+    carrier_id: int = Field(
+        ...,
+        gt=0,
+        description="Identifier of the carrier to map.",
+        examples=[1],
+    )
+    raw_status: str = Field(
+        ...,
+        max_length=100,
+        description="Original raw status reported by the carrier.",
+        examples=["En reparto"],
+    )
+    canonical_status: str = Field(
+        ...,
+        description="Standardized canonical status.",
+        examples=["OUT_FOR_DELIVERY"],
+    )
 
     @field_validator("raw_status")
     @classmethod
@@ -40,10 +54,31 @@ class StateMappingCreate(BaseModel):
     def _validate_canonical(cls, value: str) -> str:
         return _clean_canonical(value)
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "carrier_id": 1,
+                "raw_status": "En reparto",
+                "canonical_status": "OUT_FOR_DELIVERY",
+            }
+        }
+    )
+
 
 class StateMappingUpdate(BaseModel):
-    raw_status: str | None = Field(default=None, max_length=100)
-    canonical_status: str | None = None
+    """Payload for partial update of an existing state mapping."""
+
+    raw_status: str | None = Field(
+        default=None,
+        max_length=100,
+        description="New value for the carrier's raw status.",
+        examples=["En ruta de entrega"],
+    )
+    canonical_status: str | None = Field(
+        default=None,
+        description="New canonical status.",
+        examples=["OUT_FOR_DELIVERY"],
+    )
 
     @field_validator("raw_status")
     @classmethod
@@ -58,22 +93,59 @@ class StateMappingUpdate(BaseModel):
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "StateMappingUpdate":
         if self.raw_status is None and self.canonical_status is None:
-            raise ValueError("Envía al menos raw_status o canonical_status")
+            raise ValueError("Provide at least raw_status or canonical_status")
         return self
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "raw_status": "En ruta de entrega",
+                "canonical_status": "OUT_FOR_DELIVERY",
+            }
+        }
+    )
 
 
 class StateMappingRead(BaseModel):
+    """Persisted state mapping entity with traceability."""
+
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    carrier_id: int
-    raw_status: str
-    canonical_status: str
-    created_at: datetime
-    updated_at: datetime
+    id: int = Field(..., description="Mapping record ID.", examples=[1])
+    carrier_id: int = Field(..., description="Associated carrier ID.", examples=[1])
+    raw_status: str = Field(..., description="Source raw status.", examples=["En reparto"])
+    canonical_status: str = Field(
+        ..., description="Standardized canonical status.", examples=["OUT_FOR_DELIVERY"]
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="Record creation date and time.",
+        examples=["2026-10-13T10:00:00Z"],
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="Date and time of last update.",
+        examples=["2026-10-13T10:00:00Z"],
+    )
 
 
 class StateMappingResolved(BaseModel):
-    carrier_id: int
-    raw_status: str
-    canonical_status: str
+    """Result of resolving or translating a carrier raw status."""
+
+    carrier_id: int = Field(..., description="Queried carrier ID.", examples=[1])
+    raw_status: str = Field(..., description="Received raw status.", examples=["En reparto"])
+    canonical_status: str = Field(
+        ...,
+        description="Corresponding canonical status from active mapping.",
+        examples=["OUT_FOR_DELIVERY"],
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "carrier_id": 1,
+                "raw_status": "En reparto",
+                "canonical_status": "OUT_FOR_DELIVERY",
+            }
+        }
+    )

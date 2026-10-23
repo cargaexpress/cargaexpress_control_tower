@@ -7,8 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from app.config import settings
 from app.database import Base
 
-# Importar app.models para que Alembic detecte las 11 tablas del ERD
-# al generar la migración automática (ver app/models/__init__.py)
+# Import app.models so Alembic detects all ERD tables during autogenerate (see app/models/__init__.py)
 import app.models  # noqa: F401
 
 config = context.config

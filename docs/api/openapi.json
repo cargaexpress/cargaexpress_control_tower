@@ -1,0 +1,2422 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CargaExpress Supply Chain API",
+    "description": "CargaExpress Control Tower Logistics: APIs for WMS order orchestration, carrier tracking, dynamic state mapping, and exception management.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/docs/api/openapi.json": {
+      "get": {
+        "summary": "Docs Api Openapi Json",
+        "operationId": "docs_api_openapi_json_docs_api_openapi_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Service health and connectivity probe",
+        "description": "Check service availability and report database connection status. Always returns HTTP 200 with connectivity detail (up/down).",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Service health status and database connectivity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness probe",
+        "description": "Returns 200 only when the database is reachable.",
+        "operationId": "readiness_check_api_v1_ready_get",
+        "responses": {
+          "200": {
+            "description": "The service is ready to serve traffic.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is not reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/state-mappings": {
+      "get": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "List persisted state mappings (HU-12)",
+        "description": "Retrieve all configured status mappings, optionally filtered by carrier ID.",
+        "operationId": "list_mappings_api_v1_admin_state_mappings_get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of state mappings retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StateMappingRead"
+                  },
+                  "title": "Response List Mappings Api V1 Admin State Mappings Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Create a new state mapping (HU-12)",
+        "description": "Register a new single mapping between a carrier's raw status and a canonical status.",
+        "operationId": "create_mapping_api_v1_admin_state_mappings_post",
+        "parameters": [
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateMappingCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "State mapping created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMappingRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Carrier does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Mapping already exists for this carrier and status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in payload (e.g. invalid canonical status or blank raw status)."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/state-mappings/resolve": {
+      "get": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Translate raw carrier status to canonical status (HU-12)",
+        "description": "Translate a carrier's raw status to the normalized canonical status using the in-memory cache.",
+        "operationId": "resolve_mapping_api_v1_admin_state_mappings_resolve_get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "raw_status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Raw Status"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status resolved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMappingResolved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No mapping found for given status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/state-mappings/{mapping_id}": {
+      "patch": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Partially update an existing state mapping (HU-12)",
+        "description": "Modify the raw status or canonical status of an existing mapping by its ID.",
+        "operationId": "update_mapping_api_v1_admin_state_mappings__mapping_id__patch",
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mapping Id"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateMappingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "State mapping updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMappingRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mapping does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Updated raw status conflicts with an existing mapping.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in payload."
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin: state mapping"
+        ],
+        "summary": "Delete an existing state mapping (HU-12)",
+        "description": "Remove a state mapping record by its primary key ID.",
+        "operationId": "delete_mapping_api_v1_admin_state_mappings__mapping_id__delete",
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mapping Id"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "State mapping deleted successfully."
+          },
+          "401": {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mapping does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/carrier-state-mappings/{carrier_id}": {
+      "get": {
+        "tags": [
+          "admin: carrier state mapping"
+        ],
+        "summary": "Retrieve state mappings for a specific carrier (HU-15)",
+        "description": "Retrieve all current status mappings configured for the given carrier directly from the database.",
+        "operationId": "get_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Carrier state mappings retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierStateMappingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Carrier not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin: carrier state mapping"
+        ],
+        "summary": "Replace entire state mapping set for a carrier (HU-15)",
+        "description": "Synchronize and replace the complete set of status mappings for a carrier in an atomic transaction.",
+        "operationId": "update_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__put",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CarrierStateMappingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Carrier state mappings synchronized successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierStateMappingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access (missing or invalid X-Admin-Token).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Carrier not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent update conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in payload (e.g. invalid canonical status or duplicate raw status)."
+          }
+        }
+      }
+    },
+    "/api/v1/orders": {
+      "post": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Create a new order with lines and recipient (HU-13)",
+        "description": "Create an order with its mandatory child lines and recipient details. Validates that referenced brand, distribution center, and shipment type exist.",
+        "operationId": "create_order_api_v1_orders_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request or invalid input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced brand, distribution center, or shipment type not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Order reference already exists for this brand.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in entity or payload."
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "List orders with pagination (HU-13)",
+        "description": "Retrieve a paginated list of orders, including total count and pagination metadata.",
+        "operationId": "list_orders_api_v1_orders_get",
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of orders retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in pagination query parameters."
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{order_id}": {
+      "get": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Retrieve order by ID (HU-13)",
+        "description": "Retrieve full details for a single order by its ID, including recipient and order lines.",
+        "operationId": "get_order_api_v1_orders__order_id__get",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in order ID path parameter."
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{order_id}/status": {
+      "patch": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Update order status (HU-13)",
+        "description": "Update the canonical lifecycle status of an existing order.",
+        "operationId": "update_order_status_api_v1_orders__order_id__status_patch",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStatusUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order status updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in order ID or status payload."
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{order_id}/shipping-labels": {
+      "post": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Associate shipping label with an order (RN-07)",
+        "description": "Register and associate a new shipping label with the specified order.",
+        "operationId": "create_shipping_label_api_v1_orders__order_id__shipping_labels_post",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingLabelCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Shipping label created and associated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingLabelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or duplicate tracking number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order or carrier not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: tracking number already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "List shipping labels for an order (RN-07)",
+        "description": "Retrieve all shipping labels associated with the specified order.",
+        "operationId": "get_shipping_labels_api_v1_orders__order_id__shipping_labels_get",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of shipping labels associated with order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShippingLabelResponse"
+                  },
+                  "title": "Response 200 Get Shipping Labels Api V1 Orders  Order Id  Shipping Labels Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CarrierStateMappingEntry": {
+        "properties": {
+          "raw_status": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Raw Status",
+            "description": "Original raw status reported by the carrier.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Standardized canonical status.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "CarrierStateMappingEntry",
+        "description": "Single state mapping entry for a carrier.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "raw_status": "En reparto"
+        }
+      },
+      "CarrierStateMappingRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Mapping record ID.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "title": "Raw Status",
+            "description": "Source raw status.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Normalized canonical status.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Date and time of last update.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "CarrierStateMappingRead",
+        "description": "Single state mapping persisted in the database."
+      },
+      "CarrierStateMappingResponse": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id",
+            "description": "Carrier ID.",
+            "examples": [
+              1
+            ]
+          },
+          "carrier_name": {
+            "type": "string",
+            "title": "Carrier Name",
+            "description": "Carrier trade name.",
+            "examples": [
+              "SimCarrier Alpha"
+            ]
+          },
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/CarrierStateMappingRead"
+            },
+            "type": "array",
+            "title": "Mappings",
+            "description": "List of active mappings."
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "carrier_name",
+          "mappings"
+        ],
+        "title": "CarrierStateMappingResponse",
+        "description": "Response containing the complete set of mappings for a carrier.",
+        "example": {
+          "carrier_id": 1,
+          "carrier_name": "SimCarrier Alpha",
+          "mappings": [
+            {
+              "canonical_status": "OUT_FOR_DELIVERY",
+              "id": 1,
+              "raw_status": "En reparto",
+              "updated_at": "2026-10-13T10:00:00Z"
+            }
+          ]
+        }
+      },
+      "CarrierStateMappingUpdate": {
+        "properties": {
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/CarrierStateMappingEntry"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Mappings",
+            "description": "Collection of state mappings."
+          }
+        },
+        "type": "object",
+        "required": [
+          "mappings"
+        ],
+        "title": "CarrierStateMappingUpdate",
+        "description": "Payload for PUT: the complete replacement list of mappings for a carrier.",
+        "example": {
+          "mappings": [
+            {
+              "canonical_status": "CREATED",
+              "raw_status": "Generada"
+            },
+            {
+              "canonical_status": "OUT_FOR_DELIVERY",
+              "raw_status": "En reparto"
+            },
+            {
+              "canonical_status": "DELIVERED",
+              "raw_status": "Entregada"
+            }
+          ]
+        }
+      },
+      "HTTPErrorResponse": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail",
+            "description": "Detailed error message or structured request-validation errors.",
+            "examples": [
+              "Requested resource was not found."
+            ]
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "Standardized system error code.",
+            "examples": [
+              "RESOURCE_NOT_FOUND"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "HTTPErrorResponse",
+        "description": "Standard error response schema for the API.",
+        "example": {
+          "detail": "Requested resource was not found in the system.",
+          "error_code": "NOT_FOUND"
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "HealthResponse"
+      },
+      "OrderCreate": {
+        "properties": {
+          "brand_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Brand Id",
+            "description": "Identifier of the brand owning the inventory.",
+            "examples": [
+              1
+            ]
+          },
+          "dc_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Dc Id",
+            "description": "Origin Distribution Center identifier.",
+            "examples": [
+              1
+            ]
+          },
+          "shipment_type_code": {
+            "type": "string",
+            "title": "Shipment Type Code",
+            "description": "Shipment type code (STANDARD, EXPRESS, SAME_DAY).",
+            "examples": [
+              "STANDARD"
+            ]
+          },
+          "brand_order_ref": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Brand Order Ref",
+            "description": "Unique external order reference provided by the brand.",
+            "examples": [
+              "ORD-MODA-2026-0001"
+            ]
+          },
+          "destination_country": {
+            "type": "string",
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Destination Country",
+            "description": "ISO 3166-1 alpha-2 destination country code.",
+            "default": "CO",
+            "examples": [
+              "CO"
+            ]
+          },
+          "destination_region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Region",
+            "description": "Department or province of delivery.",
+            "examples": [
+              "Cundinamarca"
+            ]
+          },
+          "freight_value": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Freight Value",
+            "description": "Agreed shipping freight charge.",
+            "examples": [
+              "15000.00"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PICKED_UP",
+              "IN_TRANSIT",
+              "OUT_FOR_DELIVERY",
+              "EXCEPTION",
+              "DELIVERED",
+              "RETURNED",
+              "LOST_OR_DAMAGED"
+            ],
+            "title": "Status",
+            "description": "Initial operational status of the order.",
+            "default": "CREATED",
+            "examples": [
+              "CREATED"
+            ]
+          },
+          "order_lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrderLineCreate"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Order Lines",
+            "description": "List of product items included in the order."
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/OrderRecipientCreate",
+            "description": "Detailed delivery recipient information."
+          }
+        },
+        "type": "object",
+        "required": [
+          "brand_id",
+          "dc_id",
+          "shipment_type_code",
+          "brand_order_ref",
+          "freight_value",
+          "order_lines",
+          "recipient"
+        ],
+        "title": "OrderCreate",
+        "description": "Payload to register a new order in the WMS Control Tower.",
+        "example": {
+          "brand_id": 1,
+          "brand_order_ref": "ORD-MODA-2026-0001",
+          "dc_id": 1,
+          "destination_country": "CO",
+          "destination_region": "Cundinamarca",
+          "freight_value": 15000.0,
+          "order_lines": [
+            {
+              "description": "Blue cotton shirt size M",
+              "quantity_ordered": 2,
+              "sku": "SKU-SHIRT-BLUE-M"
+            }
+          ],
+          "recipient": {
+            "address_line": "Carrera 15 # 93-47 Apto 502",
+            "city": "Bogota",
+            "email": "juan.perez@example.com",
+            "full_name": "Juan Perez",
+            "phone": "+573001234567"
+          },
+          "shipment_type_code": "STANDARD",
+          "status": "CREATED"
+        }
+      },
+      "OrderLineCreate": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Sku",
+            "description": "Unique product identifier (SKU).",
+            "examples": [
+              "SKU-SHIRT-BLUE-M"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the item.",
+            "examples": [
+              "Blue cotton shirt size M"
+            ]
+          },
+          "quantity_ordered": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity Ordered",
+            "description": "Quantity ordered for the item.",
+            "examples": [
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku",
+          "quantity_ordered"
+        ],
+        "title": "OrderLineCreate",
+        "description": "Product line or SKU item included when creating an order.",
+        "example": {
+          "description": "Blue cotton shirt size M",
+          "quantity_ordered": 2,
+          "sku": "SKU-SHIRT-BLUE-M"
+        }
+      },
+      "OrderLineRead": {
+        "properties": {
+          "order_line_id": {
+            "type": "integer",
+            "title": "Order Line Id",
+            "description": "Sequential ID of the order line.",
+            "examples": [
+              101
+            ]
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "ID of the parent order.",
+            "examples": [
+              1
+            ]
+          },
+          "line_number": {
+            "type": "integer",
+            "title": "Line Number",
+            "description": "Ordinal line number within the order.",
+            "examples": [
+              1
+            ]
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku",
+            "description": "Unique product SKU.",
+            "examples": [
+              "SKU-SHIRT-BLUE-M"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Item description.",
+            "examples": [
+              "Blue cotton shirt"
+            ]
+          },
+          "quantity_ordered": {
+            "type": "integer",
+            "title": "Quantity Ordered",
+            "description": "Quantity ordered.",
+            "examples": [
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_line_id",
+          "order_id",
+          "line_number",
+          "sku",
+          "quantity_ordered"
+        ],
+        "title": "OrderLineRead",
+        "description": "Representation of an order line persisted in the database."
+      },
+      "OrderListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderRead"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of orders on the current page."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total count of matching orders.",
+            "examples": [
+              100
+            ]
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Skip",
+            "description": "Offset applied to the query.",
+            "examples": [
+              0
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit",
+            "description": "Maximum number of records returned per page.",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "OrderListResponse",
+        "description": "Paginated response structure for order listings.",
+        "example": {
+          "items": [],
+          "limit": 20,
+          "skip": 0,
+          "total": 0
+        }
+      },
+      "OrderRead": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "Auto-generated internal order ID.",
+            "examples": [
+              1
+            ]
+          },
+          "brand_id": {
+            "type": "integer",
+            "title": "Brand Id",
+            "description": "ID of the brand owning the order.",
+            "examples": [
+              1
+            ]
+          },
+          "dc_id": {
+            "type": "integer",
+            "title": "Dc Id",
+            "description": "Distribution Center ID.",
+            "examples": [
+              1
+            ]
+          },
+          "shipment_type_code": {
+            "type": "string",
+            "title": "Shipment Type Code",
+            "description": "Shipment type code.",
+            "examples": [
+              "STANDARD"
+            ]
+          },
+          "brand_order_ref": {
+            "type": "string",
+            "title": "Brand Order Ref",
+            "description": "Brand external reference.",
+            "examples": [
+              "ORD-MODA-2026-0001"
+            ]
+          },
+          "destination_country": {
+            "type": "string",
+            "title": "Destination Country",
+            "description": "Destination country.",
+            "examples": [
+              "CO"
+            ]
+          },
+          "destination_region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Region",
+            "description": "Region/department.",
+            "examples": [
+              "Cundinamarca"
+            ]
+          },
+          "freight_value": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Freight Value",
+            "description": "Freight charge value.",
+            "examples": [
+              "15000.00"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current order status.",
+            "examples": [
+              "CREATED"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Order creation date and time.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          },
+          "order_lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrderLineRead"
+            },
+            "type": "array",
+            "title": "Order Lines",
+            "description": "Items associated with the order."
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/OrderRecipientRead",
+            "description": "Order recipient details."
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "brand_id",
+          "dc_id",
+          "shipment_type_code",
+          "brand_order_ref",
+          "destination_country",
+          "freight_value",
+          "status",
+          "created_at",
+          "order_lines",
+          "recipient"
+        ],
+        "title": "OrderRead",
+        "description": "Full detail of a queried order."
+      },
+      "OrderRecipientCreate": {
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Full Name",
+            "description": "Full name or company name of the recipient.",
+            "examples": [
+              "Juan Perez"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Email address for delivery notifications.",
+            "examples": [
+              "juan.perez@example.com"
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone",
+            "description": "Contact phone number for delivery.",
+            "examples": [
+              "+573001234567"
+            ]
+          },
+          "address_line": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 5,
+            "title": "Address Line",
+            "description": "Physical delivery street address.",
+            "examples": [
+              "Carrera 15 # 93-47 Apto 502"
+            ]
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "City",
+            "description": "Destination city.",
+            "examples": [
+              "Bogota"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "full_name",
+          "address_line",
+          "city"
+        ],
+        "title": "OrderRecipientCreate",
+        "description": "Recipient contact and delivery address information.",
+        "example": {
+          "address_line": "Carrera 15 # 93-47 Apto 502",
+          "city": "Bogota",
+          "email": "juan.perez@example.com",
+          "full_name": "Juan Perez",
+          "phone": "+573001234567"
+        }
+      },
+      "OrderRecipientRead": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "Order ID.",
+            "examples": [
+              1
+            ]
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name",
+            "description": "Recipient full name.",
+            "examples": [
+              "Juan Perez"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Email address.",
+            "examples": [
+              "juan.perez@example.com"
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone",
+            "description": "Contact phone.",
+            "examples": [
+              "+573001234567"
+            ]
+          },
+          "address_line": {
+            "type": "string",
+            "title": "Address Line",
+            "description": "Delivery address.",
+            "examples": [
+              "Carrera 15 # 93-47 Apto 502"
+            ]
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "description": "Destination city.",
+            "examples": [
+              "Bogota"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "full_name",
+          "address_line",
+          "city"
+        ],
+        "title": "OrderRecipientRead",
+        "description": "Recipient information for a queried order."
+      },
+      "OrderStatusUpdate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PICKED_UP",
+              "IN_TRANSIT",
+              "OUT_FOR_DELIVERY",
+              "EXCEPTION",
+              "DELIVERED",
+              "RETURNED",
+              "LOST_OR_DAMAGED"
+            ],
+            "title": "Status",
+            "description": "New operational status of the order.",
+            "examples": [
+              "PICKED_UP"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "OrderStatusUpdate",
+        "description": "Payload to update an order's status.",
+        "example": {
+          "status": "PICKED_UP"
+        }
+      },
+      "ShippingLabelCreate": {
+        "properties": {
+          "tracking_number": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Tracking Number",
+            "description": "Unique carrier tracking number assigned to the package.",
+            "examples": [
+              "TRK-001-ALPHA"
+            ]
+          },
+          "carrier_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Carrier Id",
+            "description": "Identifier of the assigned carrier.",
+            "examples": [
+              1
+            ]
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg",
+            "description": "Physical package weight in kilograms.",
+            "examples": [
+              "2.50"
+            ]
+          },
+          "dispatch_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatch Id",
+            "description": "Identifier of the grouping dispatch if already consolidated.",
+            "examples": [
+              null
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "PICKED_UP",
+              "IN_TRANSIT",
+              "OUT_FOR_DELIVERY",
+              "EXCEPTION",
+              "DELIVERED",
+              "RETURNED",
+              "LOST_OR_DAMAGED"
+            ],
+            "title": "Status",
+            "description": "Initial canonical status of the shipping label according to RN-01.",
+            "default": "CREATED",
+            "examples": [
+              "CREATED"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracking_number",
+          "carrier_id"
+        ],
+        "title": "ShippingLabelCreate",
+        "description": "Input payload to register and associate a shipping label with an order (RN-07)."
+      },
+      "ShippingLabelResponse": {
+        "properties": {
+          "label_id": {
+            "type": "integer",
+            "title": "Label Id",
+            "description": "Internal sequential ID of the shipping label.",
+            "examples": [
+              1
+            ]
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "Associated order ID (1:N relationship).",
+            "examples": [
+              1
+            ]
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id",
+            "description": "Carrier ID responsible for transit.",
+            "examples": [
+              1
+            ]
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number",
+            "description": "Tracking code of the label.",
+            "examples": [
+              "TRK-001-ALPHA"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current canonical status of the label in logistics cycle.",
+            "examples": [
+              "CREATED"
+            ]
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg",
+            "description": "Recorded package weight in kg.",
+            "examples": [
+              "2.50"
+            ]
+          },
+          "dispatch_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatch Id",
+            "description": "Dispatch ID if consolidated.",
+            "examples": [
+              null
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Date and time when the label was created."
+          }
+        },
+        "type": "object",
+        "required": [
+          "label_id",
+          "order_id",
+          "carrier_id",
+          "tracking_number",
+          "status",
+          "created_at"
+        ],
+        "title": "ShippingLabelResponse",
+        "description": "Output representation with canonical information of the associated shipping label (RN-07 / RN-01)."
+      },
+      "StateMappingCreate": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Carrier Id",
+            "description": "Identifier of the carrier to map.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Raw Status",
+            "description": "Original raw status reported by the carrier.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Standardized canonical status.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "StateMappingCreate",
+        "description": "Payload to create a new mapping from a carrier status to a canonical status.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "carrier_id": 1,
+          "raw_status": "En reparto"
+        }
+      },
+      "StateMappingRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Mapping record ID.",
+            "examples": [
+              1
+            ]
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id",
+            "description": "Associated carrier ID.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "title": "Raw Status",
+            "description": "Source raw status.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Standardized canonical status.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Record creation date and time.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Date and time of last update.",
+            "examples": [
+              "2026-10-13T10:00:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "carrier_id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "StateMappingRead",
+        "description": "Persisted state mapping entity with traceability."
+      },
+      "StateMappingResolved": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id",
+            "description": "Queried carrier ID.",
+            "examples": [
+              1
+            ]
+          },
+          "raw_status": {
+            "type": "string",
+            "title": "Raw Status",
+            "description": "Received raw status.",
+            "examples": [
+              "En reparto"
+            ]
+          },
+          "canonical_status": {
+            "type": "string",
+            "title": "Canonical Status",
+            "description": "Corresponding canonical status from active mapping.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "raw_status",
+          "canonical_status"
+        ],
+        "title": "StateMappingResolved",
+        "description": "Result of resolving or translating a carrier raw status.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "carrier_id": 1,
+          "raw_status": "En reparto"
+        }
+      },
+      "StateMappingUpdate": {
+        "properties": {
+          "raw_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Status",
+            "description": "New value for the carrier's raw status.",
+            "examples": [
+              "En ruta de entrega"
+            ]
+          },
+          "canonical_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Status",
+            "description": "New canonical status.",
+            "examples": [
+              "OUT_FOR_DELIVERY"
+            ]
+          }
+        },
+        "type": "object",
+        "title": "StateMappingUpdate",
+        "description": "Payload for partial update of an existing state mapping.",
+        "example": {
+          "canonical_status": "OUT_FOR_DELIVERY",
+          "raw_status": "En ruta de entrega"
+        }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "API health check and database connectivity probe."
+    },
+    {
+      "name": "orders",
+      "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels."
+    },
+    {
+      "name": "admin: carrier state mapping",
+      "description": "Carrier status mapping administration for canonical status normalization (HU-15)."
+    },
+    {
+      "name": "admin: state mapping",
+      "description": "CRUD operations and real-time cached status translation (HU-12)."
+    },
+    {
+      "name": "openapi contract",
+      "description": "OpenAPI metadata and contract validation for the platform API surface."
+    }
+  ]
+}

@@ -1,19 +1,19 @@
-# Backend (FastAPI) + PostgreSQL con un solo comando:
-#   cp .env.example .env     (y editar las credenciales)
+# Backend + PostgreSQL startup guide:
+#   cp .env.example .env
 #   docker compose up
 #
-# Las credenciales NO están escritas aquí: se leen del archivo .env
+# Credentials are not hard-coded here; they are loaded from the .env file.
 
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?Falta POSTGRES_USER en el archivo .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en el archivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}
       POSTGRES_DB: ${POSTGRES_DB:-cargaexpress}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,19 +27,19 @@ services:
   backend:
     pull_policy: build
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    # Runtime Python packages installed by the Dockerfile via uv from
-    # pyproject.toml/uv.lock: fastapi, uvicorn[standard], sqlalchemy[asyncio],
-    # asyncpg, alembic, pydantic-settings. Keep the manifest as source of truth.
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-development}
       SQL_ECHO: ${SQL_ECHO:-false}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      API_KEY: ${API_KEY:-}
+      BRAND_API_KEYS: '${BRAND_API_KEYS:-{}}'
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
-      # El host es "db" (nombre del servicio en la red de Docker), no "localhost"
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Falta POSTGRES_USER}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cargaexpress}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@db:5432/${POSTGRES_DB:-cargaexpress}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -47,21 +47,44 @@ services:
         condition: service_healthy
     networks:
       - cargaexpress
+  worker:
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      SQL_ECHO: ${SQL_ECHO:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@db:5432/${POSTGRES_DB:-cargaexpress}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cargaexpress
 
   test:
     profiles: ["test"]
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
       target: test
     environment:
       APP_ENV: ${APP_ENV:-development}
       SQL_ECHO: ${SQL_ECHO:-false}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      API_KEY: ${API_KEY:-}
+      BRAND_API_KEYS: '${BRAND_API_KEYS:-{}}'
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Falta POSTGRES_USER}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@test-db:5432/cargaexpress_test
-      TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Falta POSTGRES_USER}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@test-db:5432/cargaexpress_test
-    command: ["sh", "-c", "alembic downgrade base && alembic upgrade head && python -m pytest -v"]
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@test-db:5432/cargaexpress_test
+      TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@test-db:5432/cargaexpress_test
+    command: ["sh", "-c", "alembic downgrade base && alembic upgrade head && alembic check && python -m pytest -v"]
     depends_on:
       test-db:
         condition: service_healthy
@@ -72,8 +95,8 @@ services:
     profiles: ["test"]
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?Falta POSTGRES_USER en el archivo .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en el archivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}
       POSTGRES_DB: cargaexpress_test
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -83,8 +106,33 @@ services:
     networks:
       - cargaexpress
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    hostname: cargaexpress_rabbitmq
+    container_name: cargaexpress_rabbitmq
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER is missing in the .env file}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is missing in the .env file}
+      RABBITMQ_NODENAME: rabbit@cargaexpress_rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_running" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - cargaexpress
+
 networks:
   cargaexpress:
 
 volumes:
   postgres_data:
+  rabbitmq_data:
+    driver: local

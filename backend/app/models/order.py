@@ -1,18 +1,44 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-from sqlalchemy import CHAR, BigInteger, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import (
+    CHAR,
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
+if TYPE_CHECKING:
+    from app.models.brand import Brand
+    from app.models.distribution_center import DistributionCenter
+    from app.models.order_line import OrderLine
+    from app.models.order_recipient import OrderRecipient
+    from app.models.shipment_type import ShipmentType
+    from app.models.shipping_label import ShippingLabel
+
 
 class Order(Base):
     __tablename__ = "orders"
+    __table_args__ = (
+        UniqueConstraint("brand_id", "brand_order_ref", name="uq_orders_brand_order_ref"),
+        Index("ix_orders_brand_id", "brand_id"),
+        Index("ix_orders_status", "status"),
+    )
 
     order_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     brand_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("brands.brand_id"), nullable=False)
-    dc_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("distribution_centers.dc_id"), nullable=False)
+    dc_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("distribution_centers.dc_id"), nullable=False
+    )
     shipment_type_code: Mapped[str] = mapped_column(
         String, ForeignKey("shipment_types.shipment_type_code"), nullable=False
     )

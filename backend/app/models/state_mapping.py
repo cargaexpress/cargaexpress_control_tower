@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TYPE_CHECKING, Literal, get_args
 
 from sqlalchemy import (
     BigInteger,
@@ -13,12 +14,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
+if TYPE_CHECKING:
+    from app.models.carrier import Carrier
+
 # This shared catalog is enforced in both API validation and the database.
 # Strings plus a CHECK constraint avoid a DB enum migration for catalog changes.
-# Estados canónicos: vocabulario único para traducir los estados de cada
-# transportadora. Se guarda como texto para ampliar el catálogo sin migrar un enum;
-# la API y una restricción CHECK de la base de datos validan los valores permitidos.
-CANONICAL_STATUSES: tuple[str, ...] = (
+CanonicalStatus = Literal[
     "CREATED",
     "PICKED_UP",
     "IN_TRANSIT",
@@ -27,21 +28,18 @@ CANONICAL_STATUSES: tuple[str, ...] = (
     "DELIVERED",
     "RETURNED",
     "LOST_OR_DAMAGED",
-)
+]
+CANONICAL_STATUSES: tuple[str, ...] = get_args(CanonicalStatus)
 
 _CANONICAL_STATUS_VALUES = ", ".join(f"'{status}'" for status in CANONICAL_STATUSES)
 
 
 class StateMapping(Base):
-    """Configurable carrier-status translation.
-
-    Traducción configurable de estados de transportadoras.
-    """
+    """Configurable carrier-status translation."""
 
     __tablename__ = "state_mapping"
     __table_args__ = (
         # One raw status has one meaning per carrier; the CHECK protects direct DB writes too.
-        # Un estado original tiene un significado por transportadora; CHECK protege escrituras SQL.
         UniqueConstraint("carrier_id", "raw_status", name="uq_state_mapping_carrier_raw_status"),
         CheckConstraint(
             f"canonical_status IN ({_CANONICAL_STATUS_VALUES})",
