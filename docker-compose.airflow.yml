@@ -129,7 +129,10 @@ services:
 
   airflow-worker:
     <<: *airflow-common
-    container_name: airflow_worker
+    # container_name omitido intencionalmente para permitir escalabilidad horizontal:
+    # docker compose -f docker-compose.airflow.yml up --scale airflow-worker=2
+    deploy:
+      replicas: ${AIRFLOW_WORKER_REPLICAS:-2}
     environment:
       <<: *airflow-common-env
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-pandas openpyxl}
