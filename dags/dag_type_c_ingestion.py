@@ -1,14 +1,15 @@
-"""DAG de ingesta de archivos para transportadoras Tipo C (Fuente F5 - Batch/Archivos).
+"""Automated batch file ingestion pipeline for Type C carriers (Source F5).
 
-Historias de Usuario asociadas:
+Airflow User Stories:
+- HU-28 (RIWI-139): Type-C file ingestion DAG
 - HU-26 (RIWI-131): Set up Airflow in Docker
-- HU-29 (RIWI-143): Configure CeleryExecutor in Airflow connected to RabbitMQ
-- HU-28 (RIWI-139): Type-C file ingestion DAG (esqueleto base y pipeline de procesamiento)
+- HU-29 (RIWI-143): CeleryExecutor distributed task orchestration
 
-Flujo de tareas:
-1. check_incoming_files: Detecta archivos CSV/XLSX en data/type_C_simulation_data/.
-2. validate_and_clean_batch: Limpia cabeceras duplicadas, filas de resumen/pie y registros inválidos.
-3. normalize_and_ingest: Mapea estados a los estados canónicos e inserta/actualiza en WMS PostgreSQL.
+Architecture:
+Uses Airflow TaskFlow API (@dag and @task decorators) for clean parameter passing
+and decoupled execution. Reuses Sprint 2 Type C Connector (HU-22 / TypeCConnectorService)
+via ControlTowerClient to sanitize repeated headers, drop summary rows, deduplicate SHA-256
+hashes, and apply canonical state transitions.
 """
 
 from __future__ import annotations
@@ -16,395 +17,187 @@ from __future__ import annotations
 import glob
 import logging
 import os
-import re
+import shutil
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any
 
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.decorators import dag, task
+from utils.control_tower_client import ControlTowerClient
 
-# Directorios de datos montados en el contenedor de Airflow
+logger = logging.getLogger("airflow.task")
+
 DATA_BASE_DIR = os.getenv("AIRFLOW_DATA_DIR", "/opt/airflow/data")
 INCOMING_DIR = os.path.join(DATA_BASE_DIR, "type_C_simulation_data")
 PROCESSED_DIR = os.path.join(INCOMING_DIR, "processed")
 
-# Configuración de base de datos WMS (PostgreSQL principal de CargaExpress)
-WMS_DB_HOST = os.getenv("WMS_DB_HOST", "db")
-WMS_DB_PORT = int(os.getenv("WMS_DB_PORT", "5432"))
-WMS_DB_NAME = os.getenv("WMS_DB_NAME", os.getenv("POSTGRES_DB", "cargaexpress"))
-WMS_DB_USER = os.getenv("WMS_DB_USER", os.getenv("POSTGRES_USER", "postgres"))
-WMS_DB_PASSWORD = os.getenv("WMS_DB_PASSWORD", os.getenv("POSTGRES_PASSWORD", "postgres"))
-
-# Catálogos conocidos de transportadoras Tipo C según especificación técnica
-TYPE_C_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "CARRIER_1": {
-        "carrier_id": 1,
-        "name": "TransExpress Logistics",
-        "tracking_cols": ["waybill_no", "tracking_number", "guia", "tracking_code"],
-        "status_cols": ["status_code", "status", "estado"],
-        "timestamp_cols": ["event_time", "timestamp", "fecha"],
-        "fallback_mappings": {
-            "DOC_REC": "CREATED",
-            "DISPATCHED": "PICKED_UP",
-            "IN_DEPOT": "IN_TRANSIT",
-            "OUT_DELIVERY": "OUT_FOR_DELIVERY",
-            "INCIDENCE": "EXCEPTION",
-            "DELIVERED": "DELIVERED",
-            "RETURN_SENDER": "RETURNED",
-            "DAMAGED_CARGO": "LOST_OR_DAMAGED",
-        },
-    },
-    "CARRIER_2": {
-        "carrier_id": 2,
-        "name": "Rápido Andino",
-        "tracking_cols": ["numero_guia", "guia", "tracking_number"],
-        "status_cols": ["estado_operativo", "estado", "status"],
-        "timestamp_cols": ["fecha_hora_evento", "fecha", "timestamp"],
-        "fallback_mappings": {
-            "REGISTRADO": "CREATED",
-            "RECOLECTADO": "PICKED_UP",
-            "TRASLADO_INTERNO": "IN_TRANSIT",
-            "RUTA_ENTREGA": "OUT_FOR_DELIVERY",
-            "NOVEDAD_DIRECCION": "EXCEPTION",
-            "ENTREGADO_OK": "DELIVERED",
-            "DEVUELTO_ORIGEN": "RETURNED",
-            "EXTRAVIO": "LOST_OR_DAMAGED",
-        },
-    },
-    "CARRIER_3": {
-        "carrier_id": 3,
-        "name": "Logística 360",
-        "tracking_cols": ["tracking_code", "waybill_no", "code"],
-        "status_cols": ["code", "status_code", "estado"],
-        "timestamp_cols": ["event_date", "timestamp", "event_time"],
-        "fallback_mappings": {
-            "10": "CREATED",
-            "20": "PICKED_UP",
-            "30": "IN_TRANSIT",
-            "40": "OUT_FOR_DELIVERY",
-            "50": "EXCEPTION",
-            "90": "DELIVERED",
-            "91": "RETURNED",
-            "99": "LOST_OR_DAMAGED",
-        },
-    },
+# Carrier name resolution from filename patterns
+CARRIER_HINTS: dict[str, str] = {
+    "CARRIER_1": "TransExpress Logistics",
+    "TRANSEXPRESS": "TransExpress Logistics",
+    "CARRIER_2": "Rapido Andino",
+    "RAPIDO": "Rapido Andino",
+    "ANDINO": "Rapido Andino",
+    "CARRIER_3": "Logistica 360",
+    "360": "Logistica 360",
 }
-
-CANONICAL_STATUSES = {
-    "CREATED",
-    "PICKED_UP",
-    "IN_TRANSIT",
-    "OUT_FOR_DELIVERY",
-    "EXCEPTION",
-    "DELIVERED",
-    "RETURNED",
-    "LOST_OR_DAMAGED",
-}
+DEFAULT_CARRIER_NAME = "TransExpress Logistics"
 
 
-def check_incoming_files(**context: Any) -> List[str]:
-    """Tarea a: Verifica si existen archivos CSV o XLSX en la carpeta de entrada."""
-    logger = logging.getLogger("airflow.task")
-    logger.info("Verificando archivos entrantes en %s", INCOMING_DIR)
-
-    if not os.path.exists(INCOMING_DIR):
-        os.makedirs(INCOMING_DIR, exist_ok=True)
-        logger.info("Directorio %s creado exitosamente", INCOMING_DIR)
-
-    search_patterns = [
-        os.path.join(INCOMING_DIR, "*.csv"),
-        os.path.join(INCOMING_DIR, "*.xlsx"),
-    ]
-
-    found_files: List[str] = []
-    for pattern in search_patterns:
-        found_files.extend(glob.glob(pattern))
-
-    # Filtrar archivos temporales de Excel o subdirectorios
-    valid_files = [
-        f for f in found_files
-        if not os.path.basename(f).startswith("~$") and os.path.isfile(f)
-    ]
-
-    logger.info("Se encontraron %d archivo(s) para procesar: %s", len(valid_files), valid_files)
-    return valid_files
+def resolve_carrier_name(filename: str) -> str:
+    """Infer Type C carrier name from batch filename."""
+    upper_name = filename.upper()
+    for hint, carrier in CARRIER_HINTS.items():
+        if hint in upper_name:
+            return carrier
+    return DEFAULT_CARRIER_NAME
 
 
-def _is_summary_or_header_row(row_values: List[str], header_names: List[str]) -> bool:
-    """Detecta si una fila corresponde a un encabezado repetido o fila de resumen/totales."""
-    clean_vals = [str(v).strip().upper() for v in row_values if v is not None and str(v).strip()]
-    if not clean_vals:
-        return True
-
-    # Comprobar si coincide con nombres de cabeceras
-    header_set = {h.strip().upper() for h in header_names if h}
-    matches = sum(1 for val in clean_vals if val in header_set)
-    if matches >= max(1, len(clean_vals) // 2):
-        return True
-
-    # Comprobar palabras clave de pie de reporte o resumen
-    joined_text = " ".join(clean_vals)
-    summary_keywords = ["TOTAL", "REGISTROS", "FIN DE LOTE", "RESUMEN", "SUBTOTAL"]
-    if any(keyword in joined_text for keyword in summary_keywords):
-        return True
-
-    return False
-
-
-def validate_and_clean_batch(**context: Any) -> List[Dict[str, Any]]:
-    """Tarea b: Valida, filtra cabeceras duplicadas, filas de resumen o datos corruptos."""
-    logger = logging.getLogger("airflow.task")
-    ti = context["ti"]
-    incoming_files: List[str] = ti.xcom_pull(task_ids="check_incoming_files") or []
-
-    if not incoming_files:
-        logger.info("No hay archivos entrantes. Finalizando lote sin procesar registros.")
-        return []
-
-    try:
-        import pandas as pd
-    except ImportError:
-        logger.warning("Pandas no está instalado en este entorno local. Usando fallback básico.")
-        pd = None
-
-    cleaned_records: List[Dict[str, Any]] = []
-
-    for file_path in incoming_files:
-        logger.info("Iniciando validación y limpieza de: %s", file_path)
-        filename = os.path.basename(file_path)
-
-        # Identificar transportadora a partir del nombre del archivo o contenido
-        carrier_hint = "CARRIER_1"
-        upper_fn = filename.upper()
-        if "CARRIER_2" in upper_fn or "RAPIDO" in upper_fn:
-            carrier_hint = "CARRIER_2"
-        elif "CARRIER_3" in upper_fn or "360" in upper_fn:
-            carrier_hint = "CARRIER_3"
-
-        carrier_cfg = TYPE_C_CONFIGS.get(carrier_hint, TYPE_C_CONFIGS["CARRIER_1"])
-
-        if pd is not None:
-            if file_path.endswith(".csv"):
-                df = pd.read_csv(file_path, dtype=str)
-            else:
-                df = pd.read_excel(file_path, dtype=str)
-
-            initial_count = len(df)
-            headers = [str(c) for c in df.columns]
-
-            # 1. Eliminar filas completamente vacías
-            df = df.dropna(how="all")
-
-            # 2. Filtrar filas de encabezado repetido o totales
-            valid_mask = []
-            for _, row in df.iterrows():
-                vals = [str(v) for v in row.values]
-                valid_mask.append(not _is_summary_or_header_row(vals, headers))
-
-            df = df[valid_mask]
-
-            # 3. Eliminar duplicados exactos
-            df = df.drop_duplicates()
-
-            # Mapear columnas a formato estandarizado
-            tracking_col = next((c for c in headers if c.lower() in [tc.lower() for tc in carrier_cfg["tracking_cols"]]), headers[0])
-            status_col = next((c for c in headers if c.lower() in [sc.lower() for sc in carrier_cfg["status_cols"]]), headers[1] if len(headers) > 1 else headers[0])
-            timestamp_col = next((c for c in headers if c.lower() in [tsc.lower() for tsc in carrier_cfg["timestamp_cols"]]), headers[2] if len(headers) > 2 else headers[0])
-
-            for _, row in df.iterrows():
-                tracking_val = str(row.get(tracking_col, "")).strip()
-                status_val = str(row.get(status_col, "")).strip()
-                raw_ts = str(row.get(timestamp_col, "")).strip()
-
-                if not tracking_val or tracking_val.upper().startswith("TOTAL"):
-                    continue
-
-                cleaned_records.append({
-                    "source_file": filename,
-                    "carrier_id": carrier_cfg["carrier_id"],
-                    "carrier_code": carrier_hint,
-                    "tracking_number": tracking_val,
-                    "raw_status": status_val,
-                    "occurred_at_raw": raw_ts,
-                })
-
-            logger.info(
-                "Archivo %s: %d filas iniciales -> %d registros limpios",
-                filename, initial_count, len(df)
-            )
-
-    logger.info("Total de registros limpios en lote: %d", len(cleaned_records))
-    return cleaned_records
-
-
-def _fetch_db_state_mappings(carrier_id: int) -> Dict[str, str]:
-    """Obtiene el mapeo de estados configurado en PostgreSQL si está disponible."""
-    try:
-        import psycopg2
-        conn = psycopg2.connect(
-            host=WMS_DB_HOST,
-            port=WMS_DB_PORT,
-            dbname=WMS_DB_NAME,
-            user=WMS_DB_USER,
-            password=WMS_DB_PASSWORD,
-            connect_timeout=3,
-        )
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT raw_status, canonical_status FROM state_mapping WHERE carrier_id = %s",
-            (carrier_id,),
-        )
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        return {r[0]: r[1] for r in rows}
-    except Exception as exc:
-        logging.getLogger("airflow.task").warning(
-            "No se pudo consultar PostgreSQL para state_mapping: %s. Usando catálogo en memoria.",
-            exc,
-        )
-        return {}
-
-
-def _update_wms_shipping_label(tracking_number: str, canonical_status: str) -> bool:
-    """Actualiza el estado de la guía en el WMS si existe conexión a PostgreSQL."""
-    try:
-        import psycopg2
-        conn = psycopg2.connect(
-            host=WMS_DB_HOST,
-            port=WMS_DB_PORT,
-            dbname=WMS_DB_NAME,
-            user=WMS_DB_USER,
-            password=WMS_DB_PASSWORD,
-            connect_timeout=3,
-        )
-        cur = conn.cursor()
-        cur.execute(
-            "UPDATE shipping_labels SET status = %s WHERE tracking_number = %s",
-            (canonical_status, tracking_number),
-        )
-        conn.commit()
-        updated_count = cur.rowcount
-        cur.close()
-        conn.close()
-        return updated_count > 0
-    except Exception as exc:
-        logging.getLogger("airflow.task").debug(
-            "Actualización simulada para guía %s: %s", tracking_number, exc
-        )
-        return False
-
-
-def normalize_and_ingest(**context: Any) -> Dict[str, Any]:
-    """Tarea c: Traduce raw_status a canonical_status y realiza la ingesta/actualización."""
-    logger = logging.getLogger("airflow.task")
-    ti = context["ti"]
-    cleaned_records: List[Dict[str, Any]] = ti.xcom_pull(task_ids="validate_and_clean_batch") or []
-
-    if not cleaned_records:
-        logger.info("No hay registros para normalizar e ingerir.")
-        return {"processed": 0, "canonical_counts": {}}
-
-    logger.info("Normalizando e ingiriendo %d registro(s)...", len(cleaned_records))
-
-    # Cache local de mapeos por transportadora
-    cached_mappings: Dict[int, Dict[str, str]] = {}
-    canonical_counts: Dict[str, int] = {st: 0 for st in CANONICAL_STATUSES}
-    unmapped_count = 0
-    updated_wms_count = 0
-
-    for record in cleaned_records:
-        carrier_id = record["carrier_id"]
-        carrier_code = record["carrier_code"]
-        raw_status = record["raw_status"]
-        tracking_no = record["tracking_number"]
-
-        if carrier_id not in cached_mappings:
-            db_maps = _fetch_db_state_mappings(carrier_id)
-            fallback = TYPE_C_CONFIGS.get(carrier_code, {}).get("fallback_mappings", {})
-            # Mezclar BD con fallback en memoria
-            merged = {**fallback, **db_maps}
-            cached_mappings[carrier_id] = merged
-
-        mapping = cached_mappings[carrier_id]
-        canonical_status = mapping.get(raw_status)
-
-        if not canonical_status:
-            # Búsqueda insensible a mayúsculas
-            upper_raw = raw_status.upper()
-            canonical_status = next(
-                (v for k, v in mapping.items() if k.upper() == upper_raw),
-                "EXCEPTION",  # Regla: estados sin mapeo o anómalos van a EXCEPTION
-            )
-            unmapped_count += 1
-
-        if canonical_status in canonical_counts:
-            canonical_counts[canonical_status] += 1
-
-        # Realizar inserción o actualización en el WMS
-        is_updated = _update_wms_shipping_label(tracking_no, canonical_status)
-        if is_updated:
-            updated_wms_count += 1
-
-    # Mover archivos procesados si existen
-    incoming_files = ti.xcom_pull(task_ids="check_incoming_files") or []
-    if incoming_files:
-        os.makedirs(PROCESSED_DIR, exist_ok=True)
-        for src_path in incoming_files:
-            try:
-                dest_path = os.path.join(PROCESSED_DIR, os.path.basename(src_path))
-                if os.path.exists(src_path):
-                    os.replace(src_path, dest_path)
-                    logger.info("Archivo archivado: %s -> %s", src_path, dest_path)
-            except Exception as e:
-                logger.warning("No se pudo mover archivo %s: %s", src_path, e)
-
-    summary = {
-        "total_records": len(cleaned_records),
-        "unmapped_records": unmapped_count,
-        "wms_records_updated": updated_wms_count,
-        "canonical_counts": canonical_counts,
-    }
-    logger.info("Resumen de ingesta Tipo C completado: %s", summary)
-    return summary
-
-
-# Definición del DAG
-default_args = {
-    "owner": "cargaexpress",
-    "depends_on_past": False,
-    "email_on_failure": False,
-    "email_on_retry": False,
-    "retries": 1,
-    "retry_delay": timedelta(minutes=2),
-}
-
-with DAG(
-    dag_id="dag_type_c_ingestion",
-    default_args=default_args,
-    description="Ingesta de archivos por lotes (CSV/XLSX) de transportadoras Tipo C - HU-28",
-    schedule_interval="@daily",
-    start_date=datetime(2026, 1, 1),
+@dag(
+    dag_id="type_c_file_ingestion",
+    schedule="0 */4 * * *",
+    start_date=datetime(2026, 10, 1),
     catchup=False,
-    tags=["cargaexpress", "type_c", "ingestion", "wms", "sprint3"],
-) as dag:
+    max_active_runs=1,
+    default_args={
+        "owner": "airflow",
+        "depends_on_past": False,
+        "retries": 2,
+        "retry_delay": timedelta(minutes=5),
+        "execution_timeout": timedelta(minutes=30),
+    },
+    tags=["ingestion", "type-c", "batch", "wms"],
+    doc_md=__doc__,
+)
+def type_c_file_ingestion_pipeline() -> None:
+    """Orchestrates periodic scanning, connector upload, and file archival."""
 
-    t_check_incoming = PythonOperator(
-        task_id="check_incoming_files",
-        python_callable=check_incoming_files,
-        provide_context=True,
-    )
+    @task
+    def scan_incoming_files() -> list[str]:
+        """Detect unprocessed CSV or Excel files in the incoming staging volume."""
+        if not os.path.exists(INCOMING_DIR):
+            os.makedirs(INCOMING_DIR, exist_ok=True)
+            logger.info("Created missing incoming staging directory: %s", INCOMING_DIR)
 
-    t_validate_clean = PythonOperator(
-        task_id="validate_and_clean_batch",
-        python_callable=validate_and_clean_batch,
-        provide_context=True,
-    )
+        search_patterns = [
+            os.path.join(INCOMING_DIR, "*.csv"),
+            os.path.join(INCOMING_DIR, "*.xlsx"),
+            os.path.join(INCOMING_DIR, "*.xls"),
+        ]
 
-    t_normalize_ingest = PythonOperator(
-        task_id="normalize_and_ingest",
-        python_callable=normalize_and_ingest,
-        provide_context=True,
-    )
+        found: list[str] = []
+        for pattern in search_patterns:
+            found.extend(glob.glob(pattern))
 
-    t_check_incoming >> t_validate_clean >> t_normalize_ingest
+        # Filter out Excel temp files and subdirectories
+        eligible = [
+            f
+            for f in found
+            if not os.path.basename(f).startswith("~$")
+            and os.path.isfile(f)
+            and "processed" not in Path(f).parts
+        ]
+
+        logger.info(
+            "Found %d candidate batch file(s) in %s: %s",
+            len(eligible),
+            INCOMING_DIR,
+            [os.path.basename(f) for f in eligible],
+        )
+        return eligible
+
+    @task
+    def ingest_batch_files(file_paths: list[str]) -> list[dict[str, Any]]:
+        """Upload candidate batch files to Control Tower Type C connector."""
+        if not file_paths:
+            logger.info("No incoming batch files to process. Skipping.")
+            return []
+
+        client = ControlTowerClient()
+        results: list[dict[str, Any]] = []
+
+        for file_path in file_paths:
+            filename = os.path.basename(file_path)
+            carrier_name = resolve_carrier_name(filename)
+            logger.info(
+                "Processing batch file '%s' (resolved carrier: '%s')",
+                filename,
+                carrier_name,
+            )
+
+            try:
+                res = client.upload_type_c_file(
+                    file_path=file_path,
+                    carrier_name=carrier_name,
+                )
+                logger.info(
+                    "Upload success for '%s': status=%s, valid_rows=%s, skipped=%s, anomalies=%s",
+                    filename,
+                    res.get("status"),
+                    res.get("valid_rows_processed"),
+                    res.get("total_rows_skipped"),
+                    res.get("anomalies_detected"),
+                )
+                results.append(
+                    {
+                        "file_path": file_path,
+                        "status": res.get("status", "completed"),
+                        "carrier_name": carrier_name,
+                        "already_processed": res.get("already_processed", False),
+                        "details": res,
+                    }
+                )
+            except Exception as exc:
+                logger.error("Failed to process batch file '%s': %s", filename, exc, exc_info=True)
+                results.append(
+                    {
+                        "file_path": file_path,
+                        "status": "failed",
+                        "carrier_name": carrier_name,
+                        "error": str(exc),
+                    }
+                )
+
+        return results
+
+    @task
+    def archive_processed_files(results: list[dict[str, Any]]) -> int:
+        """Move successfully processed or idempotent files into the processed archive folder."""
+        if not results:
+            logger.info("No files to archive.")
+            return 0
+
+        os.makedirs(PROCESSED_DIR, exist_ok=True)
+        archived_count = 0
+
+        for item in results:
+            file_path = item.get("file_path")
+            status = item.get("status")
+            if not file_path or not os.path.exists(file_path):
+                continue
+
+            if status in ("completed", "skipped"):
+                filename = os.path.basename(file_path)
+                timestamp_prefix = datetime.now().strftime("%Y%m%d_%H%M%S")
+                target_name = f"{timestamp_prefix}_{filename}"
+                target_path = os.path.join(PROCESSED_DIR, target_name)
+
+                shutil.move(file_path, target_path)
+                logger.info("Archived '%s' -> '%s'", file_path, target_path)
+                archived_count += 1
+            else:
+                logger.warning(
+                    "Retaining unarchived file '%s' due to status: %s",
+                    file_path,
+                    status,
+                )
+
+        logger.info("Total files archived in this run: %d", archived_count)
+        return archived_count
+
+    incoming_files = scan_incoming_files()
+    processed_results = ingest_batch_files(incoming_files)
+    archive_processed_files(processed_results)
+
+
+type_c_file_ingestion_pipeline()

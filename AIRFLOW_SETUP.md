@@ -2,8 +2,10 @@
 
 Este documento detalla la arquitectura, configuración y pasos operativos para el entorno de orquestación distribuida de **CargaExpress (Sprint 3)**, cubriendo:
 - **HU-26 (RIWI-131)**: Set up Airflow in Docker
+- **HU-27 (RIWI-135)**: Pull polling DAG for type-B carriers (F4 - Cada 30 min con TaskFlow API y reintentos)
+- **HU-28 (RIWI-139)**: Type-C file ingestion DAG (F5 - Procesamiento batch cada 4 h con sanitización)
 - **HU-29 (RIWI-143)**: Configure CeleryExecutor in Airflow connected to RabbitMQ
-- **HU-28 (RIWI-139)**: Type-C file ingestion DAG (procesamiento batch con limpieza y normalización)
+- **HU-30 (RIWI-147)**: Scale workers and validate distributed execution (Escalado horizontal de workers Celery)
 
 ---
 
@@ -53,94 +55,86 @@ El stack está orquestado mediante `docker-compose.airflow.yml` y convive en la 
 
 ---
 
-## 2. Instrucciones para Levantar el Stack
+## 2. Convenciones de Diseño: TaskFlow API y Modularización
+
+Alineado con los estándares del proyecto (TaskFlow API en inglés y separación de responsabilidades):
+
+1. **Paradigma TaskFlow (@dag y @task)**:
+   - Se reemplazó el uso clásico de `PythonOperator` por decoradores `@dag` y `@task`.
+   - Los datos fluyen como argumentos y valores de retorno entre tareas sin manipulación manual de XComs.
+2. **Modularización y Reutilización**:
+   - Los DAGs no contienen consultas SQL crudas ni lógica de negocio acoplada.
+   - La orquestación interactúa con los servicios oficiales de ingesta a través del cliente modular `dags/utils/control_tower_client.py` (`ControlTowerClient`), reutilizando los conectores Tipo B (`POST /api/v1/sync/type-b`) y Tipo C (`POST /api/v1/sync/type-c/upload`) construidos en Sprint 2.
+3. **Idioma 100% Inglés**:
+   - Docstrings, nombres de tareas, variables, logs y excepciones están estandarizados en inglés.
+
+---
+
+## 3. Instrucciones para Levantar el Stack
 
 ### Paso 1: Configurar Variables de Entorno (Opcional)
 Si deseas ajustar credenciales o puertos, copia `.env.example` a `.env` o define las variables:
 ```bash
-# Variables por defecto incluidas en docker-compose.airflow.yml
-AIRFLOW_WEBSERVER_PORT=8080
-AIRFLOW_DB_PORT=5433
-RABBITMQ_MANAGEMENT_PORT=15672
+AIRFLOW_UID=50000
+_AIRFLOW_WWW_USER_USERNAME=admin
+_AIRFLOW_WWW_USER_PASSWORD=admin
+CONTROL_TOWER_API_URL=http://backend:8000
 ```
 
-### Paso 2: Inicializar y Levantar Servicios
-Ejecuta el siguiente comando en la raíz del repositorio (`C:\Users\J1shu\cargaexpress\control_tower`):
+### Paso 2: Inicializar la Base de Datos de Airflow
+```bash
+docker compose -f docker-compose.airflow.yml up airflow-init
+```
 
+### Paso 3: Iniciar los Servicios de Airflow y RabbitMQ
 ```bash
 docker compose -f docker-compose.airflow.yml up -d
 ```
 
-### Paso 3: Verificar el Estado de los Contenedores
+Verificar que los servicios estén saludables (`healthy`):
 ```bash
 docker compose -f docker-compose.airflow.yml ps
 ```
-Todos los servicios (`airflow-webserver`, `airflow-scheduler`, `airflow-worker`, `airflow-db`, `rabbitmq`) deben encontrarse en estado `running` o `healthy`.
 
 ---
 
-## 3. Accesos y Credenciales
+## 4. DAGs de Ingesta Implementados
 
-| Servicio | URL / Host | Usuario por Defecto | Contraseña por Defecto |
-|---|---|---|---|
-| **Airflow UI** | [http://localhost:8080](http://localhost:8080) | `admin` | `admin` |
-| **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | `guest` | `guest` |
-| **Airflow Postgres Metastore** | `localhost:5433` (db: `airflow`) | `airflow` | `airflow` |
+### A. Pipeline de Polling Tipo B (`type_b_pull_polling`) - HU-27 (RIWI-135)
+Ejecuta la ingesta periódica por consulta REST (Pull) contra los 4 carriers Tipo B:
+- **Schedule**: `*/30 * * * *` (cada 30 minutos).
+- **Resiliencia**: 3 reintentos con backoff exponencial (`retry_exponential_backoff=True`) y límite de 20 minutos para absorber rate limits de transportadoras.
+- **Flujo**:
+  1. `verify_backend_readiness`: Comprueba que el backend esté listo.
+  2. `poll_type_b_carriers`: Invoca `POST /api/v1/sync/type-b` para consultar APIs REST, normalizar estados a RN-02 y actualizar WMS.
+  3. `evaluate_polling_metrics`: Consolida eventos normalizados, anomalías detectadas y emite alertas en caso de errores.
+
+### B. Pipeline de Archivos Lote Tipo C (`type_c_file_ingestion`) - HU-28 (RIWI-139)
+Procesa archivos por lotes (CSV/XLSX) depositados en `data/type_C_simulation_data/`:
+- **Schedule**: `0 */4 * * *` (cada 4 horas).
+- **Flujo**:
+  1. `scan_incoming_files`: Detecta archivos entrantes `.csv` y `.xlsx` no temporales.
+  2. `ingest_batch_files`: Infiere la transportadora y envía el archivo a `POST /api/v1/sync/type-c/upload`, donde se descartan cabeceras duplicadas, se eliminan filas de totales, se valida el hash SHA-256 de idempotencia y se normalizan los eventos.
+  3. `archive_processed_files`: Mueve los archivos procesados exitosamente al subdirectorio `processed/` con prefijo timestamp.
 
 ---
 
-## 4. Pipeline de Ingesta Tipo C (`dag_type_c_ingestion`) - HU-28
+## 5. Pruebas y Validación Automatizada
 
-El DAG `dag_type_c_ingestion` procesa archivos por lotes (CSV/XLSX) depositados por transportadoras Tipo C en la carpeta `data/type_C_simulation_data/`.
-
-### Fases de Ejecución:
-```mermaid
-flowchart LR
-    A["check_incoming_files<br/>(Busca *.csv / *.xlsx)"] --> B["validate_and_clean_batch<br/>(Elimina cabeceras repetidas y totales)"]
-    B --> C["normalize_and_ingest<br/>(Mapea a estados canónicos y actualiza WMS)"]
+### Pruebas de Integridad de DAGs con Pytest
+Ejecutar la suite de pruebas unitarias y estructurales de los DAGs:
+```bash
+cd backend
+uv run pytest tests/test_dags.py -v
 ```
 
-1. **`check_incoming_files`**:
-   - Escanea el directorio `/opt/airflow/data/type_C_simulation_data`.
-   - Detecta archivos de transportadoras (`CARRIER_1`, `CARRIER_2`, `CARRIER_3`).
-2. **`validate_and_clean_batch`**:
-   - Descarta encabezados repetidos intermedios generados por corrupción o corte de páginas.
-   - Filtra filas de resumen/pie de página (como `TOTAL REGISTROS: N` o `--- FIN DE LOTE ---`).
-   - Remueve registros duplicados y valida columnas mínimas.
-3. **`normalize_and_ingest`**:
-   - Consulta el catálogo de mapeo de estados (`state_mapping` en PostgreSQL o fallback interno).
-   - Traduce `raw_status` al catálogo canónico (`CREATED`, `PICKED_UP`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `EXCEPTION`, `DELIVERED`, `RETURNED`, `LOST_OR_DAMAGED`).
-   - Actualiza la guía correspondiente en `shipping_labels` si el WMS se encuentra conectado.
-   - Archiva los archivos completados en el subdirectorio `processed/`.
-
----
-
-## 5. Pruebas y Validación
-
-### Validar Sintaxis del Archivo Compose
+### Validar Sintaxis de los DAGs
 ```bash
-docker compose -f docker-compose.airflow.yml config
-```
-
-### Validar Sintaxis del DAG en Python
-```bash
+python -m py_compile dags/dag_type_b_polling.py
 python -m py_compile dags/dag_type_c_ingestion.py
-```
-
-### Probar Ejecución Manual del DAG desde CLI de Airflow
-Para disparar y probar el DAG manualmente dentro del contenedor:
-```bash
-docker compose -f docker-compose.airflow.yml exec airflow-webserver airflow dags trigger dag_type_c_ingestion
-```
-
-Para listar las tareas y verificar su ejecución en el worker de Celery:
-```bash
-docker compose -f docker-compose.airflow.yml exec airflow-webserver airflow tasks list dag_type_c_ingestion
-docker compose -f docker-compose.airflow.yml exec airflow-worker celery --app airflow.executors.celery_executor inspect active
 ```
 
 ### Detener el Stack
 ```bash
 docker compose -f docker-compose.airflow.yml down
 ```
-*(Para limpiar también los volúmenes de datos, agrega la bandera `-v`).*
