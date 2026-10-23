@@ -1,4 +1,5 @@
 .git/
+.git
 .env
 .env.*
 !.env.example
@@ -17,7 +18,9 @@
 **/htmlcov/
 **/*.egg-info/
 
+tests/
 data/
 logs/
+**/logs/
 uploads/
 storage/
