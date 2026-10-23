@@ -20,6 +20,11 @@ from app.schemas.shipping_label import (
     ShippingLabelCreate,
     ShippingLabelResponse,
 )
+from app.schemas.sla import (
+    PublicHoliday,
+    SLACalculationRequest,
+    SLADeadlineResult,
+)
 from app.schemas.state_mapping import (
     StateMappingCreate,
     StateMappingRead,
@@ -42,6 +47,9 @@ __all__ = [
     "OrderRecipientCreate",
     "OrderRecipientRead",
     "OrderStatusUpdate",
+    "PublicHoliday",
+    "SLACalculationRequest",
+    "SLADeadlineResult",
     "ShippingLabelCreate",
     "ShippingLabelResponse",
     "StateMappingCreate",

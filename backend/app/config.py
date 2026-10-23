@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     rabbitmq_max_retries: int = 3
     rabbitmq_prefetch_count: int = 10
 
+    # Holiday & SLA Configuration (HU-31 / RN-03 / Source F6)
+    nager_date_api_url: str = "https://date.nager.at/api/v3"
+    holiday_cache_ttl_seconds: int = 86400 * 30
+    sla_cutoff_hour: int = 16
+    sla_default_business_days: int = 2
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, value: str) -> str:
