@@ -1,7 +1,7 @@
 [project]
 name = "cargaexpress-backend"
 version = "0.1.0"
-description = "API de torre de control - CargaExpress Supply Chain"
+description = "Control Tower API - CargaExpress Supply Chain"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",

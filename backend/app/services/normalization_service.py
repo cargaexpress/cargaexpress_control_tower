@@ -184,7 +184,7 @@ async def normalize_and_apply_event(
     # 5. Apply standard status transition to shipping label
     label.status = canonical_status
 
-    # 6. Propagar a la orden si corresponde
+    # 6. Propagate to order if applicable
     order = await db.get(Order, label.order_id)
     if order is not None:
         if canonical_status in ("IN_TRANSIT", "OUT_FOR_DELIVERY"):

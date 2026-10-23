@@ -129,7 +129,7 @@ services:
 
   airflow-worker:
     <<: *airflow-common
-    # container_name omitido intencionalmente para permitir escalabilidad horizontal:
+    # container_name intentionally omitted to allow horizontal scalability:
     # docker compose -f docker-compose.airflow.yml up --scale airflow-worker=2
     deploy:
       replicas: ${AIRFLOW_WORKER_REPLICAS:-2}
