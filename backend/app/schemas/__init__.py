@@ -1,3 +1,4 @@
+from app.schemas.at_risk import AtRiskEvaluationResult
 from app.schemas.carrier_state_mapping import (
     CarrierStateMappingEntry,
     CarrierStateMappingRead,
@@ -33,6 +34,7 @@ from app.schemas.state_mapping import (
 )
 
 __all__ = [
+    "AtRiskEvaluationResult",
     "CarrierStateMappingEntry",
     "CarrierStateMappingRead",
     "CarrierStateMappingResponse",

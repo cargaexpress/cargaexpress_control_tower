@@ -1,4 +1,5 @@
 from app.services import (
+    at_risk_service,
     carrier_state_mapping_service,
     event_consumer,
     exceptions,
@@ -16,6 +17,7 @@ from app.services import (
 )
 
 __all__ = [
+    "at_risk_service",
     "carrier_state_mapping_service",
     "event_consumer",
     "exceptions",

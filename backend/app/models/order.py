@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     CHAR,
     BigInteger,
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -32,6 +33,7 @@ class Order(Base):
         UniqueConstraint("brand_id", "brand_order_ref", name="uq_orders_brand_order_ref"),
         Index("ix_orders_brand_id", "brand_id"),
         Index("ix_orders_status", "status"),
+        Index("ix_orders_is_at_risk", "is_at_risk"),
     )
 
     order_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -47,6 +49,13 @@ class Order(Base):
     destination_region: Mapped[str | None] = mapped_column(String, nullable=True)
     freight_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
+    is_at_risk: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default=func.false()
+    )
+    at_risk_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    at_risk_evaluated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     brand: Mapped["Brand"] = relationship(back_populates="orders")

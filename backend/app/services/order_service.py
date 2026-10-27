@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,8 @@ from app.services.exceptions import (
 
 # Eager-load child records to return complete orders without per-row queries.
 # Service functions isolate persistence from HTTP handling for reuse and testing.
+logger = logging.getLogger(__name__)
+
 _ORDER_LOAD_OPTIONS = (selectinload(Order.order_lines), selectinload(Order.recipient))
 
 # Catalog of terminal states and permitted transitions (RN-02 and ADR-002)
@@ -155,6 +159,15 @@ async def update_order_status(
         )
 
     order.status = target_status
+    await db.flush()
+    try:
+        from app.services.at_risk_service import at_risk_service
+
+        await at_risk_service.evaluate_and_update_order_risk(db, order.order_id)
+    except Exception as exc:
+        logger.warning(
+            "Failed to evaluate order risk on status update for order #%d: %s", order.order_id, exc
+        )
     await db.commit()
     await db.refresh(order, attribute_names=["order_lines", "recipient"])
     return order

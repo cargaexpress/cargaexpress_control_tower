@@ -268,6 +268,18 @@ class OrderRead(BaseModel):
     )
     order_lines: list[OrderLineRead] = Field(..., description="Items associated with the order.")
     recipient: OrderRecipientRead = Field(..., description="Order recipient details.")
+    is_at_risk: bool = Field(
+        default=False,
+        description="Flag indicating if the order is at risk of missing SLA (RN-04).",
+    )
+    at_risk_reason: str | None = Field(
+        default=None,
+        description="Reason why the order was flagged at risk.",
+    )
+    at_risk_evaluated_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when at-risk condition was last evaluated.",
+    )
 
 
 class OrderListResponse(BaseModel):
