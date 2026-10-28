@@ -12,7 +12,12 @@ from app.schemas.order import (
     OrderStatusUpdate,
 )
 from app.schemas.shipping_label import ShippingLabelCreate, ShippingLabelResponse
-from app.security import get_current_brand, require_api_key
+from app.schemas.sla import OrderSLAResponse
+from app.security import (
+    get_current_brand,
+    get_current_brand_or_coordinator,
+    require_api_key_or_admin,
+)
 from app.services import order_service, shipping_label_service
 from app.services.exceptions import (
     DuplicateOrderReferenceError,
@@ -20,10 +25,11 @@ from app.services.exceptions import (
     EntityNotFoundError,
     InvalidStatusTransitionError,
 )
+from app.services.sla_service import sla_service
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
 router = APIRouter(
-    prefix="/api/v1/orders", tags=["orders"], dependencies=[Depends(require_api_key)]
+    prefix="/api/v1/orders", tags=["orders"], dependencies=[Depends(require_api_key_or_admin)]
 )
 
 
@@ -90,6 +96,49 @@ async def list_orders(
 
 
 @router.get(
+    "/at-risk",
+    response_model=list[OrderRead],
+    status_code=http_status.HTTP_200_OK,
+    summary="List at-risk orders (HU-33 / RN-04)",
+    description=(
+        "List all active orders currently meeting the RN-04 at-risk criteria "
+        "(< 24 business hours remaining or unresolved exception > 12 hours). "
+        "Intended for the control-tower coordinator, with optional brand filtering."
+    ),
+    responses={
+        200: {"description": "List of at-risk orders.", "model": list[OrderRead]},
+        401: {"description": "Unauthorized access.", "model": HTTPErrorResponse},
+        403: {"description": "Forbidden: cross-brand access attempt.", "model": HTTPErrorResponse},
+    },
+)
+async def list_at_risk_orders(
+    brand_id: int | None = Query(default=None, gt=0, description="Optional brand ID filter"),
+    skip: int = Query(default=0, ge=0, description="Pagination offset"),
+    limit: int = Query(default=50, ge=1, le=200, description="Page size limit"),
+    recalculate: bool = Query(
+        default=False, description="Force re-evaluation of all active orders"
+    ),
+    tenant_brand_id: int | None = Depends(get_current_brand_or_coordinator),
+    db: AsyncSession = Depends(get_db),
+) -> list[OrderRead]:
+    """List active orders currently flagged at risk under RN-04."""
+    if tenant_brand_id is not None and brand_id is not None and tenant_brand_id != brand_id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: cannot query orders for another brand.",
+        )
+    effective_brand_id = brand_id if brand_id is not None else tenant_brand_id
+    orders = await order_service.list_at_risk_orders(
+        db=db,
+        tenant_brand_id=effective_brand_id,
+        skip=skip,
+        limit=limit,
+        recalculate=recalculate,
+    )
+    return [OrderRead.model_validate(order) for order in orders]
+
+
+@router.get(
     "/{order_id}",
     response_model=OrderRead,
     status_code=http_status.HTTP_200_OK,
@@ -111,6 +160,37 @@ async def get_order(
     if order is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
     return OrderRead.model_validate(order)
+
+
+@router.get(
+    "/{order_id}/sla",
+    response_model=OrderSLAResponse,
+    status_code=http_status.HTTP_200_OK,
+    summary="Query order SLA deadline and compliance status (HU-33 / RN-03 / RN-04)",
+    description=(
+        "Exposes the calculated SLA deadline (business days excluding Sundays and destination holidays), "
+        "compliance status (MET, MISSED, PENDING), and at-risk assessment for the specified order."
+    ),
+    responses={
+        200: {"description": "Order SLA and compliance details.", "model": OrderSLAResponse},
+        401: {"description": "Unauthorized access.", "model": HTTPErrorResponse},
+        404: {"description": "Order not found.", "model": HTTPErrorResponse},
+    },
+)
+async def get_order_sla(
+    order_id: int,
+    sla_business_days: int = Query(default=2, ge=0, le=30, description="SLA business days target"),
+    tenant_brand_id: int | None = Depends(get_current_brand_or_coordinator),
+    db: AsyncSession = Depends(get_db),
+) -> OrderSLAResponse:
+    """Expose SLA calculation, compliance status, and at-risk status for an order."""
+    order = await order_service.get_order(db, order_id, tenant_brand_id)
+    if order is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="order not found")
+
+    return await sla_service.get_order_sla_summary(
+        db=db, order=order, sla_business_days=sla_business_days
+    )
 
 
 @router.patch(
@@ -225,3 +305,25 @@ async def get_shipping_labels(
             detail=str(exc),
         ) from exc
     return shipping_labels
+
+
+# Alias router serving un-prefixed /orders routes (e.g. /orders/{id}/sla and /orders/at-risk)
+alias_router = APIRouter(
+    prefix="/orders", tags=["orders"], dependencies=[Depends(require_api_key_or_admin)]
+)
+alias_router.add_api_route(
+    "/at-risk",
+    list_at_risk_orders,
+    methods=["GET"],
+    response_model=list[OrderRead],
+    status_code=http_status.HTTP_200_OK,
+    include_in_schema=False,
+)
+alias_router.add_api_route(
+    "/{order_id}/sla",
+    get_order_sla,
+    methods=["GET"],
+    response_model=OrderSLAResponse,
+    status_code=http_status.HTTP_200_OK,
+    include_in_schema=False,
+)

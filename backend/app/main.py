@@ -28,7 +28,7 @@ openapi_tags = [
     },
     {
         "name": "orders",
-        "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels.",
+        "description": "WMS order lifecycle management: creation, query by ID, paginated listing, SLA calculation, and at-risk monitoring.",
     },
     {
         "name": "webhooks",
@@ -110,6 +110,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_state_mapping.router)
     application.include_router(admin_carrier_state_mapping.router)
     application.include_router(orders.router)
+    application.include_router(orders.alias_router)
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, request_validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)

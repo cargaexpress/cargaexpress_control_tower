@@ -48,6 +48,32 @@ async def require_api_key(x_api_key: str | None = Header(default=None, alias="X-
         )
 
 
+async def require_api_key_or_admin(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+) -> None:
+    """Authorize requests presenting either a valid X-API-Key or X-Admin-Token."""
+    if x_admin_token and settings.admin_api_key:
+        if hmac.compare_digest(x_admin_token.encode(), settings.admin_api_key.encode()):
+            return
+
+    configured_api_keys = _configured_api_keys()
+    if not configured_api_keys and not settings.admin_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="API_KEY is not configured.",
+        )
+    if x_api_key is not None and any(
+        hmac.compare_digest(x_api_key.encode(), key.encode()) for key in configured_api_keys
+    ):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or missing secret token (X-API-Key or X-Admin-Token header).",
+    )
+
+
 async def get_current_brand(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     _: None = Depends(require_api_key),
@@ -60,3 +86,28 @@ async def get_current_brand(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="API key is not associated with a brand.",
     )
+
+
+async def get_current_brand_or_coordinator(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    _: None = Depends(require_api_key_or_admin),
+) -> int | None:
+    """Resolve the authenticated tenant ID, or None if acting as control-tower coordinator / admin.
+
+    - Returns `int`: brand_id if authenticated with a brand-specific API key.
+    - Returns `None`: if authenticated as coordinator via X-Admin-Token or master API_KEY.
+    """
+    if x_admin_token and settings.admin_api_key:
+        if hmac.compare_digest(x_admin_token.encode(), settings.admin_api_key.encode()):
+            return None
+
+    if x_api_key:
+        for api_key, brand_id in settings.brand_api_keys.items():
+            if hmac.compare_digest(x_api_key.encode(), api_key.encode()):
+                return brand_id
+
+        if settings.api_key and hmac.compare_digest(x_api_key.encode(), settings.api_key.encode()):
+            return None
+
+    return None

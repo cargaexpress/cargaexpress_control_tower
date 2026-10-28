@@ -22,6 +22,7 @@ from app.schemas.shipping_label import (
     ShippingLabelResponse,
 )
 from app.schemas.sla import (
+    OrderSLAResponse,
     PublicHoliday,
     SLACalculationRequest,
     SLADeadlineResult,
@@ -48,6 +49,7 @@ __all__ = [
     "OrderRead",
     "OrderRecipientCreate",
     "OrderRecipientRead",
+    "OrderSLAResponse",
     "OrderStatusUpdate",
     "PublicHoliday",
     "SLACalculationRequest",

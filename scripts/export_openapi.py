@@ -41,7 +41,7 @@ def export_openapi_schema(output_path: Path | None = None) -> Path:
         json.dump(openapi_data, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    print(f"✅ OpenAPI schema successfully exported to: {output_path}")
+    print(f"[OK] OpenAPI schema successfully exported to: {output_path}")
     return output_path
 
 

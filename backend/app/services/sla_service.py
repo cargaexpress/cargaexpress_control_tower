@@ -218,5 +218,105 @@ class SLAService:
             origin_country=origin_country,
         )
 
+    async def get_order_sla_summary(
+        self,
+        db: AsyncSession,
+        order: Order,
+        current_time: datetime | None = None,
+        sla_business_days: int = 2,
+    ):
+        """Compute complete SLA deadline breakdown, risk status, and compliance status for an order."""
+        from app.models.tracking_event import TrackingEvent
+        from app.schemas.sla import OrderSLAResponse
+        from app.services.at_risk_service import at_risk_service
+
+        sla_res = await self.calculate_order_sla(
+            db, order.order_id, sla_business_days=sla_business_days
+        )
+        risk_res = await at_risk_service.evaluate_order_risk(
+            db, order.order_id, current_time=current_time
+        )
+
+        now = current_time or datetime.now(UTC)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=UTC)
+        else:
+            now = now.astimezone(UTC)
+
+        deadline_dt = sla_res.deadline_datetime
+        if deadline_dt.tzinfo is None:
+            deadline_dt = deadline_dt.replace(tzinfo=UTC)
+        else:
+            deadline_dt = deadline_dt.astimezone(UTC)
+
+        order_status = order.status.upper()
+        is_compliant: bool | None = None
+        if order_status == "DELIVERED":
+            delivered_at: datetime | None = None
+            from app.models.shipping_label import ShippingLabel
+
+            lbl_stmt = select(ShippingLabel.label_id).where(
+                ShippingLabel.order_id == order.order_id
+            )
+            lbl_res = await db.execute(lbl_stmt)
+            label_ids = list(lbl_res.scalars().all())
+
+            if label_ids:
+                evt_stmt = (
+                    select(TrackingEvent)
+                    .where(
+                        TrackingEvent.label_id.in_(label_ids),
+                        TrackingEvent.canonical_status == "DELIVERED",
+                    )
+                    .order_by(TrackingEvent.event_timestamp.desc())
+                )
+                deliv_evt = (await db.execute(evt_stmt)).scalars().first()
+                if deliv_evt:
+                    delivered_at = deliv_evt.event_timestamp
+
+            check_dt = delivered_at or order.at_risk_evaluated_at or now
+            if check_dt.tzinfo is None:
+                check_dt = check_dt.replace(tzinfo=UTC)
+            else:
+                check_dt = check_dt.astimezone(UTC)
+
+            is_compliant = check_dt <= deadline_dt
+            compliance_status = "MET" if is_compliant else "MISSED"
+        elif order_status in {"CANCELLED", "RETURNED", "LOST_OR_DAMAGED"}:
+            compliance_status = "NOT_APPLICABLE"
+            is_compliant = False if order_status in {"LOST_OR_DAMAGED", "RETURNED"} else None
+        else:
+            # Active in-transit or pending delivery order
+            if now > deadline_dt:
+                compliance_status = "MISSED"
+                is_compliant = False
+            else:
+                compliance_status = "PENDING"
+                is_compliant = None
+
+        return OrderSLAResponse(
+            order_id=order.order_id,
+            brand_id=order.brand_id,
+            status=order.status,
+            destination_country=order.destination_country,
+            sla_business_days=sla_res.sla_business_days,
+            dispatched_at=sla_res.dispatched_at,
+            cutoff_hour=sla_res.cutoff_hour,
+            is_after_cutoff=sla_res.is_after_cutoff,
+            counting_start_date=sla_res.counting_start_date,
+            deadline_date=sla_res.deadline_date,
+            deadline_datetime=deadline_dt,
+            business_days_counted=sla_res.business_days_counted,
+            excluded_dates=sla_res.excluded_dates,
+            compliance_status=compliance_status,
+            is_compliant=is_compliant,
+            is_at_risk=risk_res.is_at_risk,
+            at_risk_reason=(
+                " | ".join(risk_res.at_risk_reasons) if risk_res.at_risk_reasons else None
+            ),
+            at_risk_reasons=risk_res.at_risk_reasons,
+            business_hours_remaining=risk_res.business_hours_remaining,
+        )
+
 
 sla_service = SLAService()
