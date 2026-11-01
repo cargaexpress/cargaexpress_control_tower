@@ -45,6 +45,49 @@ class ControlTowerClient:
             headers["X-API-Key"] = self.api_key
         return headers
 
+    def trigger_type_a_sync(
+        self,
+        carrier_slug: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Trigger Type A simulator pull sync via Control Tower backend.
+
+        Endpoint: POST /api/v1/sync/type-a
+        """
+        endpoint = f"{self.base_url}/api/v1/sync/type-a"
+        params: dict[str, Any] = {"limit": limit}
+        if carrier_slug:
+            params["carrier_slug"] = carrier_slug
+
+        logger.info(
+            "Triggering Type A sync against %s (carrier: %s, limit: %d)",
+            endpoint,
+            carrier_slug or "ALL",
+            limit,
+        )
+
+        if requests is not None:
+            resp = requests.post(
+                endpoint,
+                params=params,
+                headers=self._get_headers(),
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            return resp.json()  # type: ignore[no-any-return]
+
+        import urllib.parse
+        import urllib.request
+
+        url = endpoint
+        if params:
+            url += f"?{urllib.parse.urlencode(params)}"
+
+        req = urllib.request.Request(url, data=b"", headers=self._get_headers(), method="POST")
+        with urllib.request.urlopen(req, timeout=self.timeout) as response:
+            data = response.read().decode("utf-8")
+            return json.loads(data)  # type: ignore[no-any-return]
+
     def trigger_type_b_sync(self, carrier_name: str | None = None) -> dict[str, Any]:
         """Trigger Type B pull polling sync via Control Tower backend.
 

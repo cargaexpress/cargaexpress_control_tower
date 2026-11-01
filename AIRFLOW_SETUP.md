@@ -103,7 +103,16 @@ docker compose -f docker-compose.airflow.yml ps
 
 ## 4. Implemented Ingestion and Validation DAGs
 
-### A. Type B Pull Polling Pipeline (`type_b_pull_polling`) - HU-27 (RIWI-135)
+### A. Type A Simulator Polling Pipeline (`type_a_pull_polling`)
+Orchestrates periodic batch pull sync against the Type A Webhook Simulator Receiver API (Source F3 extractor hook):
+- **Schedule**: `*/30 * * * *` (every 30 minutes).
+- **Resilience**: 3 retries with exponential backoff (`retry_exponential_backoff=True`) and a 20-minute ceiling.
+- **Workflow**:
+  1. `verify_backend_readiness`: Verifies backend API readiness.
+  2. `poll_type_a_carriers`: Triggers `POST /api/v1/sync/type-a` to query simulator events, map raw statuses to RN-02 canonical states, and update WMS.
+  3. `evaluate_polling_metrics`: Aggregates normalized events, records anomalies, and logs warning alerts on errors.
+
+### B. Type B Pull Polling Pipeline (`type_b_pull_polling`) - HU-27 (RIWI-135)
 Executes scheduled REST polling against the 4 Type B carriers:
 - **Schedule**: `*/30 * * * *` (every 30 minutes).
 - **Resilience**: 3 retries with exponential backoff (`retry_exponential_backoff=True`) and a 20-minute ceiling to absorb carrier rate limits.
@@ -184,6 +193,7 @@ uv run pytest tests/test_dags.py -v
 
 ### Compile DAGs Syntax
 ```bash
+python -m py_compile dags/dag_type_a_polling.py
 python -m py_compile dags/dag_type_b_polling.py
 python -m py_compile dags/dag_type_c_ingestion.py
 python -m py_compile dags/dag_distributed_validation.py

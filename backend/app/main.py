@@ -12,6 +12,7 @@ from app.routers import (
     admin_state_mapping,
     health,
     orders,
+    type_a_sync,
     type_b_sync,
     type_c_ingestion,
     webhooks,
@@ -105,6 +106,7 @@ def create_app() -> FastAPI:
 
     application.include_router(health.router)
     application.include_router(webhooks.router)
+    application.include_router(type_a_sync.router)
     application.include_router(type_b_sync.router)
     application.include_router(type_c_ingestion.router)
     application.include_router(admin_state_mapping.router)

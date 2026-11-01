@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     state_mapping_cache_ttl_seconds: int = Field(default=300, gt=0)
 
+    # Type A Simulator Configuration (F3 / Webhook Receiver Extractor)
+    type_a_simulator_url: str = "http://localhost:9000"
+    type_a_max_retries: int = 3
+    type_a_retry_base_delay_seconds: float = 0.5
+
     # Type B Carriers API Configuration (F4)
     type_b_carriers_urls: dict[str, str] = Field(
         default_factory=lambda: {
