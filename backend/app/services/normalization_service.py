@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +9,8 @@ from app.models.carrier import Carrier
 from app.models.order import Order
 from app.models.shipping_label import ShippingLabel
 from app.models.tracking_anomaly import TrackingAnomaly
+from app.models.tracking_event import TrackingEvent
+from app.services.at_risk_service import at_risk_service
 from app.services.exceptions import EntityNotFoundError
 from app.services.state_mapping_cache import state_mapping_cache
 
@@ -33,7 +35,7 @@ class NormalizationResult:
     canonical_status: str | None
     previous_status: str | None
     new_status: str | None
-    is_anomaly: bool
+    is_anomaly: bool = False
     anomaly_reason: str | None = None
     message: str = ""
 
@@ -64,6 +66,7 @@ async def normalize_and_apply_event(
     occurred_at: datetime | None = None,
     event_id: str | None = None,
     location: str | None = None,
+    event_timestamp: datetime | None = None,
 ) -> NormalizationResult:
     """Translate raw tracking event into canonical status and update shipping label.
 
@@ -72,6 +75,7 @@ async def normalize_and_apply_event(
     - RN-02: Protects terminal statuses (DELIVERED, RETURNED, LOST_OR_DAMAGED). If a non-terminal
       event arrives for an already terminated label, the status is NOT modified and an anomaly
       is recorded in tracking_anomalies table.
+    - RN-04: Automatically triggers at-risk evaluation on the order when events are processed (Epic 1 integration).
     - RN-07: Propagates status to parent Order when applicable (all labels delivered -> order delivered).
     """
     clean_tracking = tracking_number.strip()
@@ -181,14 +185,32 @@ async def normalize_and_apply_event(
             message="Status already at target terminal state.",
         )
 
+    effective_ts = occurred_at or event_timestamp or datetime.now(UTC)
+    if effective_ts.tzinfo is None:
+        effective_ts = effective_ts.replace(tzinfo=UTC)
+
+    # Record historical tracking event for traceability and exception duration tracking
+    tracking_event = TrackingEvent(
+        carrier_id=carrier_id,
+        label_id=label.label_id,
+        tracking_number=clean_tracking,
+        raw_status=clean_raw_status,
+        canonical_status=canonical_status,
+        location=location,
+        event_timestamp=effective_ts,
+    )
+    db.add(tracking_event)
+
     # 5. Apply standard status transition to shipping label
     label.status = canonical_status
 
     # 6. Propagate to order if applicable
     order = await db.get(Order, label.order_id)
     if order is not None:
-        if canonical_status in ("IN_TRANSIT", "OUT_FOR_DELIVERY"):
-            if order.status.upper() in ("CREATED", "PICKED_UP", "IN_TRANSIT"):
+        if canonical_status == "EXCEPTION":
+            order.status = "EXCEPTION"
+        elif canonical_status in ("IN_TRANSIT", "OUT_FOR_DELIVERY"):
+            if order.status.upper() in ("CREATED", "PICKED_UP", "IN_TRANSIT", "EXCEPTION"):
                 order.status = canonical_status
         elif canonical_status == "DELIVERED":
             # RN-07: Order meets SLA only if all of its shipping labels are delivered on time
@@ -199,6 +221,18 @@ async def normalize_and_apply_event(
                 for item_label in all_labels
             ):
                 order.status = "DELIVERED"
+
+        await db.flush()
+
+        # 7. Evaluate and update RN-04 at-risk condition automatically (Epic 1 integration)
+        try:
+            await at_risk_service.evaluate_and_update_order_risk(
+                db, order.order_id, current_time=effective_ts
+            )
+        except Exception as exc:
+            logger.warning(
+                "Automatic risk evaluation failed for order #%d: %s", order.order_id, exc
+            )
 
     await db.commit()
     await db.refresh(label)
@@ -214,3 +248,7 @@ async def normalize_and_apply_event(
         is_anomaly=False,
         message="Status normalized and updated successfully.",
     )
+
+
+# Backwards compatibility alias
+normalize_event = normalize_and_apply_event

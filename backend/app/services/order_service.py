@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,14 @@ from app.services.exceptions import (
 
 # Eager-load child records to return complete orders without per-row queries.
 # Service functions isolate persistence from HTTP handling for reuse and testing.
-_ORDER_LOAD_OPTIONS = (selectinload(Order.order_lines), selectinload(Order.recipient))
+logger = logging.getLogger(__name__)
+
+_ORDER_LOAD_OPTIONS = (
+    selectinload(Order.order_lines),
+    selectinload(Order.recipient),
+    selectinload(Order.shipping_labels),
+    selectinload(Order.distribution_center),
+)
 
 # Catalog of terminal states and permitted transitions (RN-02 and ADR-002)
 TERMINAL_STATUSES: set[str] = {
@@ -97,14 +106,47 @@ async def create_order(db: AsyncSession, payload: OrderCreate, tenant_brand_id: 
     return order
 
 
-async def get_order(db: AsyncSession, order_id: int, tenant_brand_id: int) -> Order | None:
-    stmt = (
-        select(Order)
-        .where(Order.order_id == order_id, Order.brand_id == tenant_brand_id)
-        .options(*_ORDER_LOAD_OPTIONS)
-    )
+async def get_order(
+    db: AsyncSession, order_id: int, tenant_brand_id: int | None = None
+) -> Order | None:
+    stmt = select(Order).where(Order.order_id == order_id).options(*_ORDER_LOAD_OPTIONS)
+    if tenant_brand_id is not None:
+        stmt = stmt.where(Order.brand_id == tenant_brand_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def list_at_risk_orders(
+    db: AsyncSession,
+    tenant_brand_id: int | None = None,
+    skip: int = 0,
+    limit: int = 50,
+    recalculate: bool = False,
+) -> list[Order]:
+    """Retrieve all non-terminal orders currently flagged at risk under RN-04.
+
+    If recalculate is True, evaluates active orders before querying.
+    If tenant_brand_id is provided, restricts to orders owned by that brand (RN-10).
+    """
+    if recalculate:
+        from app.services.at_risk_service import at_risk_service
+
+        await at_risk_service.evaluate_all_active_orders(db)
+
+    stmt = (
+        select(Order)
+        .where(
+            Order.is_at_risk.is_(True),
+            Order.status.not_in(TERMINAL_STATUSES),
+        )
+        .options(*_ORDER_LOAD_OPTIONS)
+    )
+    if tenant_brand_id is not None:
+        stmt = stmt.where(Order.brand_id == tenant_brand_id)
+
+    stmt = stmt.order_by(Order.order_id.asc()).offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def list_orders(
@@ -155,6 +197,15 @@ async def update_order_status(
         )
 
     order.status = target_status
+    await db.flush()
+    try:
+        from app.services.at_risk_service import at_risk_service
+
+        await at_risk_service.evaluate_and_update_order_risk(db, order.order_id)
+    except Exception as exc:
+        logger.warning(
+            "Failed to evaluate order risk on status update for order #%d: %s", order.order_id, exc
+        )
     await db.commit()
     await db.refresh(order, attribute_names=["order_lines", "recipient"])
     return order

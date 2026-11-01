@@ -76,6 +76,159 @@
         }
       }
     },
+    "/api/v1/webhooks/{carrier_slug}": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Receive Carrier Webhook",
+        "description": "Receive push tracking events from Type A carrier webhooks (F3 / RNF-01).\n\nDecodes heterogeneous payloads and publishes to RabbitMQ queue `eventos_transportadora`\nfor asynchronous processing, guaranteeing response time < 200 ms (RNF-01).",
+        "operationId": "receive_carrier_webhook_api_v1_webhooks__carrier_slug__post",
+        "parameters": [
+          {
+            "name": "carrier_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Carrier Slug"
+            }
+          },
+          {
+            "name": "content-type",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "application/json",
+              "title": "Content-Type"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Receive Carrier Webhook Api V1 Webhooks  Carrier Slug  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/type-b": {
+      "post": {
+        "tags": [
+          "connectors: type b"
+        ],
+        "summary": "Trigger Type B Sync",
+        "description": "Trigger periodic polling connector for Type B carriers (F4 / Airflow batch hook).\n\nQueries carrier REST APIs, respects rate limits with exponential backoff,\nand passes all tracking events through NormalizationService (RN-01 / RN-02).",
+        "operationId": "trigger_type_b_sync_api_v1_sync_type_b_post",
+        "parameters": [
+          {
+            "name": "carrier_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional carrier name to sync. If omitted, syncs all 4 Type B carriers.",
+              "title": "Carrier Name"
+            },
+            "description": "Optional carrier name to sync. If omitted, syncs all 4 Type B carriers."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Trigger Type B Sync Api V1 Sync Type B Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/type-c/upload": {
+      "post": {
+        "tags": [
+          "connectors: type c"
+        ],
+        "summary": "Upload Type C File",
+        "description": "Upload and ingest a Type C batch file (CSV or Excel).\n\nCleans known defects (repeated headers, total/summary rows),\nprevents duplicate ingestion via SHA-256 and filename tracking,\nand normalizes all valid tracking events using NormalizationService.",
+        "operationId": "upload_type_c_file_api_v1_sync_type_c_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_type_c_file_api_v1_sync_type_c_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Upload Type C File Api V1 Sync Type C Upload Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/state-mappings": {
       "get": {
         "tags": [
@@ -685,6 +838,22 @@
               ],
               "title": "X-Api-Key"
             }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
           }
         ],
         "requestBody": {
@@ -789,6 +958,22 @@
               ],
               "title": "X-Api-Key"
             }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
           }
         ],
         "responses": {
@@ -804,6 +989,154 @@
           },
           "422": {
             "description": "Validation error in pagination query parameters."
+          }
+        }
+      }
+    },
+    "/api/v1/orders/at-risk": {
+      "get": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "List at-risk orders (HU-33 / RN-04)",
+        "description": "List all active orders currently meeting the RN-04 at-risk criteria (< 24 business hours remaining or unresolved exception > 12 hours). Intended for the control-tower coordinator, with optional brand filtering.",
+        "operationId": "list_at_risk_orders_api_v1_orders_at_risk_get",
+        "parameters": [
+          {
+            "name": "brand_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional brand ID filter",
+              "title": "Brand Id"
+            },
+            "description": "Optional brand ID filter"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Pagination offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Page size limit",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size limit"
+          },
+          {
+            "name": "recalculate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Force re-evaluation of all active orders",
+              "default": false,
+              "title": "Recalculate"
+            },
+            "description": "Force re-evaluation of all active orders"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of at-risk orders.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderRead"
+                  },
+                  "title": "Response 200 List At Risk Orders Api V1 Orders At Risk Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: cross-brand access attempt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -841,6 +1174,22 @@
               ],
               "title": "X-Api-Key"
             }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
           }
         ],
         "responses": {
@@ -866,6 +1215,115 @@
           },
           "422": {
             "description": "Validation error in order ID path parameter."
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{order_id}/sla": {
+      "get": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Query order SLA deadline and compliance status (HU-33 / RN-03 / RN-04)",
+        "description": "Exposes the calculated SLA deadline (business days excluding Sundays and destination holidays), compliance status (MET, MISSED, PENDING), and at-risk assessment for the specified order.",
+        "operationId": "get_order_sla_api_v1_orders__order_id__sla_get",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "sla_business_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 30,
+              "minimum": 0,
+              "description": "SLA business days target",
+              "default": 2,
+              "title": "Sla Business Days"
+            },
+            "description": "SLA business days target"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order SLA and compliance details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderSLAResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -902,6 +1360,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
             }
           }
         ],
@@ -974,6 +1448,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
             }
           }
         ],
@@ -1072,6 +1562,22 @@
               ],
               "title": "X-Api-Key"
             }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
           }
         ],
         "responses": {
@@ -1115,6 +1621,26 @@
   },
   "components": {
     "schemas": {
+      "Body_upload_type_c_file_api_v1_sync_type_c_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "carrier_name": {
+            "type": "string",
+            "title": "Carrier Name",
+            "description": "Name of the Type C carrier (e.g. TransExpress Logistics, Rapido Andino, Logistica 360)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "carrier_name"
+        ],
+        "title": "Body_upload_type_c_file_api_v1_sync_type_c_upload_post"
+      },
       "CarrierStateMappingEntry": {
         "properties": {
           "raw_status": {
@@ -1783,6 +2309,37 @@
           "recipient": {
             "$ref": "#/components/schemas/OrderRecipientRead",
             "description": "Order recipient details."
+          },
+          "is_at_risk": {
+            "type": "boolean",
+            "title": "Is At Risk",
+            "description": "Flag indicating if the order is at risk of missing SLA (RN-04).",
+            "default": false
+          },
+          "at_risk_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Risk Reason",
+            "description": "Reason why the order was flagged at risk."
+          },
+          "at_risk_evaluated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Risk Evaluated At",
+            "description": "Timestamp when at-risk condition was last evaluated."
           }
         },
         "type": "object",
@@ -1957,6 +2514,183 @@
         ],
         "title": "OrderRecipientRead",
         "description": "Recipient information for a queried order."
+      },
+      "OrderSLAResponse": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id",
+            "description": "Internal unique order identifier",
+            "examples": [
+              1
+            ]
+          },
+          "brand_id": {
+            "type": "integer",
+            "title": "Brand Id",
+            "description": "Identifier of the brand owning the order",
+            "examples": [
+              1
+            ]
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current canonical status of the order",
+            "examples": [
+              "IN_TRANSIT"
+            ]
+          },
+          "destination_country": {
+            "type": "string",
+            "title": "Destination Country",
+            "description": "ISO 3166-1 alpha-2 destination country code",
+            "examples": [
+              "CO"
+            ]
+          },
+          "sla_business_days": {
+            "type": "integer",
+            "title": "Sla Business Days",
+            "description": "Target timeframe in business days under RN-03",
+            "examples": [
+              2
+            ]
+          },
+          "dispatched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Dispatched At",
+            "description": "Order dispatch timestamp in UTC"
+          },
+          "cutoff_hour": {
+            "type": "integer",
+            "title": "Cutoff Hour",
+            "description": "Cutoff hour threshold (16:00 / 4:00 PM)",
+            "default": 16
+          },
+          "is_after_cutoff": {
+            "type": "boolean",
+            "title": "Is After Cutoff",
+            "description": "True if dispatch occurred at or after 16:00 in origin/destination timezone"
+          },
+          "counting_start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Counting Start Date",
+            "description": "Date when business-day counting begins (Day 0)"
+          },
+          "deadline_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Deadline Date",
+            "description": "Calculated SLA deadline calendar date"
+          },
+          "deadline_datetime": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deadline Datetime",
+            "description": "Calculated SLA deadline timestamp in UTC"
+          },
+          "business_days_counted": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Business Days Counted",
+            "description": "Calendar dates counted as business days towards SLA"
+          },
+          "excluded_dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Excluded Dates",
+            "description": "Calendar dates skipped during counting (Sundays and public holidays)"
+          },
+          "compliance_status": {
+            "type": "string",
+            "title": "Compliance Status",
+            "description": "Current SLA compliance status: MET, MISSED, or PENDING",
+            "examples": [
+              "PENDING"
+            ]
+          },
+          "is_compliant": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Compliant",
+            "description": "True if delivered within deadline, False if missed, None if pending in progress"
+          },
+          "is_at_risk": {
+            "type": "boolean",
+            "title": "Is At Risk",
+            "description": "True if order meets any RN-04 at-risk condition",
+            "examples": [
+              false
+            ]
+          },
+          "at_risk_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Risk Reason",
+            "description": "Formatted summary of triggered at-risk condition"
+          },
+          "at_risk_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "At Risk Reasons",
+            "description": "List of all triggered at-risk condition descriptions"
+          },
+          "business_hours_remaining": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Hours Remaining",
+            "description": "Business hours remaining until SLA deadline (None if terminal)",
+            "examples": [
+              14.0
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "brand_id",
+          "status",
+          "destination_country",
+          "sla_business_days",
+          "dispatched_at",
+          "is_after_cutoff",
+          "counting_start_date",
+          "deadline_date",
+          "deadline_datetime",
+          "compliance_status",
+          "is_at_risk"
+        ],
+        "title": "OrderSLAResponse",
+        "description": "SLA calculation, deadline breakdown, and compliance status for an order."
       },
       "OrderStatusUpdate": {
         "properties": {
@@ -2404,7 +3138,19 @@
     },
     {
       "name": "orders",
-      "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels."
+      "description": "WMS order lifecycle management: creation, query by ID, paginated listing, SLA calculation, and at-risk monitoring."
+    },
+    {
+      "name": "webhooks",
+      "description": "Carrier webhook receiver for push tracking events (F3 / RNF-01)."
+    },
+    {
+      "name": "connectors: type b",
+      "description": "Polling connectors and synchronization hooks for Type B carriers (F4)."
+    },
+    {
+      "name": "connectors: type c",
+      "description": "Batch file ingestion connectors for Type C carriers (CSV/Excel) (F5)."
     },
     {
       "name": "admin: carrier state mapping",
