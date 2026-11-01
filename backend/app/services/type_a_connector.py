@@ -56,9 +56,7 @@ class TypeAConnectorService:
         sleep_fn: Callable[[float], Any] | None = None,
     ) -> None:
         self.base_url = (base_url or settings.type_a_simulator_url).rstrip("/")
-        self.max_retries = (
-            max_retries if max_retries is not None else settings.type_a_max_retries
-        )
+        self.max_retries = max_retries if max_retries is not None else settings.type_a_max_retries
         self.base_delay = (
             base_delay_seconds
             if base_delay_seconds is not None
@@ -128,14 +126,14 @@ class TypeAConnectorService:
                 try:
                     norm_result = await normalize_and_apply_event(
                         db=db,
-                        carrier_id_or_slug=carrier_slug,
+                        carrier_identifier=carrier_slug,
                         tracking_number=tracking_number,
                         raw_status=raw_status,
                         event_id=event_id,
                         occurred_at=occurred_at,
                         location=location,
                     )
-                    if norm_result.get("anomaly_recorded"):
+                    if norm_result.is_anomaly:
                         summary.anomalies += 1
                     summary.normalized += 1
                 except Exception as norm_exc:
