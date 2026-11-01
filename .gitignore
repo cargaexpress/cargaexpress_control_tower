@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 backend/.env
 backend/.env.*
 !backend/.env.example

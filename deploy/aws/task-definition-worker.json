@@ -1,0 +1,88 @@
+{
+  "family": "cargaexpress-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/cargaexpress-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/cargaexpress-worker-task-role",
+  "containerDefinitions": [
+    {
+      "name": "cargaexpress-worker",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cargaexpress-worker:latest",
+      "command": [
+        "python",
+        "-m",
+        "app.worker"
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "INFO"
+        },
+        {
+          "name": "SQL_ECHO",
+          "value": "false"
+        },
+        {
+          "name": "STATE_MAPPING_CACHE_TTL_SECONDS",
+          "value": "300"
+        },
+        {
+          "name": "RABBITMQ_EXCHANGE",
+          "value": "eventos_exchange"
+        },
+        {
+          "name": "RABBITMQ_QUEUE",
+          "value": "eventos_transportadora"
+        },
+        {
+          "name": "RABBITMQ_RETRY_QUEUE",
+          "value": "eventos_transportadora.retry"
+        },
+        {
+          "name": "RABBITMQ_DLQ_QUEUE",
+          "value": "eventos_transportadora.dlq"
+        },
+        {
+          "name": "RABBITMQ_RETRY_TTL_MS",
+          "value": "5000"
+        },
+        {
+          "name": "RABBITMQ_MAX_RETRIES",
+          "value": "3"
+        },
+        {
+          "name": "RABBITMQ_PREFETCH_COUNT",
+          "value": "10"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/database-url"
+        },
+        {
+          "name": "RABBITMQ_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/rabbitmq-url"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cargaexpress-worker",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}
