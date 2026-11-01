@@ -1,0 +1,37 @@
+{
+  "serviceName": "cargaexpress-backend-service",
+  "cluster": "cargaexpress-production",
+  "taskDefinition": "cargaexpress-backend",
+  "desiredCount": 2,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "subnet-0123456789abcdef0",
+        "subnet-0123456789abcdef1"
+      ],
+      "securityGroups": [
+        "sg-0123456789abcdef0"
+      ],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:<AWS_ACCOUNT_ID>:targetgroup/tg-cargaexpress-backend/0123456789abcdef",
+      "containerName": "cargaexpress-backend",
+      "containerPort": 8000
+    }
+  ],
+  "healthCheckGracePeriodSeconds": 60,
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "enableExecuteCommand": true
+}
