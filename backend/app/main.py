@@ -11,6 +11,7 @@ from app.routers import (
     admin_carrier_state_mapping,
     admin_state_mapping,
     alerts,
+    financial,
     health,
     orders,
     sla,
@@ -40,6 +41,10 @@ openapi_tags = [
     {
         "name": "alerts & risk monitoring",
         "description": "Operational 24h preventive risk alerts and prolonged exception tracking (RN-04).",
+    },
+    {
+        "name": "financial & penalties",
+        "description": "Responsibility attribution, freight penalties, biweekly settlements, and financial netting (FR-04, FR-05, BR-05, BR-06, BR-08).",
     },
     {
         "name": "webhooks",
@@ -124,6 +129,7 @@ def create_app() -> FastAPI:
     application.include_router(orders.router)
     application.include_router(sla.router)
     application.include_router(alerts.router)
+    application.include_router(financial.router)
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, request_validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)

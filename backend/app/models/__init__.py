@@ -3,6 +3,12 @@ from app.models.brand import Brand
 from app.models.carrier import Carrier
 from app.models.dispatch import Dispatch
 from app.models.distribution_center import DistributionCenter
+from app.models.financial import (
+    FinancialLedgerEntry,
+    FinancialSettlement,
+    FreightPenalty,
+    ShipmentAttribution,
+)
 from app.models.order import Order
 from app.models.order_line import OrderLine
 from app.models.order_recipient import OrderRecipient
@@ -21,12 +27,16 @@ __all__ = [
     "Carrier",
     "Dispatch",
     "DistributionCenter",
+    "FinancialLedgerEntry",
+    "FinancialSettlement",
+    "FreightPenalty",
     "Order",
     "OrderLine",
     "OrderRecipient",
     "PickingTask",
     "ProcessedFile",
     "ShipmentAlert",
+    "ShipmentAttribution",
     "ShipmentSlaTracking",
     "ShipmentType",
     "ShippingLabel",
