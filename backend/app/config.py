@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     state_mapping_cache_ttl_seconds: int = Field(default=300, gt=0)
 
+    # Webhook Security Configuration (NFR-06 / Carrier Webhook Authentication)
+    webhook_secret: str = ""
+    carrier_webhook_tokens: dict[str, str] = Field(default_factory=dict)
+
     # Type A Simulator Configuration (F3 / Webhook Receiver Extractor)
     type_a_simulator_url: str = "http://localhost:9000"
     type_a_max_retries: int = 3
@@ -45,6 +49,21 @@ class Settings(BaseSettings):
     )
     type_b_max_retries: int = 3
     type_b_retry_base_delay_seconds: float = 0.5
+
+    # Type C Carriers Batch & Storage Configuration (F5 / MinIO S3)
+    minio_endpoint: str = "http://localhost:9000"
+    minio_access_key: str = "cargaexpress_admin"
+    minio_secret_key: str = "cargaexpress_minio_secret_123"
+    minio_bucket: str = "type-c-carriers"
+    type_c_carriers_urls: dict[str, str] = Field(
+        default_factory=lambda: {
+            "TransExpress Logistics": "http://localhost:8005",
+            "Rapido Andino": "http://localhost:8006",
+            "Logistica 360": "http://localhost:8007",
+        }
+    )
+    type_c_max_retries: int = 3
+    type_c_retry_base_delay_seconds: float = 0.5
 
     # RabbitMQ Message Broker Configuration (RNF-01 / Webhook Queue)
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
@@ -81,6 +100,13 @@ class Settings(BaseSettings):
             ):
                 raise ValueError(
                     "BRAND_API_KEYS entries must be at least 32 characters and must not start with "
+                    "'change_me' in production"
+                )
+            if self.webhook_secret and (
+                len(self.webhook_secret) < 32 or self.webhook_secret.lower().startswith("change_me")
+            ):
+                raise ValueError(
+                    "WEBHOOK_SECRET must be at least 32 characters and must not start with "
                     "'change_me' in production"
                 )
         return self

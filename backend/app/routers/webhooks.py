@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.security import verify_carrier_webhook_auth
 from app.services.normalization_service import find_carrier_by_slug_or_id
 from app.services.rabbitmq_service import (
     QueuedWebhookMessage,
@@ -34,11 +35,13 @@ async def receive_carrier_webhook(
     content_type: str = Header(default="application/json"),
     db: AsyncSession = Depends(get_db),
     rmq: RabbitMQService = Depends(get_rabbitmq_service),
+    _auth: None = Depends(verify_carrier_webhook_auth),
 ) -> dict[str, Any]:
-    """Receive push tracking events from Type A carrier webhooks (F3 / RNF-01).
+    """Receive push tracking events from Type A carrier webhooks (F3 / RNF-01 / NFR-06).
 
     Decodes heterogeneous payloads and publishes to RabbitMQ queue `eventos_transportadora`
     for asynchronous processing, guaranteeing response time < 200 ms (RNF-01).
+    Protected by token or HMAC signature verification (NFR-06).
     """
     body = await request.body()
     if not body:
