@@ -109,7 +109,9 @@ async def test_sla_cross_country_uses_destination_calendar(db_session: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_at_risk_detection_when_under_24_hours_and_not_out_for_delivery(db_session: AsyncSession):
+async def test_at_risk_detection_when_under_24_hours_and_not_out_for_delivery(
+    db_session: AsyncSession,
+):
     """Validate RN-04: At-risk classification when <= 24 business hours remain and status != OUT_FOR_DELIVERY."""
     # Seed Order and Label
     brand = Brand(name="TestBrand", tier="TIER_1", is_active=True)
@@ -172,7 +174,9 @@ async def test_at_risk_detection_when_under_24_hours_and_not_out_for_delivery(db
 
 
 @pytest.mark.asyncio
-async def test_order_sla_endpoint_whole_order_compliance(client: AsyncClient, db_session: AsyncSession):
+async def test_order_sla_endpoint_whole_order_compliance(
+    client: AsyncClient, db_session: AsyncSession
+):
     """Validate RN-07 / HU-33: Endpoint GET /api/v1/sla/orders/{id}.
 
     Whole order is compliant only if ALL labels are delivered on time.

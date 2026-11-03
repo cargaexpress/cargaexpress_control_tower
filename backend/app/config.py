@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     admin_api_key: str = ""
     api_key: str = ""
     brand_api_keys: dict[str, int] = Field(default_factory=dict)
+    carrier_api_keys: dict[str, int] = Field(default_factory=dict)
     log_level: str = "INFO"
     state_mapping_cache_ttl_seconds: int = Field(default=300, gt=0)
 

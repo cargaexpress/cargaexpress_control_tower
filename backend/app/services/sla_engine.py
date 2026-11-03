@@ -138,8 +138,12 @@ class SlaEngineService:
         # 2. Try fetching from public Nager.Date API
         nager_holidays = await self._fetch_nager_holidays(clean_country, year)
         if nager_holidays:
-            # Persist to database cache
+            # Persist to database cache with date deduplication
+            seen_dates = set()
             for h_date, h_name in nager_holidays:
+                if h_date in seen_dates:
+                    continue
+                seen_dates.add(h_date)
                 holiday_record = CalendarHoliday(
                     country_code=clean_country,
                     holiday_date=h_date,
@@ -162,9 +166,7 @@ class SlaEngineService:
         self._memory_cache[cache_key] = fallback
         return fallback
 
-    async def _fetch_nager_holidays(
-        self, country_code: str, year: int
-    ) -> list[tuple[date, str]]:
+    async def _fetch_nager_holidays(self, country_code: str, year: int) -> list[tuple[date, str]]:
         """Fetch holidays from Nager.Date REST API with timeout protection."""
         url = f"{self.nager_api_url}/PublicHolidays/{year}/{country_code}"
         try:

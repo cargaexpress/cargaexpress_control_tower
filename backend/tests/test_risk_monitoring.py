@@ -82,9 +82,7 @@ async def test_preventive_24h_alert_generation(db_session: AsyncSession):
     )
 
     # Verify deadline
-    _, deadline = await sla_engine.calculate_delivery_deadline(
-        db_session, dispatch_time, 3, "CO"
-    )
+    _, deadline = await sla_engine.calculate_delivery_deadline(db_session, dispatch_time, 3, "CO")
     # Scan at 14h before deadline
     scan_time = deadline - timedelta(hours=14)
 
@@ -122,9 +120,7 @@ async def test_preventive_24h_alert_skipped_if_out_for_delivery(db_session: Asyn
         shipment_type="STANDARD",
     )
 
-    _, deadline = await sla_engine.calculate_delivery_deadline(
-        db_session, dispatch_time, 3, "CO"
-    )
+    _, deadline = await sla_engine.calculate_delivery_deadline(db_session, dispatch_time, 3, "CO")
     scan_time = deadline - timedelta(hours=10)
 
     summary = await service.scan_and_generate_alerts(db_session, current_time_utc=scan_time)
@@ -179,9 +175,7 @@ async def test_auto_resolution_when_shipment_progresses(db_session: AsyncSession
     )
 
     sla_engine = SlaEngineService()
-    _, deadline = await sla_engine.calculate_delivery_deadline(
-        db_session, dispatch_time, 3, "CO"
-    )
+    _, deadline = await sla_engine.calculate_delivery_deadline(db_session, dispatch_time, 3, "CO")
     # Scan at 12h before deadline
     scan_time = deadline - timedelta(hours=12)
     await service.scan_and_generate_alerts(db_session, current_time_utc=scan_time)
@@ -198,7 +192,9 @@ async def test_auto_resolution_when_shipment_progresses(db_session: AsyncSession
     await db_session.flush()
 
     # Re-scan: alert must be automatically resolved
-    summary = await service.scan_and_generate_alerts(db_session, current_time_utc=scan_time + timedelta(hours=2))
+    summary = await service.scan_and_generate_alerts(
+        db_session, current_time_utc=scan_time + timedelta(hours=2)
+    )
     assert summary.alerts_resolved >= 1
 
     await db_session.refresh(alert)

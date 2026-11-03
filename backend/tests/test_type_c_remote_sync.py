@@ -156,12 +156,12 @@ async def test_sync_from_minio_s3_success(db_session, setup_carrier_and_order):
     s3_xml_list = (
         b'<?xml version="1.0" encoding="UTF-8"?>'
         b'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
-        b'  <Name>type-c-carriers</Name>'
-        b'  <Contents>'
-        b'    <Key>batches/carrier_1_s3.csv</Key>'
-        b'    <Size>123</Size>'
-        b'  </Contents>'
-        b'</ListBucketResult>'
+        b"  <Name>type-c-carriers</Name>"
+        b"  <Contents>"
+        b"    <Key>batches/carrier_1_s3.csv</Key>"
+        b"    <Size>123</Size>"
+        b"  </Contents>"
+        b"</ListBucketResult>"
     )
 
     csv_content = (
@@ -195,6 +195,7 @@ async def test_sync_from_minio_s3_success(db_session, setup_carrier_and_order):
 async def test_api_trigger_type_c_sync(client, db_session, setup_carrier_and_order, monkeypatch):
     async def mock_sync_all(self, db):
         from app.services.type_c_connector import FileProcessingResult
+
         return [
             FileProcessingResult(
                 filename="carrier_1_test.csv",

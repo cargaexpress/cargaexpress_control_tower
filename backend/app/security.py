@@ -29,7 +29,11 @@ async def require_admin(
 
 
 def _configured_api_keys() -> tuple[str, ...]:
-    return tuple(key for key in (settings.api_key, *settings.brand_api_keys) if key)
+    return tuple(
+        key
+        for key in (settings.api_key, *settings.brand_api_keys, *settings.carrier_api_keys)
+        if key
+    )
 
 
 async def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
@@ -60,6 +64,20 @@ async def get_current_brand(
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="API key is not associated with a brand.",
+    )
+
+
+async def get_current_carrier(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    _: None = Depends(require_api_key),
+) -> int:
+    """Resolve the authenticated carrier from its API key."""
+    for api_key, carrier_id in settings.carrier_api_keys.items():
+        if x_api_key is not None and hmac.compare_digest(x_api_key.encode(), api_key.encode()):
+            return carrier_id
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="API key is not associated with a carrier.",
     )
 
 

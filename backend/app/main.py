@@ -11,6 +11,7 @@ from app.routers import (
     admin_carrier_state_mapping,
     admin_state_mapping,
     alerts,
+    analytics,
     financial,
     health,
     orders,
@@ -130,6 +131,7 @@ def create_app() -> FastAPI:
     application.include_router(sla.router)
     application.include_router(alerts.router)
     application.include_router(financial.router)
+    application.include_router(analytics.router)
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, request_validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)

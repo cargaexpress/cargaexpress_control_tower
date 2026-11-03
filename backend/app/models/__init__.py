@@ -1,4 +1,18 @@
 from app.models.alert import ShipmentAlert
+from app.models.analytics import (
+    DimBrand,
+    DimCarrier,
+    DimDate,
+    DimDistributionCenter,
+    DimGeography,
+    DimShipmentStatus,
+    EtlBatchRun,
+    EtlRejectedRecord,
+    FactCarrierSettlement,
+    FactFinancialPenalty,
+    FactShipmentEvent,
+    FactShipmentSla,
+)
 from app.models.brand import Brand
 from app.models.carrier import Carrier
 from app.models.dispatch import Dispatch
@@ -26,8 +40,20 @@ __all__ = [
     "Brand",
     "CalendarHoliday",
     "Carrier",
+    "DimBrand",
+    "DimCarrier",
+    "DimDate",
+    "DimDistributionCenter",
+    "DimGeography",
+    "DimShipmentStatus",
     "Dispatch",
     "DistributionCenter",
+    "EtlBatchRun",
+    "EtlRejectedRecord",
+    "FactCarrierSettlement",
+    "FactFinancialPenalty",
+    "FactShipmentEvent",
+    "FactShipmentSla",
     "FinancialLedgerEntry",
     "FinancialSettlement",
     "FreightPenalty",

@@ -204,9 +204,7 @@ class TypeCConnectorService:
         sleep_fn: Callable[[float], Any] | None = None,
     ) -> None:
         self._external_client = client
-        self.max_retries = (
-            max_retries if max_retries is not None else settings.type_c_max_retries
-        )
+        self.max_retries = max_retries if max_retries is not None else settings.type_c_max_retries
         self.base_delay = (
             base_delay_seconds
             if base_delay_seconds is not None
@@ -372,7 +370,7 @@ class TypeCConnectorService:
                     cd = resp.headers.get("content-disposition", "")
                     filename = ""
                     if "filename=" in cd:
-                        filename = cd.split("filename=")[-1].strip('"\'; ')
+                        filename = cd.split("filename=")[-1].strip("\"'; ")
                     if not filename:
                         fmt = (
                             "xlsx"

@@ -36,7 +36,9 @@ async def setup_carrier(db_session):
 
 
 @pytest.mark.asyncio
-async def test_webhook_auth_success_with_carrier_token(sec_client, db_session, setup_carrier, monkeypatch):
+async def test_webhook_auth_success_with_carrier_token(
+    sec_client, db_session, setup_carrier, monkeypatch
+):
     monkeypatch.setattr(settings, "webhook_secret", "secret_" + "a" * 32)
     monkeypatch.setattr(settings, "carrier_webhook_tokens", {"alpha": "token_alpha_12345"})
 
@@ -54,6 +56,7 @@ async def test_webhook_auth_success_with_carrier_token(sec_client, db_session, s
         )
 
     from app.routers import webhooks
+
     monkeypatch.setattr(webhooks.RabbitMQService, "publish_webhook_event", mock_publish)
 
     payload = {
@@ -73,7 +76,9 @@ async def test_webhook_auth_success_with_carrier_token(sec_client, db_session, s
 
 
 @pytest.mark.asyncio
-async def test_webhook_auth_success_with_hmac_signature(sec_client, db_session, setup_carrier, monkeypatch):
+async def test_webhook_auth_success_with_hmac_signature(
+    sec_client, db_session, setup_carrier, monkeypatch
+):
     secret = "my_super_secret_webhook_key_32chars"
     monkeypatch.setattr(settings, "webhook_secret", secret)
 
@@ -91,6 +96,7 @@ async def test_webhook_auth_success_with_hmac_signature(sec_client, db_session, 
         )
 
     from app.routers import webhooks
+
     monkeypatch.setattr(webhooks.RabbitMQService, "publish_webhook_event", mock_publish)
 
     body_bytes = b'{"event_id": "evt-1", "tracking_number": "TRK100", "status": "IN_TRANSIT"}'
@@ -109,7 +115,9 @@ async def test_webhook_auth_success_with_hmac_signature(sec_client, db_session, 
 
 
 @pytest.mark.asyncio
-async def test_webhook_auth_rejected_with_invalid_token(sec_client, db_session, setup_carrier, monkeypatch):
+async def test_webhook_auth_rejected_with_invalid_token(
+    sec_client, db_session, setup_carrier, monkeypatch
+):
     monkeypatch.setattr(settings, "webhook_secret", "secret_" + "a" * 32)
     monkeypatch.setattr(settings, "carrier_webhook_tokens", {"alpha": "token_alpha_12345"})
 
@@ -125,7 +133,9 @@ async def test_webhook_auth_rejected_with_invalid_token(sec_client, db_session, 
 
 
 @pytest.mark.asyncio
-async def test_webhook_auth_rejected_with_invalid_hmac(sec_client, db_session, setup_carrier, monkeypatch):
+async def test_webhook_auth_rejected_with_invalid_hmac(
+    sec_client, db_session, setup_carrier, monkeypatch
+):
     secret = "my_super_secret_webhook_key_32chars"
     monkeypatch.setattr(settings, "webhook_secret", secret)
 
@@ -143,7 +153,9 @@ async def test_webhook_auth_rejected_with_invalid_hmac(sec_client, db_session, s
 
 
 @pytest.mark.asyncio
-async def test_webhook_auth_rejected_in_production_without_secrets(sec_client, db_session, setup_carrier, monkeypatch):
+async def test_webhook_auth_rejected_in_production_without_secrets(
+    sec_client, db_session, setup_carrier, monkeypatch
+):
     monkeypatch.setattr(settings, "app_env", "production")
     monkeypatch.setattr(settings, "webhook_secret", "")
     monkeypatch.setattr(settings, "carrier_webhook_tokens", {})

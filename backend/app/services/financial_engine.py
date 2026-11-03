@@ -96,6 +96,10 @@ class FinancialEngineService:
             dispatched_at = label.dispatch.dispatched_at
 
         delivered_at = now if label.status.upper() == "DELIVERED" else None
+        if dispatched_at and dispatched_at.tzinfo is None:
+            dispatched_at = dispatched_at.replace(tzinfo=UTC)
+        if delivered_at and delivered_at.tzinfo is None:
+            delivered_at = delivered_at.replace(tzinfo=UTC)
 
         # Check existing SLA tracking for deadline
         stmt_sla = select(ShipmentSlaTracking).where(ShipmentSlaTracking.label_id == label.label_id)
@@ -110,6 +114,8 @@ class FinancialEngineService:
                 sla_business_days=3,
                 destination_country=order.destination_country,
             )
+        if sla_deadline and sla_deadline.tzinfo is None:
+            sla_deadline = sla_deadline.replace(tzinfo=UTC)
 
         # Check for address-related exceptions or anomalies (Client responsibility)
         stmt_anomaly = select(TrackingAnomaly).where(
@@ -408,6 +414,10 @@ class FinancialEngineService:
         effective_completion = attribution.delivered_at or (
             now if label.status.upper() == "DELIVERED" else now
         )
+        if effective_completion and effective_completion.tzinfo is None:
+            effective_completion = effective_completion.replace(tzinfo=UTC)
+        if sla_deadline and sla_deadline.tzinfo is None:
+            sla_deadline = sla_deadline.replace(tzinfo=UTC)
 
         delay_days = 0
         if sla_deadline:
