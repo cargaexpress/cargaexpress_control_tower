@@ -12,6 +12,7 @@ from app.routers import (
     admin_state_mapping,
     alerts,
     analytics,
+    carriers,
     financial,
     health,
     orders,
@@ -128,6 +129,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_state_mapping.router)
     application.include_router(admin_carrier_state_mapping.router)
     application.include_router(orders.router)
+    application.include_router(carriers.router)
     application.include_router(sla.router)
     application.include_router(alerts.router)
     application.include_router(financial.router)

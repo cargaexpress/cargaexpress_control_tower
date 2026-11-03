@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.models.brand import Brand
+from app.models.carrier import Carrier
 from app.models.financial import FreightPenalty
 from app.models.order import Order
 from app.models.shipping_label import ShippingLabel
@@ -199,8 +201,11 @@ async def get_brand_sla_metrics(
         1 for p in penalties if p.calculation_status == "PENDING_APPROVAL"
     )
 
+    brand = await db.get(Brand, brand_id)
+
     return BrandSlaMetricsResponse(
         brand_id=brand_id,
+        brand_name=brand.name if brand else None,
         total_shipments=total_shipments,
         delivered_shipments=delivered_shipments,
         compliant_shipments=compliant_shipments,
@@ -442,8 +447,11 @@ async def get_carrier_sla_metrics(
         1 for p in penalties if p.calculation_status == "PENDING_APPROVAL"
     )
 
+    carrier = await db.get(Carrier, carrier_id)
+
     return CarrierSlaMetricsResponse(
         carrier_id=carrier_id,
+        carrier_name=carrier.name if carrier else None,
         total_shipments=total_shipments,
         delivered_shipments=delivered_shipments,
         compliant_shipments=compliant_shipments,

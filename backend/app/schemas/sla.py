@@ -58,6 +58,7 @@ class BrandSlaMetricsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     brand_id: int
+    brand_name: str | None = None
     total_shipments: int
     delivered_shipments: int
     compliant_shipments: int
@@ -74,6 +75,7 @@ class CarrierSlaMetricsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     carrier_id: int
+    carrier_name: str | None = None
     total_shipments: int
     delivered_shipments: int
     compliant_shipments: int
