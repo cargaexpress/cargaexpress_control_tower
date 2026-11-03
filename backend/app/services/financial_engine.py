@@ -2,7 +2,7 @@ import calendar
 import json
 import logging
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from app.models.financial import (
     FinancialSettlement,
     FreightPenalty,
     ShipmentAttribution,
+    UniversalPenaltyConfig,
 )
 from app.models.shipping_label import ShippingLabel
 from app.models.sla_tracking import ShipmentSlaTracking
@@ -20,32 +21,28 @@ from app.services.sla_engine import SlaEngineService
 
 logger = logging.getLogger("cargaexpress.financial_engine")
 
-# Documented contractual delay penalty tiers (from seed data / business rules BR-06)
-# Marked TBD for future customized contractual Excel overrides
-DEFAULT_PENALTY_TIERS = [
-    (1, 2, Decimal("5.00")),  # 1-2 days late -> 5%
-    (3, 5, Decimal("10.00")),  # 3-5 days late -> 10%
-    (6, 9999, Decimal("20.00")),  # 6+ days late -> 20%
-]
-
-# Max normal duration for DC picking and dispatch (hours before DC is held responsible)
-DC_MAX_DISPATCH_HOURS = 48.0
+# The five universal progressive penalty scale levels (Phase 4)
+UNIVERSAL_DELAY_LEVELS = ("NO_DELAY", "LOW", "MODERATE", "HIGH", "CRITICAL")
 
 
 class FinancialEngineService:
-    """Core domain service for responsibility attribution, penalty calculation, and biweekly settlements.
+    """Core domain service for responsibility attribution, progressive penalty calculation,
+    and biweekly financial settlements (Phase 4).
 
-    Implements:
-    - BR-05: Responsibility Attribution (DC: creation->dispatch, Carrier: dispatch->delivery, Client: wrong address)
-    - BR-06: Freight Penalty Calculation (% of freight, transferred to carrier ONLY if responsible)
-    - BR-08: Biweekly Settlements and Financial Netting
+    Adheres strictly to:
+    - Universal Progressive Penalty Scale (NO_DELAY, LOW, MODERATE, HIGH, CRITICAL)
+    - Python Decimal arithmetic for all monetary calculations
+    - Configurable delay thresholds and percentage caps without hardcoded assumptions
+    - Responsibility Attribution (Carrier, Client, DC, or Undetermined)
+    - Biweekly settlements in separate balances (client liabilities vs carrier recoverables)
+      marked PENDING_VALIDATION without unauthorized netting.
     """
 
     def __init__(self, sla_engine: SlaEngineService | None = None) -> None:
         self.sla_engine = sla_engine or SlaEngineService()
 
     # =========================================================================
-    # 1. Responsibility Attribution Engine (BR-05)
+    # 1. Responsibility Attribution Engine (FR-04, BR-05)
     # =========================================================================
 
     async def attribute_shipment_responsibility(
@@ -53,9 +50,21 @@ class FinancialEngineService:
         db: AsyncSession,
         label: ShippingLabel,
         current_time_utc: datetime | None = None,
+        dc_dispatch_sla_hours: float | None = None,
     ) -> ShipmentAttribution:
-        """Determine and persist responsibility attribution for delays or incidents on a shipment."""
+        """Determine and persist responsibility attribution for shipment delays or incidents.
+
+        Rules:
+        - Incorrect delivery address exception -> CLIENT.
+        - SLA breached after dispatch under carrier custody -> CARRIER.
+        - Delivered on time -> CARRIER (NORMAL_DELIVERY).
+        - Order created but not dispatched:
+            If dc_dispatch_sla_hours is explicitly configured and exceeded -> DISTRIBUTION_CENTER.
+            Otherwise -> UNDETERMINED (pending approved warehouse dispatch policy).
+        - Unclear causality / insufficient evidence -> UNDETERMINED.
+        """
         now = current_time_utc or datetime.now(UTC)
+
         # Ensure order is loaded in async context
         order = None
         if "order" in label.__dict__ and label.order:
@@ -74,7 +83,8 @@ class FinancialEngineService:
         order_created_at = order.created_at
         if order_created_at and order_created_at.tzinfo is None:
             order_created_at = order_created_at.replace(tzinfo=UTC)
-        # Retrieve dispatched_at from dispatch table directly using explicit query to avoid lazy load issues
+
+        # Retrieve dispatched_at from dispatch table
         dispatched_at = None
         if label.dispatch_id:
             from app.models.dispatch import Dispatch
@@ -84,6 +94,7 @@ class FinancialEngineService:
             dispatched_at = res_d.scalar_one_or_none()
         elif "dispatch" in label.__dict__ and label.dispatch:
             dispatched_at = label.dispatch.dispatched_at
+
         delivered_at = now if label.status.upper() == "DELIVERED" else None
 
         # Check existing SLA tracking for deadline
@@ -138,23 +149,31 @@ class FinancialEngineService:
             evidence["cause"] = "INCORRECT_ADDRESS"
 
         elif not dispatched_at:
-            # Not dispatched yet
-            hours_since_creation = (now - order_created_at).total_seconds() / 3600.0
+            # Order created but not yet dispatched
+            hours_since_creation = (
+                (now - order_created_at).total_seconds() / 3600.0 if order_created_at else 0.0
+            )
             evidence["hours_in_dc"] = round(hours_since_creation, 2)
-            if hours_since_creation > DC_MAX_DISPATCH_HOURS:
+            if dc_dispatch_sla_hours is not None and hours_since_creation > dc_dispatch_sla_hours:
                 responsible_party = "DISTRIBUTION_CENTER"
                 incident_type = "DISPATCH_DELAY"
-                reason = f"Order remained in distribution center for {hours_since_creation:.1f} hours without dispatch."
+                reason = (
+                    f"Order remained in distribution center for {hours_since_creation:.1f} hours, "
+                    f"exceeding approved dispatch threshold ({dc_dispatch_sla_hours:.1f} hours)."
+                )
             else:
                 responsible_party = "UNDETERMINED"
-                incident_type = "NORMAL_PROCESSING"
-                reason = "Order is currently within normal distribution center fulfillment window."
+                incident_type = "PENDING_DISPATCH"
+                reason = (
+                    "Order created but not dispatched. Distribution center dispatch SLA threshold "
+                    "is pending approved business configuration."
+                )
 
         elif sla_deadline and (
             (delivered_at and delivered_at > sla_deadline)
             or (not delivered_at and now > sla_deadline)
         ):
-            # SLA breached after dispatch -> Carrier responsibility
+            # SLA breached after dispatch -> Carrier custody
             responsible_party = "CARRIER"
             incident_type = "SLA_BREACH"
             delay_hours = ((delivered_at or now) - sla_deadline).total_seconds() / 3600.0
@@ -188,7 +207,7 @@ class FinancialEngineService:
                 incident_type=incident_type,
                 reason=reason,
                 evidence_details=json.dumps(evidence),
-                order_created_at=order_created_at,
+                order_created_at=order_created_at or now,
                 dispatched_at=dispatched_at,
                 delivered_at=delivered_at,
                 sla_deadline=sla_deadline,
@@ -207,40 +226,164 @@ class FinancialEngineService:
         return attr
 
     # =========================================================================
-    # 2. Freight Penalty Calculation Engine (BR-06)
+    # 2. Universal Progressive Penalty Scale Engine (FR-04, BR-06)
     # =========================================================================
 
-    def resolve_penalty_percentage(self, delay_days: int) -> tuple[Decimal, str]:
-        """Resolve penalty percentage based on delay business days.
+    @staticmethod
+    def calculate_penalty_amounts(
+        freight_amount: Decimal,
+        penalty_percentage: Decimal,
+        maximum_cap_percentage: Decimal,
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        """Perform exact Decimal financial penalty calculation with maximum percentage cap.
 
-        Returns (percentage, rule_applied).
+        Formula:
+        base_penalty = freight_amount * (penalty_percentage / 100)
+        maximum_penalty = freight_amount * (maximum_cap_percentage / 100)
+        final_penalty = min(base_penalty, maximum_penalty)
+
+        Rounds results consistently to 2 decimal places using ROUND_HALF_UP.
+        No floating-point operations allowed.
         """
-        if delay_days <= 0:
-            return Decimal("0.00"), "NO_DELAY"
+        two_places = Decimal("0.01")
+        pct_factor = penalty_percentage / Decimal("100")
+        cap_factor = maximum_cap_percentage / Decimal("100")
 
-        for min_days, max_days, pct in DEFAULT_PENALTY_TIERS:
-            if min_days <= delay_days <= max_days:
-                return pct, f"CONTRACT_TIER_{min_days}_{max_days}_DAYS_{pct}%"
+        base_penalty = (freight_amount * pct_factor).quantize(two_places, rounding=ROUND_HALF_UP)
+        max_penalty = (freight_amount * cap_factor).quantize(two_places, rounding=ROUND_HALF_UP)
+        final_penalty = min(base_penalty, max_penalty)
+        return base_penalty, max_penalty, final_penalty
 
-        return Decimal("20.00"), "CONTRACT_TIER_MAX_20%"
+    async def count_delay_business_days(
+        self,
+        db: AsyncSession,
+        deadline_utc: datetime,
+        actual_utc: datetime,
+        destination_country: str,
+    ) -> int:
+        """Count business days elapsed past deadline_utc in destination country.
+
+        Integrates with SlaEngineService: excludes Sundays and Nager.Date holidays.
+        """
+        if actual_utc <= deadline_utc:
+            return 0
+
+        tz = self.sla_engine.get_country_timezone(destination_country)
+        deadline_local = deadline_utc.astimezone(tz)
+        actual_local = actual_utc.astimezone(tz)
+
+        if actual_local.date() <= deadline_local.date():
+            return 0
+
+        delay_days = 0
+        curr = deadline_local.date() + timedelta(days=1)
+        while curr <= actual_local.date():
+            if await self.sla_engine.is_business_day(db, curr, destination_country):
+                delay_days += 1
+            curr += timedelta(days=1)
+        return delay_days
+
+    async def get_or_initialize_penalty_configs(
+        self,
+        db: AsyncSession,
+        version: str = "v1.0",
+    ) -> list[UniversalPenaltyConfig]:
+        """Retrieve active progressive penalty configurations.
+
+        If unconfigured, seeds the 5 required levels in PENDING_APPROVAL status
+        without assuming or inventing business percentages.
+        """
+        stmt = (
+            select(UniversalPenaltyConfig)
+            .where(
+                UniversalPenaltyConfig.version == version,
+                UniversalPenaltyConfig.is_active.is_(True),
+            )
+            .order_by(UniversalPenaltyConfig.config_id)
+        )
+        res = await db.execute(stmt)
+        configs = list(res.scalars().all())
+        if configs:
+            return configs
+
+        # Seed unapproved scaffolding for the 5 universal levels
+        today = date.today()
+        initial_scaffolding = [
+            ("NO_DELAY", 0, 0, Decimal("0.00"), Decimal("0.00"), "APPROVED"),
+            ("LOW", None, None, None, None, "PENDING_APPROVAL"),
+            ("MODERATE", None, None, None, None, "PENDING_APPROVAL"),
+            ("HIGH", None, None, None, None, "PENDING_APPROVAL"),
+            ("CRITICAL", None, None, None, None, "PENDING_APPROVAL"),
+        ]
+        created = []
+        for level, min_d, max_d, pct, cap, status in initial_scaffolding:
+            cfg = UniversalPenaltyConfig(
+                version=version,
+                delay_level=level,
+                min_delay_days=min_d,
+                max_delay_days=max_d,
+                penalty_percentage=pct,
+                maximum_cap_percentage=cap,
+                effective_date=today,
+                is_active=True,
+                approval_status=status,
+            )
+            db.add(cfg)
+            created.append(cfg)
+        await db.flush()
+        return created
+
+    async def resolve_penalty_tier(
+        self,
+        db: AsyncSession,
+        delay_business_days: int,
+        version: str = "v1.0",
+    ) -> tuple[str, UniversalPenaltyConfig | None]:
+        """Resolve the universal penalty level and active configuration entry.
+
+        Returns (delay_level, matching_config_or_none).
+        """
+        if delay_business_days <= 0:
+            configs = await self.get_or_initialize_penalty_configs(db, version=version)
+            no_delay_cfg = next((c for c in configs if c.delay_level == "NO_DELAY"), None)
+            return "NO_DELAY", no_delay_cfg
+
+        configs = await self.get_or_initialize_penalty_configs(db, version=version)
+        for cfg in configs:
+            if cfg.delay_level == "NO_DELAY":
+                continue
+            if (
+                cfg.min_delay_days is not None
+                and cfg.min_delay_days <= delay_business_days
+                and (cfg.max_delay_days is None or delay_business_days <= cfg.max_delay_days)
+            ):
+                return cfg.delay_level, cfg
+
+        # Delay exists but thresholds are not configured or matching
+        return "PENDING_CLASSIFICATION", None
 
     async def calculate_freight_penalty(
         self,
         db: AsyncSession,
         label: ShippingLabel,
         current_time_utc: datetime | None = None,
+        config_version: str = "v1.0",
+        dc_dispatch_sla_hours: float | None = None,
     ) -> FreightPenalty | None:
-        """Calculate freight penalty for a delayed shipment.
+        """Calculate progressive freight penalty for a shipment.
 
-        Rules:
-        - Must be delayed past SLA deadline.
-        - Calculated as % of freight cost.
-        - Transferred to carrier ONLY if responsible_party == 'CARRIER'.
-        - Prevents duplicate penalties for the same shipment.
+        Adheres strictly to:
+        - Universal 5-level scale.
+        - Decimal calculation with maximum percentage cap.
+        - If configuration is PENDING_APPROVAL: record penalty with calculation_status="PENDING_APPROVAL",
+          no definitive charge generated (penalty_amount=None), not payable.
+        - If responsibility is UNDETERMINED: no definitive charge generated.
+        - Recoverable from carrier (is_carrier_payable=True) ONLY when carrier responsibility is established
+          under approved rules and calculation is approved.
         """
         now = current_time_utc or datetime.now(UTC)
 
-        # Ensure order is loaded in async context
+        # Load order in async context
         order = None
         if "order" in label.__dict__ and label.order:
             order = label.order
@@ -255,40 +398,99 @@ class FinancialEngineService:
         if not order:
             return None
 
-        # 1. Attribute responsibility first
-        attribution = await self.attribute_shipment_responsibility(db, label, current_time_utc=now)
-
-        # 2. Check if delay or DC breach occurred
-        sla_deadline = attribution.sla_deadline
-        delivered_at = attribution.delivered_at or (
-            now if label.status.upper() == "DELIVERED" else None
+        # 1. Attribute responsibility
+        attribution = await self.attribute_shipment_responsibility(
+            db, label, current_time_utc=now, dc_dispatch_sla_hours=dc_dispatch_sla_hours
         )
-        effective_completion = delivered_at or now
 
-        # If not dispatched yet but DC delayed
-        if attribution.responsible_party == "DISTRIBUTION_CENTER":
-            # Calculate days delayed in DC past normal 48h
-            hours_in_dc = (now - attribution.order_created_at).total_seconds() / 3600.0
-            delay_days = max(1, int((hours_in_dc - DC_MAX_DISPATCH_HOURS) // 24) + 1)
-        elif not sla_deadline or effective_completion <= sla_deadline:
-            # No SLA delay breached
-            return None
-        else:
-            # Calculate delay in business days
-            delay_days = max(1, (effective_completion.date() - sla_deadline.date()).days)
-        pct, contract_rule = self.resolve_penalty_percentage(delay_days)
+        # 2. Determine business-day delay
+        sla_deadline = attribution.sla_deadline
+        effective_completion = attribution.delivered_at or (
+            now if label.status.upper() == "DELIVERED" else now
+        )
+
+        delay_days = 0
+        if sla_deadline:
+            delay_days = await self.count_delay_business_days(
+                db=db,
+                deadline_utc=sla_deadline,
+                actual_utc=effective_completion,
+                destination_country=order.destination_country,
+            )
+
+        # 3. Resolve universal penalty level and configuration
+        delay_level, config = await self.resolve_penalty_tier(
+            db, delay_days, version=config_version
+        )
 
         freight_cost = Decimal(str(order.freight_value))
-        penalty_amount = (freight_cost * (pct / Decimal("100.00"))).quantize(Decimal("0.01"))
+        incident_ref = f"DELAY_DAYS_{delay_days}_{delay_level}"
 
-        # Rule BR-06: Transfer to carrier ONLY if carrier is responsible
-        is_carrier_responsible = attribution.responsible_party == "CARRIER"
-        is_carrier_payable = is_carrier_responsible
-        is_client_owed = attribution.responsible_party in {"CARRIER", "DISTRIBUTION_CENTER"}
+        # 4. Determine financial charge based on approval status and responsibility
+        calculation_status: str
+        penalty_percentage: Decimal | None = None
+        base_penalty: Decimal | None = None
+        max_penalty: Decimal | None = None
+        final_penalty: Decimal | None = None
+        is_carrier_payable: bool = False
+        is_client_owed: bool = False
+        contract_rule: str
 
-        incident_ref = f"DELAY_DAYS_{delay_days}"
+        if attribution.responsible_party == "UNDETERMINED":
+            # Responsibility undetermined -> no definitive financial charge
+            calculation_status = "UNDETERMINED_RESPONSIBILITY"
+            penalty_percentage = None
+            base_penalty = None
+            max_penalty = None
+            final_penalty = None
+            is_carrier_payable = False
+            is_client_owed = False
+            contract_rule = f"UNIVERSAL_SCALE_{delay_level}_UNDETERMINED_RESPONSIBILITY"
 
-        # Prevent duplicate penalty
+        elif delay_level == "NO_DELAY":
+            calculation_status = "NO_DELAY"
+            penalty_percentage = Decimal("0.00")
+            base_penalty = Decimal("0.00")
+            max_penalty = Decimal("0.00")
+            final_penalty = Decimal("0.00")
+            is_carrier_payable = False
+            is_client_owed = False
+            contract_rule = "UNIVERSAL_SCALE_NO_DELAY"
+
+        elif (
+            config is not None
+            and config.approval_status == "APPROVED"
+            and config.penalty_percentage is not None
+            and config.maximum_cap_percentage is not None
+        ):
+            # Approved configuration -> calculate definitive monetary amounts
+            base_penalty, max_penalty, final_penalty = self.calculate_penalty_amounts(
+                freight_amount=freight_cost,
+                penalty_percentage=config.penalty_percentage,
+                maximum_cap_percentage=config.maximum_cap_percentage,
+            )
+            calculation_status = "APPROVED"
+            penalty_percentage = config.penalty_percentage
+            # Carrier recoverable only when Carrier is responsible
+            is_carrier_payable = attribution.responsible_party == "CARRIER"
+            is_client_owed = attribution.responsible_party in {"CARRIER", "DISTRIBUTION_CENTER"}
+            contract_rule = (
+                f"UNIVERSAL_SCALE_{delay_level}_{config.penalty_percentage}%_"
+                f"CAP_{config.maximum_cap_percentage}%_APPROVED"
+            )
+
+        else:
+            # Unapproved configuration -> do not generate definitive charges
+            calculation_status = "PENDING_APPROVAL"
+            penalty_percentage = config.penalty_percentage if config else None
+            base_penalty = None
+            max_penalty = None
+            final_penalty = None
+            is_carrier_payable = False
+            is_client_owed = False
+            contract_rule = f"UNIVERSAL_SCALE_{delay_level}_PENDING_APPROVAL"
+
+        # Check existing penalty record for idempotency
         stmt = select(FreightPenalty).where(
             FreightPenalty.label_id == label.label_id,
             FreightPenalty.incident_reference == incident_ref,
@@ -309,11 +511,16 @@ class FinancialEngineService:
             responsible_party=attribution.responsible_party,
             freight_amount=freight_cost,
             delay_business_days=delay_days,
-            penalty_percentage=pct,
-            penalty_amount=penalty_amount,
+            delay_level=delay_level,
+            calculation_status=calculation_status,
+            penalty_percentage=penalty_percentage,
+            base_penalty_amount=base_penalty,
+            maximum_penalty_amount=max_penalty,
+            penalty_amount=final_penalty,
             is_carrier_payable=is_carrier_payable,
             is_client_owed=is_client_owed,
             contract_rule_applied=contract_rule,
+            calculated_at=now,
         )
         db.add(penalty)
         await db.flush()
@@ -346,12 +553,14 @@ class FinancialEngineService:
         half: int,
         notes: str | None = None,
     ) -> FinancialSettlement:
-        """Generate biweekly settlement and calculate netting for a carrier over a calendar half-month.
+        """Generate biweekly settlement for a carrier over a calendar half-month.
 
-        Netting formula (BR-08):
-        - total_owed_to_clients: Sum of penalties where is_client_owed=True.
-        - total_recoverable_from_carrier: Sum of penalties where is_carrier_payable=True.
-        - net_settlement_amount: total_owed_to_clients - total_recoverable_from_carrier.
+        Preserves:
+        - Separate balances for client liabilities (total_owed_to_clients) and
+          carrier recoverables (total_recoverable_from_carrier).
+        - Status is PENDING_VALIDATION until a netting formula is approved.
+        - net_settlement_amount is set to None (no unauthorized netting).
+        - Detailed double-entry movements recorded in the financial ledger.
         """
         period_code, start_date, end_date = self.compute_half_month_period(year, month, half)
 
@@ -380,13 +589,23 @@ class FinancialEngineService:
         penalties = res_p.scalars().all()
 
         total_freight = sum((p.freight_amount for p in penalties), Decimal("0.00"))
+        # Sum approved definitive amounts only
         total_owed_clients = sum(
-            (p.penalty_amount for p in penalties if p.is_client_owed), Decimal("0.00")
+            (
+                p.penalty_amount
+                for p in penalties
+                if p.is_client_owed and p.penalty_amount is not None
+            ),
+            Decimal("0.00"),
         )
         total_recoverable_carrier = sum(
-            (p.penalty_amount for p in penalties if p.is_carrier_payable), Decimal("0.00")
+            (
+                p.penalty_amount
+                for p in penalties
+                if p.is_carrier_payable and p.penalty_amount is not None
+            ),
+            Decimal("0.00"),
         )
-        net_amount = total_owed_clients - total_recoverable_carrier
 
         settlement = FinancialSettlement(
             carrier_id=carrier_id,
@@ -397,20 +616,22 @@ class FinancialEngineService:
             total_freight_amount=total_freight,
             total_owed_to_clients=total_owed_clients,
             total_recoverable_from_carrier=total_recoverable_carrier,
-            net_settlement_amount=net_amount,
-            status="CLOSED",
-            notes=notes or f"Biweekly settlement for {period_code}",
-            closed_at=datetime.now(UTC),
+            net_settlement_amount=None,  # Pending financial approval
+            status="PENDING_VALIDATION",
+            notes=(
+                notes
+                or f"Biweekly settlement for {period_code}. Netting formula pending validation."
+            ),
+            closed_at=None,
         )
         db.add(settlement)
         await db.flush()
 
-        # Link penalties and create audit ledger movements
+        # Link penalties and create audit ledger movements for approved amounts
         for p in penalties:
             p.settlement_id = settlement.settlement_id
 
-            # Ledger entry for client indemnity
-            if p.is_client_owed:
+            if p.is_client_owed and p.penalty_amount is not None:
                 ledger_client = FinancialLedgerEntry(
                     settlement_id=settlement.settlement_id,
                     carrier_id=carrier_id,
@@ -419,12 +640,14 @@ class FinancialEngineService:
                     entry_type="CLIENT_INDEMNITY_PAYABLE",
                     amount=p.penalty_amount,
                     currency="COP",
-                    description=f"Indemnity payable to client for delayed tracking {p.tracking_number} ({p.delay_business_days} days late).",
+                    description=(
+                        f"Indemnity payable to client for delayed tracking {p.tracking_number} "
+                        f"({p.delay_business_days} business days late, level {p.delay_level})."
+                    ),
                 )
                 db.add(ledger_client)
 
-            # Ledger entry for carrier penalty
-            if p.is_carrier_payable:
+            if p.is_carrier_payable and p.penalty_amount is not None:
                 ledger_carrier = FinancialLedgerEntry(
                     settlement_id=settlement.settlement_id,
                     carrier_id=carrier_id,
@@ -433,22 +656,12 @@ class FinancialEngineService:
                     entry_type="CARRIER_PENALTY_RECEIVABLE",
                     amount=p.penalty_amount,
                     currency="COP",
-                    description=f"Penalty recoverable from carrier {carrier_id} for shipment {p.tracking_number}.",
+                    description=(
+                        f"Penalty recoverable from carrier {carrier_id} for shipment {p.tracking_number} "
+                        f"({p.delay_business_days} business days late, level {p.delay_level})."
+                    ),
                 )
                 db.add(ledger_carrier)
 
-        # Master Net Settlement movement
-        master_ledger = FinancialLedgerEntry(
-            settlement_id=settlement.settlement_id,
-            carrier_id=carrier_id,
-            brand_id=None,
-            penalty_id=None,
-            entry_type="NET_SETTLEMENT",
-            amount=net_amount,
-            currency="COP",
-            description=f"Net settlement amount for period {period_code}: owed to clients {total_owed_clients} minus recoverable {total_recoverable_carrier}.",
-        )
-        db.add(master_ledger)
         await db.flush()
-
         return settlement

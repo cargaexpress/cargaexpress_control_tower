@@ -10,6 +10,7 @@ from app.models.financial import (
     FinancialLedgerEntry,
     FinancialSettlement,
     FreightPenalty,
+    UniversalPenaltyConfig,
 )
 from app.models.shipping_label import ShippingLabel
 from app.schemas.financial import (
@@ -18,6 +19,8 @@ from app.schemas.financial import (
     FinancialSettlementRead,
     FreightPenaltyRead,
     SettlementGenerateRequest,
+    UniversalPenaltyConfigCreate,
+    UniversalPenaltyConfigRead,
 )
 from app.security import get_current_brand, require_admin, require_api_key
 from app.services.financial_engine import FinancialEngineService
@@ -166,3 +169,61 @@ async def list_settlement_ledger_entries(
     res = await db.execute(stmt)
     entries = res.scalars().all()
     return [FinancialLedgerEntryRead.model_validate(e) for e in entries]
+
+
+# =============================================================================
+# 4. Universal Penalty Scale Configuration (Admin Only)
+# =============================================================================
+
+
+@router.get("/config/penalty-scales", response_model=list[UniversalPenaltyConfigRead])
+async def list_penalty_scale_configs(
+    version: str = Query(default="v1.0", description="Configuration version"),
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_api_key),
+) -> list[UniversalPenaltyConfigRead]:
+    """Retrieve universal progressive penalty scale configurations."""
+    service = FinancialEngineService()
+    configs = await service.get_or_initialize_penalty_configs(db, version=version)
+    return [UniversalPenaltyConfigRead.model_validate(c) for c in configs]
+
+
+@router.post("/config/penalty-scales", response_model=UniversalPenaltyConfigRead)
+async def create_or_update_penalty_scale_config(
+    payload: UniversalPenaltyConfigCreate,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+) -> UniversalPenaltyConfigRead:
+    """Create or update a universal penalty scale level configuration (Admin only)."""
+    stmt = select(UniversalPenaltyConfig).where(
+        UniversalPenaltyConfig.version == payload.version,
+        UniversalPenaltyConfig.delay_level == payload.delay_level,
+    )
+    res = await db.execute(stmt)
+    config = res.scalar_one_or_none()
+
+    if not config:
+        config = UniversalPenaltyConfig(
+            version=payload.version,
+            delay_level=payload.delay_level,
+            min_delay_days=payload.min_delay_days,
+            max_delay_days=payload.max_delay_days,
+            penalty_percentage=payload.penalty_percentage,
+            maximum_cap_percentage=payload.maximum_cap_percentage,
+            effective_date=payload.effective_date,
+            is_active=payload.is_active,
+            approval_status=payload.approval_status,
+        )
+        db.add(config)
+    else:
+        config.min_delay_days = payload.min_delay_days
+        config.max_delay_days = payload.max_delay_days
+        config.penalty_percentage = payload.penalty_percentage
+        config.maximum_cap_percentage = payload.maximum_cap_percentage
+        config.effective_date = payload.effective_date
+        config.is_active = payload.is_active
+        config.approval_status = payload.approval_status
+
+    await db.commit()
+    await db.refresh(config)
+    return UniversalPenaltyConfigRead.model_validate(config)

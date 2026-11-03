@@ -39,8 +39,12 @@ class FreightPenaltyRead(BaseModel):
     responsible_party: str
     freight_amount: Decimal
     delay_business_days: int
-    penalty_percentage: Decimal
-    penalty_amount: Decimal
+    delay_level: str
+    calculation_status: str
+    penalty_percentage: Decimal | None = None
+    base_penalty_amount: Decimal | None = None
+    maximum_penalty_amount: Decimal | None = None
+    penalty_amount: Decimal | None = None
     is_carrier_payable: bool
     is_client_owed: bool
     contract_rule_applied: str
@@ -59,11 +63,50 @@ class FinancialSettlementRead(BaseModel):
     total_freight_amount: Decimal
     total_owed_to_clients: Decimal
     total_recoverable_from_carrier: Decimal
-    net_settlement_amount: Decimal
+    net_settlement_amount: Decimal | None = None
     status: str
     notes: str | None = None
     created_at: datetime
     closed_at: datetime | None = None
+
+
+class UniversalPenaltyConfigRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    config_id: int
+    version: str
+    delay_level: str
+    min_delay_days: int | None = None
+    max_delay_days: int | None = None
+    penalty_percentage: Decimal | None = None
+    maximum_cap_percentage: Decimal | None = None
+    effective_date: date
+    is_active: bool
+    approval_status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class UniversalPenaltyConfigCreate(BaseModel):
+    version: str = "v1.0"
+    delay_level: str = Field(description="NO_DELAY, LOW, MODERATE, HIGH, CRITICAL")
+    min_delay_days: int | None = None
+    max_delay_days: int | None = None
+    penalty_percentage: Decimal | None = None
+    maximum_cap_percentage: Decimal | None = None
+    effective_date: date
+    is_active: bool = True
+    approval_status: str = "PENDING_APPROVAL"
+
+
+class UniversalPenaltyConfigUpdate(BaseModel):
+    min_delay_days: int | None = None
+    max_delay_days: int | None = None
+    penalty_percentage: Decimal | None = None
+    maximum_cap_percentage: Decimal | None = None
+    effective_date: date | None = None
+    is_active: bool | None = None
+    approval_status: str | None = None
 
 
 class SettlementGenerateRequest(BaseModel):

@@ -30,8 +30,8 @@ def upgrade() -> None:
         sa.Column("total_freight_amount", sa.Numeric(precision=14, scale=2), server_default="0.00", nullable=False),
         sa.Column("total_owed_to_clients", sa.Numeric(precision=14, scale=2), server_default="0.00", nullable=False),
         sa.Column("total_recoverable_from_carrier", sa.Numeric(precision=14, scale=2), server_default="0.00", nullable=False),
-        sa.Column("net_settlement_amount", sa.Numeric(precision=14, scale=2), server_default="0.00", nullable=False),
-        sa.Column("status", sa.String(), server_default="DRAFT", nullable=False),
+        sa.Column("net_settlement_amount", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column("status", sa.String(), server_default="PENDING_VALIDATION", nullable=False),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
@@ -84,8 +84,12 @@ def upgrade() -> None:
         sa.Column("responsible_party", sa.String(), nullable=False),
         sa.Column("freight_amount", sa.Numeric(precision=12, scale=2), nullable=False),
         sa.Column("delay_business_days", sa.Integer(), nullable=False),
-        sa.Column("penalty_percentage", sa.Numeric(precision=5, scale=2), nullable=False),
-        sa.Column("penalty_amount", sa.Numeric(precision=12, scale=2), nullable=False),
+        sa.Column("delay_level", sa.String(), server_default="NO_DELAY", nullable=False),
+        sa.Column("calculation_status", sa.String(), server_default="PENDING_APPROVAL", nullable=False),
+        sa.Column("penalty_percentage", sa.Numeric(precision=5, scale=2), nullable=True),
+        sa.Column("base_penalty_amount", sa.Numeric(precision=12, scale=2), nullable=True),
+        sa.Column("maximum_penalty_amount", sa.Numeric(precision=12, scale=2), nullable=True),
+        sa.Column("penalty_amount", sa.Numeric(precision=12, scale=2), nullable=True),
         sa.Column("is_carrier_payable", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("is_client_owed", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("contract_rule_applied", sa.String(), nullable=False),
@@ -126,8 +130,30 @@ def upgrade() -> None:
     op.create_index("ix_financial_ledger_entries_carrier_id", "financial_ledger_entries", ["carrier_id"], unique=False)
     op.create_index("ix_financial_ledger_entries_entry_type", "financial_ledger_entries", ["entry_type"], unique=False)
 
+    # 5. Universal Penalty Configurations (Universal Progressive Penalty Scale)
+    op.create_table(
+        "universal_penalty_configs",
+        sa.Column("config_id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column("version", sa.String(), server_default="v1.0", nullable=False),
+        sa.Column("delay_level", sa.String(), nullable=False),  # NO_DELAY, LOW, MODERATE, HIGH, CRITICAL
+        sa.Column("min_delay_days", sa.Integer(), nullable=True),
+        sa.Column("max_delay_days", sa.Integer(), nullable=True),
+        sa.Column("penalty_percentage", sa.Numeric(precision=5, scale=2), nullable=True),
+        sa.Column("maximum_cap_percentage", sa.Numeric(precision=5, scale=2), nullable=True),
+        sa.Column("effective_date", sa.Date(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column("approval_status", sa.String(), server_default="PENDING_APPROVAL", nullable=False),  # PENDING_APPROVAL, APPROVED, REJECTED
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.PrimaryKeyConstraint("config_id"),
+        sa.UniqueConstraint("version", "delay_level", name="uq_universal_penalty_configs_version_level"),
+    )
+    op.create_index("ix_universal_penalty_configs_version", "universal_penalty_configs", ["version"], unique=False)
+    op.create_index("ix_universal_penalty_configs_is_active", "universal_penalty_configs", ["is_active"], unique=False)
+
 
 def downgrade() -> None:
+    op.drop_table("universal_penalty_configs")
     op.drop_table("financial_ledger_entries")
     op.drop_table("freight_penalties")
     op.drop_table("shipment_attributions")

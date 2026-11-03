@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -14,6 +14,7 @@ from app.models.distribution_center import DistributionCenter
 from app.models.financial import (
     FinancialLedgerEntry,
     FreightPenalty,
+    UniversalPenaltyConfig,
 )
 from app.models.order import Order
 from app.models.shipment_type import ShipmentType
@@ -91,125 +92,237 @@ async def _seed_financial_shipment(
 
 
 # =============================================================================
-# 1. Responsibility Attribution Tests (BR-05)
+# 1. Universal Penalty Scale & Decimal Calculation Tests
 # =============================================================================
 
 
 @pytest.mark.asyncio
-async def test_attribution_distribution_center_when_delayed_before_dispatch(
+async def test_universal_penalty_scale_five_levels(db_session: AsyncSession):
+    """Verify that all 5 universal levels exist and unapproved levels start as PENDING_APPROVAL."""
+    service = FinancialEngineService()
+    configs = await service.get_or_initialize_penalty_configs(db_session, version="test_v1")
+
+    levels = {c.delay_level: c for c in configs}
+    assert set(levels.keys()) == {"NO_DELAY", "LOW", "MODERATE", "HIGH", "CRITICAL"}
+
+    assert levels["NO_DELAY"].approval_status == "APPROVED"
+    assert levels["NO_DELAY"].penalty_percentage == Decimal("0.00")
+
+    # The 4 delay levels are configurable and default to PENDING_APPROVAL without invented percentages
+    for lvl in ("LOW", "MODERATE", "HIGH", "CRITICAL"):
+        assert levels[lvl].approval_status == "PENDING_APPROVAL"
+        assert levels[lvl].penalty_percentage is None
+        assert levels[lvl].maximum_cap_percentage is None
+
+
+@pytest.mark.asyncio
+async def test_universal_application_across_different_carriers(db_session: AsyncSession):
+    """Verify the universal penalty scale is shared uniformly across different carriers."""
+    service = FinancialEngineService()
+    today = date.today()
+
+    # Configure approved universal scale in DB
+    cfg_low = UniversalPenaltyConfig(
+        version="v_shared",
+        delay_level="LOW",
+        min_delay_days=1,
+        max_delay_days=2,
+        penalty_percentage=Decimal("5.00"),
+        maximum_cap_percentage=Decimal("20.00"),
+        effective_date=today,
+        is_active=True,
+        approval_status="APPROVED",
+    )
+    db_session.add(cfg_low)
+    await db_session.flush()
+
+    # Create two different carriers
+    carrier_a = Carrier(name="Carrier Alpha", integration_type="webhook", status="active")
+    carrier_b = Carrier(name="Carrier Beta", integration_type="webhook", status="active")
+    db_session.add_all([carrier_a, carrier_b])
+    await db_session.flush()
+
+    lvl_a, conf_a = await service.resolve_penalty_tier(
+        db_session, delay_business_days=1, version="v_shared"
+    )
+    lvl_b, conf_b = await service.resolve_penalty_tier(
+        db_session, delay_business_days=1, version="v_shared"
+    )
+
+    assert lvl_a == "LOW"
+    assert lvl_b == "LOW"
+    assert conf_a.config_id == conf_b.config_id
+    assert conf_a.penalty_percentage == Decimal("5.00")
+
+
+def test_decimal_financial_calculation_and_maximum_cap():
+    """Verify exact Decimal financial calculations and enforcement of the maximum percentage cap."""
+    service = FinancialEngineService()
+
+    # 1. Base penalty less than cap: 5% of 100,000 = 5,000; Cap 20% = 20,000 -> Final 5,000
+    base, cap, final = service.calculate_penalty_amounts(
+        freight_amount=Decimal("100000.00"),
+        penalty_percentage=Decimal("5.00"),
+        maximum_cap_percentage=Decimal("20.00"),
+    )
+    assert base == Decimal("5000.00")
+    assert cap == Decimal("20000.00")
+    assert final == Decimal("5000.00")
+    assert isinstance(final, Decimal)
+
+    # 2. Base penalty exceeds cap: 25% of 100,000 = 25,000; Cap 15% = 15,000 -> Final 15,000 (Capped)
+    base2, cap2, final2 = service.calculate_penalty_amounts(
+        freight_amount=Decimal("100000.00"),
+        penalty_percentage=Decimal("25.00"),
+        maximum_cap_percentage=Decimal("15.00"),
+    )
+    assert base2 == Decimal("25000.00")
+    assert cap2 == Decimal("15000.00")
+    assert final2 == Decimal("15000.00")
+
+    # 3. Precision rounding check with half-up
+    _, _, final3 = service.calculate_penalty_amounts(
+        freight_amount=Decimal("33.33"),
+        penalty_percentage=Decimal("5.00"),
+        maximum_cap_percentage=Decimal("20.00"),
+    )
+    # 33.33 * 0.05 = 1.6665 -> 1.67
+    assert final3 == Decimal("1.67")
+
+
+# =============================================================================
+# 2. Penalty Level & Responsibility Rules
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_no_penalty_when_no_delay(db_session: AsyncSession):
+    """Verify that shipments delivered within SLA produce NO_DELAY and 0.00 penalty."""
+    service = FinancialEngineService()
+    dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
+
+    _, label, _, _ = await _seed_financial_shipment(
+        db=db_session,
+        tracking_number="TRK-ON-TIME",
+        status="DELIVERED",
+        dispatched_at=dispatch_time,
+        freight_value=Decimal("80000.00"),
+    )
+    # Delivered on Day 1 (well before 3 days SLA deadline)
+    delivery_time = dispatch_time + timedelta(days=1)
+
+    penalty = await service.calculate_freight_penalty(
+        db_session, label, current_time_utc=delivery_time
+    )
+    assert penalty is not None
+    assert penalty.delay_level == "NO_DELAY"
+    assert penalty.penalty_amount == Decimal("0.00")
+    assert penalty.is_carrier_payable is False
+    assert penalty.contract_rule_applied == "UNIVERSAL_SCALE_NO_DELAY"
+
+
+@pytest.mark.asyncio
+async def test_no_definitive_monetary_charge_when_configuration_pending_approval(
     db_session: AsyncSession,
 ):
-    """SCN-04: Dispatch took > 48 hours -> Distribution Center responsible."""
+    """Verify that unapproved configuration generates NO definitive monetary charge."""
+    service = FinancialEngineService()
+    dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
+
+    _, label, _, _ = await _seed_financial_shipment(
+        db=db_session,
+        tracking_number="TRK-UNAPPROVED-CFG",
+        status="DELIVERED",
+        dispatched_at=dispatch_time,
+        freight_value=Decimal("120000.00"),
+    )
+    # Delayed past SLA deadline
+    delivery_time = dispatch_time + timedelta(days=6)
+
+    # Use default version where configuration is PENDING_APPROVAL
+    penalty = await service.calculate_freight_penalty(
+        db_session, label, current_time_utc=delivery_time, config_version="v_unapproved"
+    )
+    assert penalty is not None
+    assert penalty.calculation_status == "PENDING_APPROVAL"
+    assert penalty.penalty_amount is None
+    assert penalty.base_penalty_amount is None
+    assert penalty.maximum_penalty_amount is None
+    assert penalty.is_carrier_payable is False  # Cannot collect unapproved penalty
+    assert "PENDING_APPROVAL" in penalty.contract_rule_applied
+
+
+@pytest.mark.asyncio
+async def test_no_charge_for_undetermined_responsibility(db_session: AsyncSession):
+    """Verify that undetermined responsibility produces no definitive financial charge."""
     service = FinancialEngineService()
     created_time = datetime(2026, 11, 1, 8, 0, 0, tzinfo=UTC)
-    now = created_time + timedelta(hours=54)
 
-    order, label, _, _ = await _seed_financial_shipment(
+    # Order not dispatched, and no approved DC threshold provided -> UNDETERMINED
+    _, label, _, _ = await _seed_financial_shipment(
         db=db_session,
-        tracking_number="TRK-DC-DELAY",
+        tracking_number="TRK-UNDETERMINED",
         status="CREATED",
         dispatched_at=None,
         order_created_at=created_time,
+        freight_value=Decimal("100000.00"),
     )
-
-    attr = await service.attribute_shipment_responsibility(db_session, label, current_time_utc=now)
-    assert attr.responsible_party == "DISTRIBUTION_CENTER"
-    assert attr.incident_type == "DISPATCH_DELAY"
-    assert "distribution center" in attr.reason.lower()
-
-
-@pytest.mark.asyncio
-async def test_attribution_carrier_when_delayed_in_transit(db_session: AsyncSession):
-    """SCN-03: Carrier delivered past SLA deadline -> Carrier responsible."""
-    service = FinancialEngineService()
-    dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
-
-    order, label, carrier, _ = await _seed_financial_shipment(
-        db=db_session,
-        tracking_number="TRK-CARRIER-DELAY",
-        status="DELIVERED",
-        dispatched_at=dispatch_time,
-    )
-
-    # 6 days later (past 3 days SLA deadline)
-    delivery_time = dispatch_time + timedelta(days=6)
-    attr = await service.attribute_shipment_responsibility(
-        db_session, label, current_time_utc=delivery_time
-    )
-    assert attr.responsible_party == "CARRIER"
-    assert attr.incident_type == "SLA_BREACH"
-    assert "exceeded sla delivery deadline" in attr.reason.lower()
-
-
-@pytest.mark.asyncio
-async def test_attribution_client_when_incorrect_address_exception(db_session: AsyncSession):
-    """SCN-05: Delivery issue caused by incorrect address -> Client responsible."""
-    service = FinancialEngineService()
-    dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
-
-    order, label, carrier, _ = await _seed_financial_shipment(
-        db=db_session,
-        tracking_number="TRK-CLIENT-ADDR",
-        status="EXCEPTION",
-        dispatched_at=dispatch_time,
-    )
-
-    # Add anomaly marking incorrect address
-    anomaly = TrackingAnomaly(
-        carrier_id=carrier.carrier_id,
-        tracking_number=label.tracking_number,
-        label_id=label.label_id,
-        current_status="EXCEPTION",
-        attempted_status="EXCEPTION",
-        raw_status="DIRECCION_ERRONEA",
-        anomaly_type="ADDRESS_EXCEPTION",
-        details="Delivery failed: incorrect recipient address supplied",
-    )
-    db_session.add(anomaly)
-    await db_session.flush()
 
     attr = await service.attribute_shipment_responsibility(db_session, label)
-    assert attr.responsible_party == "CLIENT"
-    assert attr.incident_type == "ADDRESS_EXCEPTION"
-    assert "incorrect address" in attr.reason.lower()
+    assert attr.responsible_party == "UNDETERMINED"
+    assert attr.incident_type == "PENDING_DISPATCH"
 
-
-# =============================================================================
-# 2. Penalty Calculation Tests (BR-06)
-# =============================================================================
+    penalty = await service.calculate_freight_penalty(db_session, label)
+    assert penalty is not None
+    assert penalty.calculation_status == "UNDETERMINED_RESPONSIBILITY"
+    assert penalty.penalty_amount is None
+    assert penalty.is_carrier_payable is False
 
 
 @pytest.mark.asyncio
-async def test_penalty_transferred_to_carrier_only_when_carrier_responsible(
-    db_session: AsyncSession,
-):
-    """BR-06: 1-2 days late -> 5%, transferred to carrier ONLY if carrier is responsible."""
+async def test_carrier_recoverables_only_when_carrier_responsible(db_session: AsyncSession):
+    """Verify carrier is marked payable ONLY when carrier responsibility is established and approved."""
     service = FinancialEngineService()
+    today = date.today()
     dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
 
-    # 1. Carrier responsible shipment
-    order_c, label_c, carrier, _ = await _seed_financial_shipment(
+    # Seed approved configuration
+    cfg_low = UniversalPenaltyConfig(
+        version="v_approved_test",
+        delay_level="LOW",
+        min_delay_days=1,
+        max_delay_days=3,
+        penalty_percentage=Decimal("5.00"),
+        maximum_cap_percentage=Decimal("20.00"),
+        effective_date=today,
+        is_active=True,
+        approval_status="APPROVED",
+    )
+    db_session.add(cfg_low)
+    await db_session.flush()
+
+    # 1. Carrier responsible shipment (delayed in transit past SLA)
+    _, label_carrier, carrier, _ = await _seed_financial_shipment(
         db=db_session,
-        tracking_number="TRK-PENALTY-CARRIER",
+        tracking_number="TRK-CARRIER-RESP",
         status="DELIVERED",
         dispatched_at=dispatch_time,
         freight_value=Decimal("100000.00"),
     )
-    delivery_time = dispatch_time + timedelta(days=5)  # 2 days past SLA deadline
+    delivery_time = dispatch_time + timedelta(days=5)  # 2 business days late -> LOW
     penalty_c = await service.calculate_freight_penalty(
-        db_session, label_c, current_time_utc=delivery_time
+        db_session, label_carrier, current_time_utc=delivery_time, config_version="v_approved_test"
     )
-
     assert penalty_c is not None
-    assert penalty_c.is_carrier_payable is True
+    assert penalty_c.calculation_status == "APPROVED"
     assert penalty_c.responsible_party == "CARRIER"
-    assert penalty_c.penalty_percentage == Decimal("5.00")
-    assert penalty_c.penalty_amount == Decimal("5000.00")  # 5% of 100,000
+    assert penalty_c.is_carrier_payable is True
+    assert penalty_c.penalty_amount == Decimal("5000.00")
 
-    # 2. Client address exception shipment -> Carrier is NOT charged
-    order_cl, label_cl, _, _ = await _seed_financial_shipment(
+    # 2. Client address exception shipment -> Carrier NOT payable
+    _, label_client, _, _ = await _seed_financial_shipment(
         db=db_session,
-        tracking_number="TRK-NO-PENALTY-CLIENT",
+        tracking_number="TRK-CLIENT-RESP",
         status="EXCEPTION",
         dispatched_at=dispatch_time,
         freight_value=Decimal("100000.00"),
@@ -217,33 +330,33 @@ async def test_penalty_transferred_to_carrier_only_when_carrier_responsible(
     db_session.add(
         TrackingAnomaly(
             carrier_id=carrier.carrier_id,
-            tracking_number=label_cl.tracking_number,
-            label_id=label_cl.label_id,
+            tracking_number=label_client.tracking_number,
+            label_id=label_client.label_id,
             current_status="EXCEPTION",
             attempted_status="EXCEPTION",
             raw_status="DIRECCION_ERRONEA",
-            details="Wrong address",
+            details="Wrong street address",
         )
     )
     await db_session.flush()
 
     penalty_cl = await service.calculate_freight_penalty(
-        db_session, label_cl, current_time_utc=delivery_time
+        db_session, label_client, current_time_utc=delivery_time, config_version="v_approved_test"
     )
     assert penalty_cl is not None
-    assert penalty_cl.is_carrier_payable is False
     assert penalty_cl.responsible_party == "CLIENT"
+    assert penalty_cl.is_carrier_payable is False
 
 
 @pytest.mark.asyncio
-async def test_duplicate_penalty_prevention(db_session: AsyncSession):
-    """Ensure idempotency: running penalty calculation multiple times creates exactly one penalty record."""
+async def test_duplicate_penalty_idempotency(db_session: AsyncSession):
+    """Ensure idempotency: running penalty calculation multiple times creates exactly one record."""
     service = FinancialEngineService()
     dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
 
     _, label, _, _ = await _seed_financial_shipment(
         db=db_session,
-        tracking_number="TRK-DUP-PENALTY",
+        tracking_number="TRK-IDEMPOTENCY",
         status="DELIVERED",
         dispatched_at=dispatch_time,
         freight_value=Decimal("50000.00"),
@@ -257,53 +370,50 @@ async def test_duplicate_penalty_prevention(db_session: AsyncSession):
     assert p2 is not None
     assert p1.penalty_id == p2.penalty_id
 
-    # Count records in table
-    stmt = select(FreightPenalty).where(FreightPenalty.tracking_number == "TRK-DUP-PENALTY")
+    stmt = select(FreightPenalty).where(FreightPenalty.tracking_number == "TRK-IDEMPOTENCY")
     res = await db_session.execute(stmt)
     assert len(res.scalars().all()) == 1
 
 
 # =============================================================================
-# 3. Biweekly Settlement and Netting Tests (FR-05, BR-08)
+# 3. Biweekly Settlement & Netting Protection Tests
 # =============================================================================
 
 
 @pytest.mark.asyncio
-async def test_biweekly_settlement_and_netting_calculation(db_session: AsyncSession):
-    """FR-05, BR-08: Generate H1 settlement, group by carrier, calculate net amount and ledger entries."""
+async def test_settlement_pending_validation_no_unauthorized_netting(db_session: AsyncSession):
+    """Verify settlements remain PENDING_VALIDATION with separate balances and NO unauthorized netting."""
     service = FinancialEngineService()
+    today = date.today()
     dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
 
-    # Seed carrier delayed shipment ($100,000 freight -> $5,000 penalty)
-    _, label_carrier, carrier, _ = await _seed_financial_shipment(
+    # Seed approved config for calculation
+    cfg_low = UniversalPenaltyConfig(
+        version="v_settle_test",
+        delay_level="LOW",
+        min_delay_days=1,
+        max_delay_days=3,
+        penalty_percentage=Decimal("5.00"),
+        maximum_cap_percentage=Decimal("20.00"),
+        effective_date=today,
+        is_active=True,
+        approval_status="APPROVED",
+    )
+    db_session.add(cfg_low)
+    await db_session.flush()
+
+    _, label, carrier, _ = await _seed_financial_shipment(
         db=db_session,
-        tracking_number="TRK-SETTLE-01",
+        tracking_number="TRK-SETTLE-TEST",
         status="DELIVERED",
         dispatched_at=dispatch_time,
         freight_value=Decimal("100000.00"),
     )
-    # Seed DC delayed shipment ($200,000 freight -> $10,000 penalty owed to client, NOT carrier payable)
-    _, label_dc, _, _ = await _seed_financial_shipment(
-        db=db_session,
-        tracking_number="TRK-SETTLE-02",
-        status="CREATED",
-        dispatched_at=None,
-        freight_value=Decimal("200000.00"),
-        order_created_at=datetime(2026, 11, 1, 8, 0, 0, tzinfo=UTC),
-        carrier=carrier,
+    calc_time = datetime(2026, 11, 10, 10, 0, 0, tzinfo=UTC)
+    await service.calculate_freight_penalty(
+        db_session, label, current_time_utc=calc_time, config_version="v_settle_test"
     )
 
-    # Calculate penalties in early November (H1 period: Nov 1-15)
-    calc_time = datetime(2026, 11, 7, 10, 0, 0, tzinfo=UTC)
-    p_carrier = await service.calculate_freight_penalty(
-        db_session, label_carrier, current_time_utc=calc_time
-    )
-    p_dc = await service.calculate_freight_penalty(db_session, label_dc, current_time_utc=calc_time)
-
-    assert p_carrier is not None
-    assert p_dc is not None
-
-    # Generate H1 settlement for carrier
     settlement = await service.generate_biweekly_settlement(
         db=db_session,
         carrier_id=carrier.carrier_id,
@@ -312,33 +422,46 @@ async def test_biweekly_settlement_and_netting_calculation(db_session: AsyncSess
         half=1,
     )
 
-    assert settlement.period_code == "2026-11-H1"
-    assert settlement.carrier_id == carrier.carrier_id
-    assert settlement.status == "CLOSED"
-    assert settlement.total_penalties_count == 2
-    assert settlement.total_owed_to_clients == p_carrier.penalty_amount + p_dc.penalty_amount
-    assert settlement.total_recoverable_from_carrier == p_carrier.penalty_amount
-    # Net amount: owed to clients minus recoverable from carrier
-    assert (
-        settlement.net_settlement_amount
-        == settlement.total_owed_to_clients - settlement.total_recoverable_from_carrier
-    )
+    # Must remain PENDING_VALIDATION without unauthorized netting formula
+    assert settlement.status == "PENDING_VALIDATION"
+    assert settlement.net_settlement_amount is None
+    assert settlement.total_recoverable_from_carrier == Decimal("5000.00")
+    assert settlement.total_owed_to_clients == Decimal("5000.00")
 
-    # Verify audit ledger movements created
-    stmt_ledger = select(FinancialLedgerEntry).where(
+    # Verify ledger movements: only atomic entries, NO NET_SETTLEMENT movement
+    stmt_l = select(FinancialLedgerEntry).where(
         FinancialLedgerEntry.settlement_id == settlement.settlement_id
     )
-    res_l = await db_session.execute(stmt_ledger)
+    res_l = await db_session.execute(stmt_l)
     entries = res_l.scalars().all()
-    assert len(entries) >= 3
     types = {e.entry_type for e in entries}
-    assert "CLIENT_INDEMNITY_PAYABLE" in types
     assert "CARRIER_PENALTY_RECEIVABLE" in types
-    assert "NET_SETTLEMENT" in types
+    assert "CLIENT_INDEMNITY_PAYABLE" in types
+    assert "NET_SETTLEMENT" not in types  # No unauthorized netting entry
+
+
+def test_biweekly_settlement_boundaries():
+    """Verify strict half-month boundaries: H1 (1-15) and H2 (16-last day)."""
+    service = FinancialEngineService()
+
+    code1, start1, end1 = service.compute_half_month_period(2026, 2, 1)
+    assert code1 == "2026-02-H1"
+    assert start1 == date(2026, 2, 1)
+    assert end1 == date(2026, 2, 15)
+
+    code2, start2, end2 = service.compute_half_month_period(2026, 2, 2)
+    assert code2 == "2026-02-H2"
+    assert start2 == date(2026, 2, 16)
+    assert end2 == date(2026, 2, 28)  # Leap year check (2026 is non-leap)
+
+    code3, start3, end3 = service.compute_half_month_period(2026, 11, 2)
+    assert code3 == "2026-11-H2"
+    assert start3 == date(2026, 11, 16)
+    assert end3 == date(2026, 11, 30)
 
 
 # =============================================================================
-# 4. API Endpoints & Tenant Isolation Tests (FR-06, BR-10)
+# 4. API & Tenant Isolation Tests
 # =============================================================================
 
 
@@ -346,11 +469,11 @@ async def test_biweekly_settlement_and_netting_calculation(db_session: AsyncSess
 async def test_financial_api_endpoints_and_tenant_isolation(
     client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):
-    """Test client penalties API, ensuring recipient/tenant isolation (BR-10)."""
+    """Test client penalties API, ensuring strict tenant isolation (BR-10)."""
     dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
 
     # 1. Seed shipment for Brand 1
-    order1, label1, carrier, brand1 = await _seed_financial_shipment(
+    _, label1, carrier, brand1 = await _seed_financial_shipment(
         db=db_session,
         tracking_number="TRK-TENANT-01",
         status="DELIVERED",
@@ -358,7 +481,7 @@ async def test_financial_api_endpoints_and_tenant_isolation(
         brand_name="Brand Tenant 1",
     )
     # 2. Seed shipment for Brand 2
-    order2, label2, _, brand2 = await _seed_financial_shipment(
+    _, label2, _, brand2 = await _seed_financial_shipment(
         db=db_session,
         tracking_number="TRK-TENANT-02",
         status="DELIVERED",
@@ -366,7 +489,6 @@ async def test_financial_api_endpoints_and_tenant_isolation(
         brand_name="Brand Tenant 2",
     )
 
-    # Calculate penalties
     service = FinancialEngineService()
     delivery_time = dispatch_time + timedelta(days=6)
     await service.calculate_freight_penalty(db_session, label1, current_time_utc=delivery_time)
@@ -393,12 +515,13 @@ async def test_financial_api_endpoints_and_tenant_isolation(
     assert resp_forbidden.status_code == 403
     assert "belongs to another client" in resp_forbidden.json()["detail"].lower()
 
-    # Carrier penalties query (FR-07)
-    resp_carrier = await client.get(
-        f"/api/v1/financial/carrier/{carrier.carrier_id}/penalties",
+    # Query scale configuration endpoint
+    resp_cfg = await client.get(
+        "/api/v1/financial/config/penalty-scales",
         headers={"X-API-Key": api_key_brand1},
     )
-    assert resp_carrier.status_code == 200
-    data_carrier = resp_carrier.json()
-    assert len(data_carrier) >= 1
-    assert all(p["carrier_id"] == carrier.carrier_id for p in data_carrier)
+    assert resp_cfg.status_code == 200
+    data_cfg = resp_cfg.json()
+    assert len(data_cfg) >= 5
+    levels = {c["delay_level"] for c in data_cfg}
+    assert {"NO_DELAY", "LOW", "MODERATE", "HIGH", "CRITICAL"}.issubset(levels)

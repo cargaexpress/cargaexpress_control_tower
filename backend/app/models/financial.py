@@ -121,10 +121,16 @@ class FreightPenalty(Base):
 
     freight_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     delay_business_days: Mapped[int] = mapped_column(Integer, nullable=False)
-    penalty_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
-    penalty_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    delay_level: Mapped[str] = mapped_column(String, default="NO_DELAY", nullable=False)
+    calculation_status: Mapped[str] = mapped_column(
+        String, default="PENDING_APPROVAL", nullable=False
+    )
+    penalty_percentage: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    base_penalty_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    maximum_penalty_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    penalty_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 
-    # Transferred to carrier only if responsible_party == "CARRIER"
+    # Transferred to carrier only if responsible_party == "CARRIER" and approved
     is_carrier_payable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Due to client (indemnity)
     is_client_owed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -181,13 +187,11 @@ class FinancialSettlement(Base):
     total_recoverable_from_carrier: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), default=Decimal("0.00"), nullable=False
     )
-    net_settlement_amount: Mapped[Decimal] = mapped_column(
-        Numeric(14, 2), default=Decimal("0.00"), nullable=False
-    )
+    net_settlement_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
 
     status: Mapped[str] = mapped_column(
-        String, default="DRAFT", nullable=False
-    )  # DRAFT, CLOSED, SETTLED
+        String, default="PENDING_VALIDATION", nullable=False
+    )  # PENDING_VALIDATION, CLOSED, SETTLED
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -240,3 +244,59 @@ class FinancialLedgerEntry(Base):
     settlement: Mapped["FinancialSettlement"] = relationship(back_populates="ledger_entries")
     carrier: Mapped["Carrier"] = relationship()
     penalty: Mapped["FreightPenalty | None"] = relationship()
+
+
+class UniversalPenaltyConfig(Base):
+    """Universal progressive penalty scale configuration (Phase 4).
+
+    Supports 5 levels:
+    - NO_DELAY: 0 delay days, 0% penalty
+    - LOW: Minor delay
+    - MODERATE: Moderate delay
+    - HIGH: Significant delay
+    - CRITICAL: Severe delay
+
+    Fields:
+    - version: Configuration version (e.g. 'v1.0')
+    - delay_level: One of NO_DELAY, LOW, MODERATE, HIGH, CRITICAL
+    - min_delay_days: Minimum business-day delay threshold (inclusive)
+    - max_delay_days: Maximum business-day delay threshold (inclusive, None for open-ended)
+    - penalty_percentage: Configurable percentage of freight amount
+    - maximum_cap_percentage: Configurable maximum cap percentage of freight amount
+    - effective_date: Date from which the configuration applies
+    - is_active: Whether this configuration entry is active
+    - approval_status: PENDING_APPROVAL, APPROVED, REJECTED
+    """
+
+    __tablename__ = "universal_penalty_configs"
+    __table_args__ = (
+        UniqueConstraint(
+            "version", "delay_level", name="uq_universal_penalty_configs_version_level"
+        ),
+        Index("ix_universal_penalty_configs_version", "version"),
+        Index("ix_universal_penalty_configs_is_active", "is_active"),
+    )
+
+    config_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    version: Mapped[str] = mapped_column(String, default="v1.0", nullable=False)
+    delay_level: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # NO_DELAY, LOW, MODERATE, HIGH, CRITICAL
+
+    min_delay_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_delay_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    penalty_percentage: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    maximum_cap_percentage: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    approval_status: Mapped[str] = mapped_column(
+        String, default="PENDING_APPROVAL", nullable=False
+    )  # PENDING_APPROVAL, APPROVED, REJECTED
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

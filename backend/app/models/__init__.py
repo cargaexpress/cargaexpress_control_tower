@@ -8,6 +8,7 @@ from app.models.financial import (
     FinancialSettlement,
     FreightPenalty,
     ShipmentAttribution,
+    UniversalPenaltyConfig,
 )
 from app.models.order import Order
 from app.models.order_line import OrderLine
@@ -43,4 +44,5 @@ __all__ = [
     "ShippingLabelItem",
     "StateMapping",
     "TrackingAnomaly",
+    "UniversalPenaltyConfig",
 ]
