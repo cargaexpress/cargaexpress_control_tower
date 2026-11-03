@@ -1,14 +1,11 @@
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.brand import Brand
 from app.models.carrier import Carrier
 from app.models.dispatch import Dispatch
@@ -16,7 +13,7 @@ from app.models.distribution_center import DistributionCenter
 from app.models.order import Order
 from app.models.shipment_type import ShipmentType
 from app.models.shipping_label import ShippingLabel
-from app.models.sla_tracking import CalendarHoliday, ShipmentSlaTracking
+from app.models.sla_tracking import CalendarHoliday
 from app.services.sla_engine import SlaEngineService
 
 

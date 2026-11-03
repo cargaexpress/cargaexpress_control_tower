@@ -89,5 +89,5 @@ def test_seed_all_12_carriers_migration_contains_all_twelve():
         assert c["integration_type"] in valid_types
         mappings = c["mappings"]
         assert len(mappings) >= 6
-        for raw, canonical in mappings.items():
+        for _raw, canonical in mappings.items():
             assert canonical in CANONICAL_STATUSES
