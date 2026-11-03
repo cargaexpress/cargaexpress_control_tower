@@ -21,6 +21,45 @@ TERMINAL_STATUSES: set[str] = {
     "LOST_OR_DAMAGED",
 }
 
+# Recognized aliases mapping short slugs to registered carrier names
+CARRIER_SLUG_ALIASES: dict[str, str] = {
+    "alpha": "SimCarrier Alpha",
+    "beta": "SimCarrier Beta",
+    "gamma": "SimCarrier Gamma",
+    "delta": "SimCarrier Delta",
+    "epsilon": "SimCarrier Epsilon",
+    "carrier-a": "SimCarrier A",
+    "carrier_a": "SimCarrier A",
+    "carrier a": "SimCarrier A",
+    "carrier-b": "SimCarrier B",
+    "carrier_b": "SimCarrier B",
+    "carrier b": "SimCarrier B",
+    "carrier-c": "SimCarrier C",
+    "carrier_c": "SimCarrier C",
+    "carrier c": "SimCarrier C",
+    "carrier-d": "SimCarrier D",
+    "carrier_d": "SimCarrier D",
+    "carrier d": "SimCarrier D",
+    "carrier-1": "TransExpress Logistics",
+    "carrier_1": "TransExpress Logistics",
+    "carrier 1": "TransExpress Logistics",
+    "transexpress": "TransExpress Logistics",
+    "transexpress logistics": "TransExpress Logistics",
+    "carrier-2": "Rapido Andino",
+    "carrier_2": "Rapido Andino",
+    "carrier 2": "Rapido Andino",
+    "rapido": "Rapido Andino",
+    "andino": "Rapido Andino",
+    "rapido andino": "Rapido Andino",
+    "rápido andino": "Rapido Andino",
+    "carrier-3": "Logistica 360",
+    "carrier_3": "Logistica 360",
+    "carrier 3": "Logistica 360",
+    "360": "Logistica 360",
+    "logistica 360": "Logistica 360",
+    "logística 360": "Logistica 360",
+}
+
 
 @dataclass(slots=True)
 class NormalizationResult:
@@ -39,19 +78,27 @@ class NormalizationResult:
 
 
 async def find_carrier_by_slug_or_id(db: AsyncSession, identifier: str | int) -> Carrier | None:
-    """Locate a carrier by its numeric ID, exact name, or slug substring."""
+    """Locate a carrier by its numeric ID, exact name, recognized alias, or slug substring."""
     if isinstance(identifier, int) or (isinstance(identifier, str) and identifier.isdigit()):
         return await db.get(Carrier, int(identifier))
 
     slug = str(identifier).strip().lower()
 
-    # Exact match (case insensitive)
+    # 1. Alias lookup (e.g. "carrier-a" -> "SimCarrier A")
+    target_name = CARRIER_SLUG_ALIASES.get(slug)
+    if target_name:
+        stmt = select(Carrier).where(func.lower(Carrier.name) == target_name.lower())
+        carrier = (await db.execute(stmt)).scalar_one_or_none()
+        if carrier is not None:
+            return carrier
+
+    # 2. Exact match (case insensitive)
     stmt = select(Carrier).where(func.lower(Carrier.name) == slug)
     carrier = (await db.execute(stmt)).scalar_one_or_none()
     if carrier is not None:
         return carrier
 
-    # Substring match (e.g. "alpha" matches "SimCarrier Alpha")
+    # 3. Substring match (e.g. "alpha" matches "SimCarrier Alpha")
     stmt = select(Carrier).where(func.lower(Carrier.name).like(f"%{slug}%"))
     return (await db.execute(stmt)).scalars().first()
 
@@ -162,7 +209,7 @@ async def normalize_and_apply_event(
                 raw_status=clean_raw_status,
                 canonical_status=canonical_status,
                 previous_status=current_status,
-                new_status=current_status,  # Preservado intacto
+                new_status=current_status,  # Preserved intact
                 is_anomaly=True,
                 anomaly_reason="RN-02: Final status cannot be reverted; anomaly recorded.",
                 message="Event processed: terminal status preserved and anomaly recorded.",
