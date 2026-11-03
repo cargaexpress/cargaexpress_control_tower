@@ -10,11 +10,13 @@ from app.models.processed_file import ProcessedFile
 from app.models.shipment_type import ShipmentType
 from app.models.shipping_label import ShippingLabel
 from app.models.shipping_label_item import ShippingLabelItem
+from app.models.sla_tracking import CalendarHoliday, ShipmentSlaTracking
 from app.models.state_mapping import StateMapping
 from app.models.tracking_anomaly import TrackingAnomaly
 
 __all__ = [
     "Brand",
+    "CalendarHoliday",
     "Carrier",
     "Dispatch",
     "DistributionCenter",
@@ -23,6 +25,7 @@ __all__ = [
     "OrderRecipient",
     "PickingTask",
     "ProcessedFile",
+    "ShipmentSlaTracking",
     "ShipmentType",
     "ShippingLabel",
     "ShippingLabelItem",

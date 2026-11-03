@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from app.models.dispatch import Dispatch
     from app.models.order import Order
     from app.models.shipping_label_item import ShippingLabelItem
+    from app.models.sla_tracking import ShipmentSlaTracking
 
 
 class ShippingLabel(Base):
@@ -48,3 +49,6 @@ class ShippingLabel(Base):
     carrier: Mapped["Carrier"] = relationship(back_populates="shipping_labels")
     dispatch: Mapped["Dispatch | None"] = relationship(back_populates="shipping_labels")
     label_items: Mapped[list["ShippingLabelItem"]] = relationship(back_populates="shipping_label")
+    sla_tracking: Mapped["ShipmentSlaTracking | None"] = relationship(
+        back_populates="shipping_label", uselist=False
+    )
