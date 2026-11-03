@@ -1,7 +1,7 @@
 """Control Tower API Client for Airflow DAGs.
 
 Provides decoupled HTTP integration between Apache Airflow tasks
-and Control Tower ingestion/sync endpoints (Type B and Type C connectors).
+and Control Tower ingestion/sync endpoints (Type A, Type B, and Type C connectors).
 """
 
 from __future__ import annotations
@@ -113,6 +113,49 @@ class ControlTowerClient:
             return resp.json()  # type: ignore[no-any-return]
 
         # Fallback using standard library urllib
+        import urllib.parse
+        import urllib.request
+
+        url = endpoint
+        if params:
+            url += f"?{urllib.parse.urlencode(params)}"
+
+        req = urllib.request.Request(url, data=b"", headers=self._get_headers(), method="POST")
+        with urllib.request.urlopen(req, timeout=self.timeout) as response:
+            data = response.read().decode("utf-8")
+            return json.loads(data)  # type: ignore[no-any-return]
+
+    def trigger_type_c_sync(
+        self,
+        carrier_name: str | None = None,
+        source: str = "all",
+    ) -> dict[str, Any]:
+        """Trigger Type C remote pull sync (carrier endpoints & MinIO S3) via Control Tower backend.
+
+        Endpoint: POST /api/v1/sync/type-c/sync
+        """
+        endpoint = f"{self.base_url}/api/v1/sync/type-c/sync"
+        params: dict[str, Any] = {"source": source}
+        if carrier_name:
+            params["carrier_name"] = carrier_name
+
+        logger.info(
+            "Triggering Type C remote sync against %s (carrier: %s, source: %s)",
+            endpoint,
+            carrier_name or "ALL",
+            source,
+        )
+
+        if requests is not None:
+            resp = requests.post(
+                endpoint,
+                params=params,
+                headers=self._get_headers(),
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            return resp.json()  # type: ignore[no-any-return]
+
         import urllib.parse
         import urllib.request
 

@@ -1,16 +1,21 @@
+import asyncio
 import csv
 import hashlib
 import io
 import logging
+import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import openpyxl
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.processed_file import ProcessedFile
 from app.services.normalization_service import normalize_and_apply_event
 
@@ -191,6 +196,29 @@ def extract_rows_from_excel(content: bytes) -> list[list[str]]:
 class TypeCConnectorService:
     """Processes Type C carrier files (F5 / Batch), cleaning defects and updating WMS."""
 
+    def __init__(
+        self,
+        client: httpx.AsyncClient | None = None,
+        max_retries: int | None = None,
+        base_delay_seconds: float | None = None,
+        sleep_fn: Callable[[float], Any] | None = None,
+    ) -> None:
+        self._external_client = client
+        self.max_retries = (
+            max_retries if max_retries is not None else settings.type_c_max_retries
+        )
+        self.base_delay = (
+            base_delay_seconds
+            if base_delay_seconds is not None
+            else settings.type_c_retry_base_delay_seconds
+        )
+        self._sleep = sleep_fn or asyncio.sleep
+
+    async def _do_sleep(self, delay: float) -> None:
+        res = self._sleep(delay)
+        if asyncio.iscoroutine(res):
+            await res
+
     async def is_file_already_processed(
         self, db: AsyncSession, filename: str, file_hash: str
     ) -> bool:
@@ -241,7 +269,7 @@ class TypeCConnectorService:
             result.message = "File is empty."
             return result
 
-        # 3. Detectar cabecera inicial
+        # 3. Detect initial header
         header_row = raw_rows[0]
         col_indices = match_column_indices(header_row)
 
@@ -326,3 +354,173 @@ class TypeCConnectorService:
         )
 
         return result
+
+    async def fetch_carrier_file(
+        self,
+        client: httpx.AsyncClient,
+        carrier_name: str,
+        base_url: str,
+    ) -> tuple[str, bytes] | None:
+        """Download latest batch file directly from carrier server endpoint (/download)."""
+        url = f"{base_url.rstrip('/')}/download"
+        delay = self.base_delay
+
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                resp = await client.get(url, timeout=15.0)
+                if resp.status_code == 200:
+                    cd = resp.headers.get("content-disposition", "")
+                    filename = ""
+                    if "filename=" in cd:
+                        filename = cd.split("filename=")[-1].strip('"\'; ')
+                    if not filename:
+                        fmt = (
+                            "xlsx"
+                            if "2" in carrier_name or "andino" in carrier_name.lower()
+                            else "csv"
+                        )
+                        filename = f"{carrier_name.replace(' ', '_').lower()}_latest.{fmt}"
+                    return filename, resp.content
+                elif resp.status_code in (429, 500, 502, 503, 504):
+                    logger.warning(
+                        "Attempt %d: Carrier %s returned HTTP %d",
+                        attempt,
+                        carrier_name,
+                        resp.status_code,
+                    )
+                    await self._do_sleep(delay)
+                    delay *= 2
+                else:
+                    logger.error(
+                        "Carrier %s returned non-retryable HTTP %d",
+                        carrier_name,
+                        resp.status_code,
+                    )
+                    return None
+            except Exception as exc:
+                logger.warning(
+                    "Attempt %d: Connection error querying carrier %s: %s",
+                    attempt,
+                    carrier_name,
+                    exc,
+                )
+                if attempt == self.max_retries:
+                    logger.error("Exhausted retries fetching file from %s: %s", carrier_name, exc)
+                    return None
+                await self._do_sleep(delay)
+                delay *= 2
+
+        return None
+
+    async def _sync_endpoints_impl(
+        self, client: httpx.AsyncClient, db: AsyncSession, urls: dict[str, str]
+    ) -> list[FileProcessingResult]:
+        results: list[FileProcessingResult] = []
+        for carrier_name, base_url in urls.items():
+            logger.info("Polling batch file for %s from %s", carrier_name, base_url)
+            file_tuple = await self.fetch_carrier_file(client, carrier_name, base_url)
+            if file_tuple is None:
+                results.append(
+                    FileProcessingResult(
+                        filename=f"{carrier_name}_latest",
+                        carrier_name=carrier_name,
+                        file_hash="",
+                        status="failed",
+                        message=f"Failed to fetch batch file from {base_url}",
+                    )
+                )
+                continue
+
+            filename, content = file_tuple
+            res = await self.process_file_content(
+                db=db,
+                filename=filename,
+                content=content,
+                carrier_name=carrier_name,
+            )
+            results.append(res)
+        return results
+
+    async def sync_from_carrier_endpoints(
+        self,
+        db: AsyncSession,
+        carrier_urls: dict[str, str] | None = None,
+    ) -> list[FileProcessingResult]:
+        """Poll and ingest latest batch files across configured Type C carrier servers."""
+        urls = carrier_urls or settings.type_c_carriers_urls
+        if self._external_client:
+            return await self._sync_endpoints_impl(self._external_client, db, urls)
+        async with httpx.AsyncClient() as client:
+            return await self._sync_endpoints_impl(client, db, urls)
+
+    async def _sync_minio_impl(
+        self, client: httpx.AsyncClient, db: AsyncSession, s3_endpoint: str, s3_bucket: str
+    ) -> list[FileProcessingResult]:
+        results: list[FileProcessingResult] = []
+        list_url = f"{s3_endpoint}/{s3_bucket}"
+        try:
+            resp = await client.get(list_url, timeout=10.0)
+            if resp.status_code != 200:
+                logger.warning(
+                    "MinIO S3 list bucket returned HTTP %d for %s",
+                    resp.status_code,
+                    list_url,
+                )
+                return results
+
+            root = ET.fromstring(resp.content)
+            keys: list[str] = []
+            for elem in root.iter():
+                if elem.tag.endswith("Key") and elem.text:
+                    keys.append(elem.text.strip())
+
+            for key in keys:
+                filename = Path(key).name
+                carrier_name = "TransExpress Logistics"
+                key_upper = key.upper()
+                if "CARRIER_2" in key_upper or "RAPIDO" in key_upper or "ANDINO" in key_upper:
+                    carrier_name = "Rapido Andino"
+                elif "CARRIER_3" in key_upper or "360" in key_upper:
+                    carrier_name = "Logistica 360"
+
+                stmt = select(ProcessedFile).where(ProcessedFile.filename == filename)
+                if (await db.execute(stmt)).scalar_one_or_none() is not None:
+                    continue
+
+                get_url = f"{s3_endpoint}/{s3_bucket}/{key}"
+                obj_resp = await client.get(get_url, timeout=20.0)
+                if obj_resp.status_code == 200:
+                    res = await self.process_file_content(
+                        db=db,
+                        filename=filename,
+                        content=obj_resp.content,
+                        carrier_name=carrier_name,
+                    )
+                    results.append(res)
+        except Exception as exc:
+            logger.warning("Error querying MinIO S3 bucket %s: %s", s3_bucket, exc)
+
+        return results
+
+    async def sync_from_minio_s3(
+        self,
+        db: AsyncSession,
+        endpoint: str | None = None,
+        bucket: str | None = None,
+    ) -> list[FileProcessingResult]:
+        """Ingest batch files from MinIO / S3 Object Storage bucket."""
+        s3_endpoint = (endpoint or settings.minio_endpoint).rstrip("/")
+        s3_bucket = bucket or settings.minio_bucket
+        if self._external_client:
+            return await self._sync_minio_impl(self._external_client, db, s3_endpoint, s3_bucket)
+        async with httpx.AsyncClient() as client:
+            return await self._sync_minio_impl(client, db, s3_endpoint, s3_bucket)
+
+    async def sync_all_sources(
+        self,
+        db: AsyncSession,
+    ) -> list[FileProcessingResult]:
+        """Synchronize files from both carrier direct endpoints and MinIO S3 bucket."""
+        endpoint_results = await self.sync_from_carrier_endpoints(db)
+        minio_results = await self.sync_from_minio_s3(db)
+        return endpoint_results + minio_results

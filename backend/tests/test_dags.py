@@ -108,6 +108,31 @@ def test_control_tower_client_type_c_upload(tmp_path: Path):
         assert kwargs["data"] == {"carrier_name": "TransExpress Logistics"}
 
 
+def test_control_tower_client_type_c_sync():
+    """Verify Type C remote sync triggers the expected POST endpoint."""
+    client = ControlTowerClient(base_url="http://test-server:8000")
+    fake_response = {
+        "status": "completed",
+        "total_files_evaluated": 2,
+        "results": [],
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = fake_response
+
+    mock_requests = MagicMock()
+    mock_requests.post.return_value = mock_resp
+
+    with patch("dags.utils.control_tower_client.requests", mock_requests):
+        res = client.trigger_type_c_sync(carrier_name="TransExpress Logistics", source="all")
+        assert res["status"] == "completed"
+        assert res["total_files_evaluated"] == 2
+        mock_requests.post.assert_called_once()
+        args, kwargs = mock_requests.post.call_args
+        assert args[0] == "http://test-server:8000/api/v1/sync/type-c/sync"
+        assert kwargs["params"] == {"source": "all", "carrier_name": "TransExpress Logistics"}
+
+
 def test_control_tower_client_health():
     """Verify health check probe against Control Tower backend."""
     client = ControlTowerClient(base_url="http://test-server:8000")
