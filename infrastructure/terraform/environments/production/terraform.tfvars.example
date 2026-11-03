@@ -1,0 +1,25 @@
+# ==============================================================================
+# CargaExpress Infrastructure - Production Variables Example
+# File: infrastructure/terraform/environments/production/terraform.tfvars.example
+# ==============================================================================
+
+project_name       = "cargaexpress"
+environment        = "production"
+aws_region         = "us-east-2"
+aws_account_id     = "123456789012"
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-2a", "us-east-2b"]
+
+db_instance_class  = "db.t4g.medium"
+db_name            = "cargaexpress"
+db_admin_username  = "cargaexpress_admin"
+db_admin_password  = "REPLACE_WITH_SECURE_GENERATED_PASSWORD_MIN_16_CHARS"
+
+rabbitmq_password  = "REPLACE_WITH_SECURE_RABBITMQ_PASSWORD_MIN_16_CHARS"
+
+backend_image      = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-backend:latest"
+worker_image       = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-worker:latest"
+spark_image        = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-spark:latest"
+
+github_repository  = "cargaexpress/cargaexpress_control_tower"
+alert_email        = "devops@cargaexpress.local"
