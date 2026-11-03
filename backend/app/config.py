@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     carrier_webhook_tokens: dict[str, str] = Field(default_factory=dict)
 
     # Type A Simulator Configuration (F3 / Webhook Receiver Extractor)
-    type_a_simulator_url: str = "http://localhost:9000"
+    type_a_simulator_url: str = "https://cargaexpress-simulator-b.mooo.com/sim-a"
     type_a_max_retries: int = 3
     type_a_retry_base_delay_seconds: float = 0.5
 

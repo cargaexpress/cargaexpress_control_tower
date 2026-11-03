@@ -124,7 +124,7 @@ resource "aws_secretsmanager_secret_version" "app_secrets" {
     WEBHOOK_SECRET       = "CHANGE_ME_WEBHOOK_SECRET_32_CHARS_MIN"
     BRAND_API_KEYS       = "{\"brand_alpha\": 1, \"brand_beta\": 2}"
     CARRIER_API_KEYS     = "{\"carrier_alpha\": 1, \"carrier_beta\": 2}"
-    TYPE_A_SIMULATOR_URL = "https://cargaexpress-simulator-a.onrender.com"
+    TYPE_A_SIMULATOR_URL = "https://cargaexpress-simulator-b.mooo.com/sim-a"
     TYPE_B_CARRIERS_URLS = "{\"SimCarrier A\": \"https://cargaexpress-simulator-b.mooo.com/carrier-a\"}"
     TYPE_C_CARRIERS_URLS = "{\"TransExpress Logistics\": \"https://cargaexpress-simulator-b.mooo.com/carrier-1\"}"
   })
