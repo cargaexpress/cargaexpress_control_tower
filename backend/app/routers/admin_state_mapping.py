@@ -19,7 +19,7 @@ from app.services.state_mapping_cache import state_mapping_cache
 # A shared key is used instead of JWT because this scope has no user sessions or roles.
 router = APIRouter(
     prefix="/api/v1/admin/state-mappings",
-    tags=["admin: state mapping"],
+    tags=["Administration: State Mappings", "admin: state mapping"],
     dependencies=[Depends(require_admin)],
 )
 

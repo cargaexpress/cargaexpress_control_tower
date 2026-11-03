@@ -17,18 +17,25 @@ from app.schemas.analytics import (
     FactFinancialPenaltyRead,
     FactShipmentSlaRead,
 )
-from app.security import require_admin, require_api_key
+from app.security import require_admin, require_api_key, require_internal_service
 from app.services.analytical_etl import AnalyticalEtlService
 
 logger = logging.getLogger("cargaexpress.analytics_router")
 
-router = APIRouter(prefix="/api/v1/analytics", tags=["analytics & data warehouse"])
+router = APIRouter(
+    prefix="/api/v1/analytics", tags=["Operational: Analytics", "analytics & data warehouse"]
+)
 
 
-@router.post("/etl/run", response_model=EtlBatchRunRead)
+@router.post(
+    "/etl/run",
+    response_model=EtlBatchRunRead,
+    tags=["Internal Processes: Analytics ETL"],
+    summary="Execute the full analytical ETL/ELT pipeline (Internal process)",
+)
 async def trigger_etl_run(
     db: AsyncSession = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_internal_service),
 ) -> EtlBatchRunRead:
     """Execute the full analytical ETL/ELT pipeline (Admin only).
 

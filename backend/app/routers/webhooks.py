@@ -16,7 +16,7 @@ from app.services.webhook_decoders import WebhookDecodeError, decode_carrier_pay
 
 logger = logging.getLogger("cargaexpress.webhooks")
 
-router = APIRouter(tags=["webhooks"])
+router = APIRouter(tags=["Integration: Webhooks", "webhooks"])
 
 
 @router.post(

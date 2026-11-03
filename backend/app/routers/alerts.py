@@ -9,12 +9,14 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.alert import ShipmentAlert
 from app.schemas.alert import AlertResolveRequest, AlertScanSummary, ShipmentAlertRead
-from app.security import require_api_key
+from app.security import require_api_key, require_internal_service
 from app.services.risk_monitoring_service import RiskMonitoringService
 
 logger = logging.getLogger("cargaexpress.alerts_router")
 
-router = APIRouter(prefix="/api/v1/alerts", tags=["alerts & risk monitoring"])
+router = APIRouter(
+    prefix="/api/v1/alerts", tags=["Operational: Alerts", "alerts & risk monitoring"]
+)
 
 
 @router.get("", response_model=list[ShipmentAlertRead])
@@ -69,10 +71,15 @@ async def list_alerts(
     ]
 
 
-@router.post("/scan", response_model=AlertScanSummary)
+@router.post(
+    "/scan",
+    response_model=AlertScanSummary,
+    tags=["Internal Processes: Alerts"],
+    summary="Trigger controlled on-demand shipment risk scan (Internal process)",
+)
 async def trigger_risk_scan(
     db: AsyncSession = Depends(get_db),
-    _: None = Depends(require_api_key),
+    _: None = Depends(require_internal_service),
 ) -> AlertScanSummary:
     """Trigger an on-demand scan across all active shipments to identify risks and generate alerts."""
     service = RiskMonitoringService()

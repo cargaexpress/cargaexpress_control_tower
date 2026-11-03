@@ -16,7 +16,7 @@ from app.services.exceptions import ConcurrentUpdateConflictError, EntityNotFoun
 
 router = APIRouter(
     prefix="/api/v1/admin/carrier-state-mappings",
-    tags=["admin: carrier state mapping"],
+    tags=["Administration: State Mappings", "admin: carrier state mapping"],
     dependencies=[Depends(require_admin)],
 )
 

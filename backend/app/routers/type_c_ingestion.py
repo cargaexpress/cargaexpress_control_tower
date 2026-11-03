@@ -9,7 +9,9 @@ from app.services.type_c_connector import TypeCConnectorService
 
 logger = logging.getLogger("cargaexpress.type_c_router")
 
-router = APIRouter(prefix="/api/v1/sync/type-c", tags=["connectors: type c"])
+router = APIRouter(
+    prefix="/api/v1/sync/type-c", tags=["Integration: Connectors", "connectors: type c"]
+)
 
 
 @router.post("")

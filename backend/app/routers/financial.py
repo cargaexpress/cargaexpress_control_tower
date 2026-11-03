@@ -22,12 +22,14 @@ from app.schemas.financial import (
     UniversalPenaltyConfigCreate,
     UniversalPenaltyConfigRead,
 )
-from app.security import get_current_brand, require_admin, require_api_key
+from app.security import get_current_brand, require_admin, require_api_key, require_internal_service
 from app.services.financial_engine import FinancialEngineService
 
 logger = logging.getLogger("cargaexpress.financial_router")
 
-router = APIRouter(prefix="/api/v1/financial", tags=["financial & penalties"])
+router = APIRouter(
+    prefix="/api/v1/financial", tags=["Operational: Financial", "financial & penalties"]
+)
 
 
 # =============================================================================
@@ -118,11 +120,16 @@ async def list_carrier_penalties(
 # =============================================================================
 
 
-@router.post("/settlements/generate", response_model=FinancialSettlementRead)
+@router.post(
+    "/settlements/generate",
+    response_model=FinancialSettlementRead,
+    tags=["Internal Processes: Financial Settlements"],
+    summary="Generate or retrieve a biweekly settlement period and netting calculation (Internal process)",
+)
 async def generate_settlement(
     payload: SettlementGenerateRequest,
     db: AsyncSession = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_internal_service),
 ) -> FinancialSettlementRead:
     """Generate or retrieve a biweekly settlement period and netting calculation (Admin only)."""
     service = FinancialEngineService()

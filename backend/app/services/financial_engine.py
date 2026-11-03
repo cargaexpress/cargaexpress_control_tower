@@ -75,7 +75,8 @@ class FinancialEngineService:
             stmt_o = select(Order).where(Order.order_id == label.order_id)
             res_o = await db.execute(stmt_o)
             order = res_o.scalar_one_or_none()
-            label.order = order
+            if order is not None:
+                label.order = order
 
         if not order:
             raise ValueError(f"Shipping label {label.label_id} has no associated order.")
@@ -399,7 +400,8 @@ class FinancialEngineService:
             stmt_o = select(Order).where(Order.order_id == label.order_id)
             res_o = await db.execute(stmt_o)
             order = res_o.scalar_one_or_none()
-            label.order = order
+            if order is not None:
+                label.order = order
 
         if not order:
             return None

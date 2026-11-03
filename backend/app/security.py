@@ -21,6 +21,38 @@ def _validate_header_secret(
         )
 
 
+async def require_internal_service(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> None:
+    """Protect internal process endpoints (alert scan, settlements, ETL).
+
+    Allows:
+    1. Administrators via X-Admin-Token matching ADMIN_API_KEY.
+    2. Internal orchestration service accounts (Airflow, Celery) via X-API-Key matching
+       the system-level API_KEY or ADMIN_API_KEY.
+
+    Explicitly rejects brand and carrier tenant keys to prevent unauthorized external
+    consumers from triggering heavy batch processes.
+    """
+    if x_admin_token and settings.admin_api_key:
+        if hmac.compare_digest(x_admin_token.encode(), settings.admin_api_key.encode()):
+            return
+
+    if x_api_key:
+        if settings.admin_api_key and hmac.compare_digest(
+            x_api_key.encode(), settings.admin_api_key.encode()
+        ):
+            return
+        if settings.api_key and hmac.compare_digest(x_api_key.encode(), settings.api_key.encode()):
+            return
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Unauthorized internal operation. Valid admin token or internal service API key required.",
+    )
+
+
 async def require_admin(
     x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
 ) -> None:

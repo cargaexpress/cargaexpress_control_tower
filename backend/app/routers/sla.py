@@ -29,7 +29,7 @@ from app.services.sla_engine import SlaEngineService
 
 logger = logging.getLogger("cargaexpress.sla_router")
 
-router = APIRouter(prefix="/api/v1/sla", tags=["sla & compliance"])
+router = APIRouter(prefix="/api/v1/sla", tags=["Operational: SLA & Compliance", "sla & compliance"])
 
 
 # =============================================================================

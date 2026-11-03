@@ -12,7 +12,7 @@ from app.security import get_current_carrier, require_api_key
 
 logger = logging.getLogger("cargaexpress.carriers_router")
 
-router = APIRouter(prefix="/api/v1/carriers", tags=["carriers"])
+router = APIRouter(prefix="/api/v1/carriers", tags=["Operational: Carriers", "carriers"])
 
 
 @router.get("/me", response_model=CarrierRead)

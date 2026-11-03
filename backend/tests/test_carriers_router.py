@@ -60,7 +60,9 @@ async def test_carrier_endpoints_listing_and_self_profile(
     assert data_me2["integration_type"] == "rest_api"
 
     # 5. Carrier 1 checks its own SLA metrics
-    resp_metrics1 = await client.get("/api/v1/sla/carrier/metrics", headers={"X-API-Key": api_key_carrier_1})
+    resp_metrics1 = await client.get(
+        "/api/v1/sla/carrier/metrics", headers={"X-API-Key": api_key_carrier_1}
+    )
     assert resp_metrics1.status_code == 200
     data_metrics1 = resp_metrics1.json()
     assert data_metrics1["carrier_id"] == c1.carrier_id

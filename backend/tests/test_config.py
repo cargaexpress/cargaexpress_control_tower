@@ -46,6 +46,7 @@ def test_production_accepts_strong_api_secrets():
         api_key="a" * 32,
         admin_api_key="b" * 32,
         brand_api_keys={"c" * 32: 1},
+        webhook_secret="s" * 32,
     )
 
     assert configured.app_env == "production"

@@ -9,7 +9,7 @@ from app.services.type_a_connector import TypeAConnectorService
 
 logger = logging.getLogger("cargaexpress.type_a_router")
 
-router = APIRouter(prefix="/api/v1/sync", tags=["connectors: type a"])
+router = APIRouter(prefix="/api/v1/sync", tags=["Integration: Connectors", "connectors: type a"])
 
 
 @router.post("/type-a")
