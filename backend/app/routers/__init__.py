@@ -1,6 +1,7 @@
 from app.routers import (
     admin_carrier_state_mapping,
     admin_state_mapping,
+    alerts,
     health,
     orders,
     sla,
@@ -13,6 +14,7 @@ from app.routers import (
 __all__ = [
     "admin_carrier_state_mapping",
     "admin_state_mapping",
+    "alerts",
     "health",
     "orders",
     "sla",

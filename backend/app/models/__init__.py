@@ -1,3 +1,4 @@
+from app.models.alert import ShipmentAlert
 from app.models.brand import Brand
 from app.models.carrier import Carrier
 from app.models.dispatch import Dispatch
@@ -25,6 +26,7 @@ __all__ = [
     "OrderRecipient",
     "PickingTask",
     "ProcessedFile",
+    "ShipmentAlert",
     "ShipmentSlaTracking",
     "ShipmentType",
     "ShippingLabel",

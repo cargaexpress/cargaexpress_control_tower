@@ -10,6 +10,7 @@ from app.config import settings
 from app.routers import (
     admin_carrier_state_mapping,
     admin_state_mapping,
+    alerts,
     health,
     orders,
     sla,
@@ -35,6 +36,10 @@ openapi_tags = [
     {
         "name": "sla & compliance",
         "description": "SLA engine, business-day delivery deadline calculation, and at-risk early detection (RN-03, RN-04, RN-07).",
+    },
+    {
+        "name": "alerts & risk monitoring",
+        "description": "Operational 24h preventive risk alerts and prolonged exception tracking (RN-04).",
     },
     {
         "name": "webhooks",
@@ -118,6 +123,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_carrier_state_mapping.router)
     application.include_router(orders.router)
     application.include_router(sla.router)
+    application.include_router(alerts.router)
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, request_validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)
