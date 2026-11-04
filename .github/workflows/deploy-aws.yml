@@ -126,11 +126,17 @@ jobs:
       # Step 2: Database Automation and Migration on Amazon RDS (HU-38)
       # ------------------------------------------------------------------------
       - name: Apply Database Migrations on RDS
+        if: ${{ secrets.DATABASE_URL != '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           chmod +x scripts/migrate_rds.sh
           ./scripts/migrate_rds.sh --action upgrade
+
+      - name: Skip RDS Migrations (DATABASE_URL not configured)
+        if: ${{ secrets.DATABASE_URL == '' }}
+        run: |
+          echo "DATABASE_URL secret is not set. Skipping automatic RDS migrations."
 
       # ------------------------------------------------------------------------
       # Step 3: Render ECS Task Definitions with New ECR Images
