@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-import openpyxl
+import openpyxl  # type: ignore[import-untyped]
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

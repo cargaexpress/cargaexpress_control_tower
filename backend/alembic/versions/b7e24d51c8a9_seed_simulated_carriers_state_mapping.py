@@ -13,17 +13,17 @@ Revises: a3f1c9d27b45
 Create Date: 2026-10-08 12:50:00.000000
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'b7e24d51c8a9'
-down_revision: Union[str, None] = 'a3f1c9d27b45'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = 'a3f1c9d27b45'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 SIMULATED_INTEGRATION_TYPE = "simulated"
 

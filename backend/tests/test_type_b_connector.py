@@ -335,3 +335,51 @@ def test_type_b_parse_event_time_helpers():
     dt = _parse_event_time("2026-03-29T10:00:00Z")
     assert dt is not None
     assert dt.year == 2026
+
+
+@pytest.mark.asyncio
+async def test_type_b_heterogeneous_payload_structures(db_session):
+    """Verify Type B connector handles 'items' and 'event_documents' payloads."""
+    await _seed_test_carrier_b(db_session)
+
+    # 1. Test payload with 'items' (Carrier A / B / D format)
+    items_payload = {
+        "carrier": "SimCarrier A",
+        "pagination": {"total_items": 1, "limit": 100, "offset": 0},
+        "items": [
+            {
+                "event_key": "EVT-ITEMS-001",
+                "tracking_number": "TRK-TYPEB-001",
+                "status": "IN_TRANSIT",
+                "event_time": "01/01/2026 12:00:00",
+            }
+        ],
+    }
+    client_items = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=items_payload))
+    )
+    connector = TypeBConnectorService(client=client_items)
+    summary = await connector.sync_carrier(db_session, "SimCarrier A", "http://mock-a")
+    assert summary.total_fetched == 1
+    assert summary.normalized == 1
+
+    # 2. Test payload with 'event_documents' and 'event_status' (Carrier C format)
+    docs_payload = {
+        "carrier": "SimCarrier C",
+        "pagination": {"total": 1, "limit": 100, "offset": 0},
+        "event_documents": [
+            {
+                "event_key": "EVT-DOCS-001",
+                "tracking_number": "TRK-TYPEB-001",
+                "event_status": "DELIVERED",
+                "event_time": "2026-01-01T15:00:00Z",
+            }
+        ],
+    }
+    client_docs = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=docs_payload))
+    )
+    connector_docs = TypeBConnectorService(client=client_docs)
+    summary_docs = await connector_docs.sync_carrier(db_session, "SimCarrier A", "http://mock-c")
+    assert summary_docs.total_fetched == 1
+    assert summary_docs.normalized == 1

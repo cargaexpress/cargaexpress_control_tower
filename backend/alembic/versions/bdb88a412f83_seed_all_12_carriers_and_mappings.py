@@ -5,20 +5,20 @@ Revises: h8e4c2f6b315
 Create Date: 2026-11-03 06:51:35.205348
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'bdb88a412f83'
-down_revision: Union[str, None] = 'h8e4c2f6b315'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = 'h8e4c2f6b315'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
-CARRIER_SEED_DATA: list[dict[str, Union[str, dict[str, str]]]] = [
+CARRIER_SEED_DATA: list[dict[str, str | dict[str, str]]] = [
     # --- Type A Carriers (Webhooks) ---
     {
         "name": "SimCarrier Alpha",

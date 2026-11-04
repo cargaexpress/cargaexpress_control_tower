@@ -37,16 +37,29 @@ class CarrierSyncSummary:
     details: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _parse_event_time(event_time_str: str | None) -> datetime | None:
-    if not event_time_str:
+def _parse_event_time(event_time_val: Any) -> datetime | None:
+    if not event_time_val:
         return None
+    val_str = str(event_time_val).strip()
     try:
-        dt = datetime.fromisoformat(event_time_str)
+        dt = datetime.fromisoformat(val_str)
         if dt.tzinfo is None:
             return dt.replace(tzinfo=UTC)
         return dt.astimezone(UTC)
     except Exception:
-        return None
+        pass
+    for fmt in (
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%m/%d/%Y %H:%M:%S",
+        "%d/%m/%Y",
+        "%Y-%m-%d",
+    ):
+        try:
+            return datetime.strptime(val_str, fmt).replace(tzinfo=UTC)
+        except Exception:
+            pass
+    return None
 
 
 class TypeBConnectorService:
@@ -182,7 +195,12 @@ class TypeBConnectorService:
                     summary.error_message = str(exc)
                     return summary
 
-                events = payload.get("events", [])
+                events = (
+                    payload.get("events")
+                    or payload.get("items")
+                    or payload.get("event_documents")
+                    or []
+                )
                 if not events:
                     break
 
@@ -191,7 +209,12 @@ class TypeBConnectorService:
                 # Subtask 2: Reuse normalization service
                 for raw_event in events:
                     tracking_number = str(raw_event.get("tracking_number", "")).strip()
-                    raw_status = str(raw_event.get("status", "")).strip()
+                    raw_status = str(
+                        raw_event.get("status")
+                        or raw_event.get("event_status")
+                        or raw_event.get("raw_status")
+                        or ""
+                    ).strip()
                     event_id = str(raw_event.get("event_key") or raw_event.get("event_id", ""))
                     occurred_at = _parse_event_time(raw_event.get("event_time"))
 
@@ -219,9 +242,14 @@ class TypeBConnectorService:
                         )
                         summary.errors += 1
 
-                total = payload.get("total", 0)
+                total = (
+                    payload.get("total")
+                    or payload.get("pagination", {}).get("total_items")
+                    or payload.get("pagination", {}).get("total")
+                    or 0
+                )
                 offset += len(events)
-                if offset >= total or len(events) < page_size:
+                if (total and offset >= total) or len(events) < page_size:
                     break
 
         return summary

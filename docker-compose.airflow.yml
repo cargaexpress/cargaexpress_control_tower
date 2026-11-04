@@ -31,8 +31,9 @@ x-airflow-common: &airflow-common
 
 services:
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:3.13-management-alpine
     restart: unless-stopped
+    container_name: cargaexpress_rabbitmq
     ports:
       - "${RABBITMQ_NODE_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
@@ -158,7 +159,6 @@ services:
 
 networks:
   cargaexpress:
-    name: control_tower_cargaexpress
 
 volumes:
   rabbitmq_data:

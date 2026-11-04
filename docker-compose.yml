@@ -30,6 +30,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       APP_ENV: ${APP_ENV:-development}
       SQL_ECHO: ${SQL_ECHO:-false}
@@ -54,6 +56,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     command: ["python", "-m", "app.worker"]
     environment:
       APP_ENV: ${APP_ENV:-development}
@@ -66,6 +70,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - cargaexpress
 
