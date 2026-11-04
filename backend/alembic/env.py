@@ -1,14 +1,13 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-
-from app.config import settings
-from app.database import Base
 
 # Import app.models so Alembic detects all ERD tables during autogenerate (see app/models/__init__.py)
 import app.models  # noqa: F401
+from alembic import context
+from app.config import settings
+from app.database import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

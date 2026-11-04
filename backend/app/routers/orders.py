@@ -23,7 +23,9 @@ from app.services.exceptions import (
 
 # The router translates HTTP requests/errors; persistence rules stay in the service.
 router = APIRouter(
-    prefix="/api/v1/orders", tags=["orders"], dependencies=[Depends(require_api_key)]
+    prefix="/api/v1/orders",
+    tags=["Operational: Orders", "orders"],
+    dependencies=[Depends(require_api_key)],
 )
 
 

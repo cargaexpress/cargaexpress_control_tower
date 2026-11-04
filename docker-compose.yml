@@ -30,12 +30,15 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       APP_ENV: ${APP_ENV:-development}
       SQL_ECHO: ${SQL_ECHO:-false}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       API_KEY: ${API_KEY:-}
       BRAND_API_KEYS: '${BRAND_API_KEYS:-{}}'
+      CARRIER_API_KEYS: '${CARRIER_API_KEYS:-{}}'
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@db:5432/${POSTGRES_DB:-cargaexpress}
@@ -53,6 +56,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     command: ["python", "-m", "app.worker"]
     environment:
       APP_ENV: ${APP_ENV:-development}
@@ -65,6 +70,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - cargaexpress
 
@@ -80,6 +90,7 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       API_KEY: ${API_KEY:-}
       BRAND_API_KEYS: '${BRAND_API_KEYS:-{}}'
+      CARRIER_API_KEYS: '${CARRIER_API_KEYS:-{}}'
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       STATE_MAPPING_CACHE_TTL_SECONDS: ${STATE_MAPPING_CACHE_TTL_SECONDS:-300}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is missing in the .env file}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in the .env file}@test-db:5432/cargaexpress_test

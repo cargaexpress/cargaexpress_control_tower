@@ -1,0 +1,23 @@
+{
+  "Name": "tg-cargaexpress-backend",
+  "Protocol": "HTTP",
+  "Port": 8000,
+  "VpcId": "vpc-0123456789abcdef0",
+  "TargetType": "ip",
+  "HealthCheckProtocol": "HTTP",
+  "HealthCheckPort": "8000",
+  "HealthCheckPath": "/api/v1/health",
+  "HealthCheckIntervalSeconds": 15,
+  "HealthCheckTimeoutSeconds": 5,
+  "HealthyThresholdCount": 2,
+  "UnhealthyThresholdCount": 3,
+  "Matcher": {
+    "HttpCode": "200"
+  },
+  "TargetGroupAttributes": [
+    {
+      "Key": "deregistration_delay.timeout_seconds",
+      "Value": "30"
+    }
+  ]
+}

@@ -1,0 +1,183 @@
+{
+  "family": "cargaexpress-airflow",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/cargaexpress-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/cargaexpress-airflow-task-role",
+  "containerDefinitions": [
+    {
+      "name": "airflow-webserver",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cargaexpress-airflow:latest",
+      "command": [
+        "webserver"
+      ],
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl --fail http://localhost:8080/health || exit 1"
+        ],
+        "interval": 20,
+        "timeout": 10,
+        "retries": 5,
+        "startPeriod": 30
+      },
+      "environment": [
+        {
+          "name": "AIRFLOW__CORE__EXECUTOR",
+          "value": "CeleryExecutor"
+        },
+        {
+          "name": "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION",
+          "value": "true"
+        },
+        {
+          "name": "AIRFLOW__CORE__LOAD_EXAMPLES",
+          "value": "false"
+        },
+        {
+          "name": "AIRFLOW__API__AUTH_BACKENDS",
+          "value": "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+        },
+        {
+          "name": "AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL",
+          "value": "10"
+        },
+        {
+          "name": "AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK",
+          "value": "true"
+        },
+        {
+          "name": "AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT",
+          "value": "300"
+        },
+        {
+          "name": "AIRFLOW__WEBSERVER__WORKERS",
+          "value": "2"
+        },
+        {
+          "name": "CONTROL_TOWER_API_URL",
+          "value": "http://cargaexpress-backend.internal:8000"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-db-url"
+        },
+        {
+          "name": "AIRFLOW__CELERY__RESULT_BACKEND",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-result-backend"
+        },
+        {
+          "name": "AIRFLOW__CELERY__BROKER_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-broker-url"
+        },
+        {
+          "name": "AIRFLOW__CORE__FERNET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-fernet-key"
+        },
+        {
+          "name": "ADMIN_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cargaexpress-airflow-webserver",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "airflow-scheduler",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cargaexpress-airflow:latest",
+      "command": [
+        "scheduler"
+      ],
+      "essential": true,
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl --fail http://localhost:8974/health || exit 1"
+        ],
+        "interval": 20,
+        "timeout": 10,
+        "retries": 5,
+        "startPeriod": 30
+      },
+      "environment": [
+        {
+          "name": "AIRFLOW__CORE__EXECUTOR",
+          "value": "CeleryExecutor"
+        },
+        {
+          "name": "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION",
+          "value": "true"
+        },
+        {
+          "name": "AIRFLOW__CORE__LOAD_EXAMPLES",
+          "value": "false"
+        },
+        {
+          "name": "AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL",
+          "value": "10"
+        },
+        {
+          "name": "AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK",
+          "value": "true"
+        },
+        {
+          "name": "CONTROL_TOWER_API_URL",
+          "value": "http://cargaexpress-backend.internal:8000"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-db-url"
+        },
+        {
+          "name": "AIRFLOW__CELERY__RESULT_BACKEND",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-result-backend"
+        },
+        {
+          "name": "AIRFLOW__CELERY__BROKER_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-broker-url"
+        },
+        {
+          "name": "AIRFLOW__CORE__FERNET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-fernet-key"
+        },
+        {
+          "name": "ADMIN_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cargaexpress-airflow-scheduler",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}

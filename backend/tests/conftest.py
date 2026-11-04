@@ -16,6 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.ext.compiler import compiles
 
 from app.config import settings
+
+# Reset ambient development webhook credentials so tests default to isolated test fixtures
+settings.webhook_secret = ""
+settings.carrier_webhook_tokens = {}
+
 from app.database import Base, get_db
 from app.main import app
 from app.services.rabbitmq_service import QueuedWebhookMessage, get_rabbitmq_service

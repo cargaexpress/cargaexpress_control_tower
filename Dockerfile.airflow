@@ -1,0 +1,11 @@
+# syntax=docker/dockerfile:1
+# CargaExpress Airflow Custom Image with Pre-baked Dependencies (RIWI-168)
+FROM apache/airflow:2.9.3
+
+USER airflow
+
+# Install batch pipeline and Celery dependencies directly into the image
+# This eliminates startup latency from _PIP_ADDITIONAL_REQUIREMENTS during container boot
+RUN pip install --no-cache-dir \
+    pandas>=2.2.0 \
+    openpyxl>=3.1.5

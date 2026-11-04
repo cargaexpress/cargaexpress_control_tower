@@ -120,9 +120,9 @@ async def test_type_c_csv_reader_cleans_defects_and_normalizes(db_session):
     csv_content = (
         b"tracking_number,status,event_time\n"
         b"TRK-TYPEC-001,DISPATCHED,2026-10-20T10:00:00Z\n"
-        b"tracking_number,status,event_time\n"  # Encabezado repetido (Defecto 5.3)
-        b"TRK-TYPEC-002,IN_DEPOT,20/10/2026 11:30:00\n"  # Fecha DD/MM (Defecto 5.3)
-        b"TOTAL REGISTROS,2,SUBTOTAL\n"  # Fila de totales (Defecto 5.3)
+        b"tracking_number,status,event_time\n"  # Repeated header (Defect 5.3)
+        b"TRK-TYPEC-002,IN_DEPOT,20/10/2026 11:30:00\n"  # Mixed date DD/MM format (Defect 5.3)
+        b"TOTAL REGISTROS,2,SUBTOTAL\n"  # Summary totals row (Defect 5.3)
     )
 
     service = TypeCConnectorService()
@@ -160,14 +160,14 @@ async def test_type_c_excel_reader_cleans_and_normalizes(db_session):
     """Subtask 1 & 2: Reads Excel (.xlsx), cleans summary rows and normalizes."""
     await _seed_test_carrier_c(db_session)
 
-    # Crear libro de Excel en memoria
+    # Create in-memory Excel workbook
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.append(["guia", "estado", "fecha"])
     ws.append(["TRK-TYPEC-001", "DISPATCHED", "2026-10-20T08:00:00Z"])
-    ws.append(["guia", "estado", "fecha"])  # Cabecera repetida
+    ws.append(["guia", "estado", "fecha"])  # Repeated header
     ws.append(["TRK-TYPEC-002", "IN_DEPOT", "2026-10-20T09:00:00Z"])
-    ws.append(["TOTAL", "2", ""])  # Fila de total
+    ws.append(["TOTAL", "2", ""])  # Total summary row
 
     stream = io.BytesIO()
     wb.save(stream)
@@ -215,7 +215,7 @@ async def test_type_c_marks_processed_files_to_prevent_duplicates(db_session):
     assert record is not None
     assert record.valid_records == 1
 
-    # Segundo procesamiento del mismo archivo: Debe ser omitido
+    # Second processing of same file: must be skipped (idempotent)
     result_2 = await service.process_file_content(
         db=db_session,
         filename="unique_batch_001.csv",

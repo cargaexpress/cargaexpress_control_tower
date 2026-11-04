@@ -10,8 +10,14 @@ from app.config import settings
 from app.routers import (
     admin_carrier_state_mapping,
     admin_state_mapping,
+    alerts,
+    analytics,
+    carriers,
+    financial,
     health,
     orders,
+    sla,
+    type_a_sync,
     type_b_sync,
     type_c_ingestion,
     webhooks,
@@ -22,38 +28,99 @@ logging.basicConfig(level=getattr(logging, settings.log_level))
 logger = logging.getLogger("cargaexpress")
 
 openapi_tags = [
+    # =========================================================================
+    # Group A: Operational API (Daily Control Tower operations)
+    # =========================================================================
     {
-        "name": "health",
-        "description": "API health check and database connectivity probe.",
+        "name": "Operational: Orders",
+        "description": "Daily operations: order creation, detail query, status updates, and shipping labels.",
     },
     {
-        "name": "orders",
-        "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels.",
+        "name": "Operational: Carriers",
+        "description": "Daily operations: carrier catalog query, detail view, and authenticated carrier profile.",
     },
     {
-        "name": "webhooks",
-        "description": "Carrier webhook receiver for push tracking events (F3 / RNF-01).",
+        "name": "Operational: SLA & Compliance",
+        "description": "Daily operations: SLA tracking, delivery deadlines, at-risk shipments, brand and carrier metrics.",
     },
     {
-        "name": "connectors: type b",
-        "description": "Polling connectors and synchronization hooks for Type B carriers (F4).",
+        "name": "Operational: Alerts",
+        "description": "Daily operations: operational alerts query for at-risk shipments/exceptions, and alert resolution.",
     },
     {
-        "name": "connectors: type c",
-        "description": "Batch file ingestion connectors for Type C carriers (CSV/Excel) (F5).",
+        "name": "Operational: Financial",
+        "description": "Daily operations: responsibility attributions, freight penalties, settlements, and penalty configurations.",
     },
+    {
+        "name": "Operational: Analytics",
+        "description": "Daily operations: high-level KPI metrics, SLA facts, and financial penalty facts consultation.",
+    },
+    # =========================================================================
+    # Group B: Integration API (External carriers and simulators)
+    # =========================================================================
+    {
+        "name": "Integration: Webhooks",
+        "description": "External integration: push webhook tracking receiver with token and HMAC verification (Type A).",
+    },
+    {
+        "name": "Integration: Connectors",
+        "description": "External integration: polling connectors and batch file uploads for external carriers and simulators (Type A, B, C).",
+    },
+    # =========================================================================
+    # Group C: Internal Process API (Controlled operations for internal services)
+    # =========================================================================
+    {
+        "name": "Internal Processes: Alerts",
+        "description": "Controlled internal operations: on-demand automated risk scanning and preventive alert generation.",
+    },
+    {
+        "name": "Internal Processes: Financial Settlements",
+        "description": "Controlled internal operations: biweekly financial netting settlement calculation and period generation.",
+    },
+    {
+        "name": "Internal Processes: Analytics ETL",
+        "description": "Controlled internal operations: dimensional star-schema analytical ETL pipeline execution.",
+    },
+    # =========================================================================
+    # Group D: Administration API (State mapping configuration)
+    # =========================================================================
+    {
+        "name": "Administration: State Mappings",
+        "description": "Administrative operations: carrier raw status translation and canonical status mapping management.",
+    },
+    # =========================================================================
+    # Group E: Monitoring API (Health and readiness probes)
+    # =========================================================================
+    {
+        "name": "Monitoring: Health & Readiness",
+        "description": "System monitoring: service availability health check and database connectivity readiness probe.",
+    },
+    # =========================================================================
+    # Legacy Compatibility Tags
+    # =========================================================================
+    {"name": "health", "description": "Legacy alias: System health check."},
+    {"name": "orders", "description": "Legacy alias: Orders operations."},
+    {"name": "sla & compliance", "description": "Legacy alias: SLA and compliance."},
+    {
+        "name": "alerts & risk monitoring",
+        "description": "Legacy alias: Alerts and risk monitoring.",
+    },
+    {"name": "financial & penalties", "description": "Legacy alias: Financial and penalties."},
+    {
+        "name": "analytics & data warehouse",
+        "description": "Legacy alias: Analytics and data warehouse.",
+    },
+    {"name": "webhooks", "description": "Legacy alias: Webhooks."},
+    {"name": "connectors: type a", "description": "Legacy alias: Connectors Type A."},
+    {"name": "connectors: type b", "description": "Legacy alias: Connectors Type B."},
+    {"name": "connectors: type c", "description": "Legacy alias: Connectors Type C."},
     {
         "name": "admin: carrier state mapping",
-        "description": "Carrier status mapping administration for canonical status normalization (HU-15).",
+        "description": "Legacy alias: Carrier state mapping admin.",
     },
-    {
-        "name": "admin: state mapping",
-        "description": "CRUD operations and real-time cached status translation (HU-12).",
-    },
-    {
-        "name": "openapi contract",
-        "description": "OpenAPI metadata and contract validation for the platform API surface.",
-    },
+    {"name": "admin: state mapping", "description": "Legacy alias: State mapping admin."},
+    {"name": "carriers", "description": "Legacy alias: Carriers catalog."},
+    {"name": "openapi contract", "description": "OpenAPI metadata and contract validation."},
 ]
 
 
@@ -105,11 +172,17 @@ def create_app() -> FastAPI:
 
     application.include_router(health.router)
     application.include_router(webhooks.router)
+    application.include_router(type_a_sync.router)
     application.include_router(type_b_sync.router)
     application.include_router(type_c_ingestion.router)
     application.include_router(admin_state_mapping.router)
     application.include_router(admin_carrier_state_mapping.router)
     application.include_router(orders.router)
+    application.include_router(carriers.router)
+    application.include_router(sla.router)
+    application.include_router(alerts.router)
+    application.include_router(financial.router)
+    application.include_router(analytics.router)
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, request_validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)

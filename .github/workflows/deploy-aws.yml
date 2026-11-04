@@ -1,0 +1,174 @@
+name: Deploy to AWS ECS Fargate (HU-40)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - 'deploy/**'
+      - 'Dockerfile.airflow'
+      - '.github/workflows/deploy-aws.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      deploy_airflow:
+        description: 'Whether to deploy Airflow ECS task definition'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write   # Required for AWS OIDC authentication
+  contents: read    # Required to checkout the repository
+
+concurrency:
+  group: deploy-aws-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Continuous Deployment to AWS
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER || 'cargaexpress-production' }}
+      ECS_BACKEND_SERVICE: ${{ vars.ECS_BACKEND_SERVICE || 'cargaexpress-backend-service' }}
+      ECS_WORKER_SERVICE: ${{ vars.ECS_WORKER_SERVICE || 'cargaexpress-worker-service' }}
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up uv for RDS Migrations
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.7"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+          role-session-name: CargaExpressGitHubActions-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ------------------------------------------------------------------------
+      # Step 1: Multi-stage Build & Dual-tagging Push to Amazon ECR
+      # ------------------------------------------------------------------------
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          target: final
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/cargaexpress-backend:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/cargaexpress-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push Worker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          target: final
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/cargaexpress-worker:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/cargaexpress-worker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push Airflow Custom Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.airflow
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/cargaexpress-airflow:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/cargaexpress-airflow:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ------------------------------------------------------------------------
+      # Step 2: Database Automation and Migration on Amazon RDS (HU-38)
+      # ------------------------------------------------------------------------
+      - name: Apply Database Migrations on RDS
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          chmod +x scripts/migrate_rds.sh
+          ./scripts/migrate_rds.sh --action upgrade
+
+      # ------------------------------------------------------------------------
+      # Step 3: Render ECS Task Definitions with New ECR Images
+      # ------------------------------------------------------------------------
+      - name: Render Backend ECS Task Definition
+        id: render-backend-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: deploy/aws/task-definition-backend.json
+          container-name: cargaexpress-backend
+          image: ${{ steps.login-ecr.outputs.registry }}/cargaexpress-backend:${{ env.IMAGE_TAG }}
+
+      - name: Render Worker ECS Task Definition
+        id: render-worker-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: deploy/aws/task-definition-worker.json
+          container-name: cargaexpress-worker
+          image: ${{ steps.login-ecr.outputs.registry }}/cargaexpress-worker:${{ env.IMAGE_TAG }}
+
+      # ------------------------------------------------------------------------
+      # Step 4: Deploy Task Definitions to ECS Fargate
+      # ------------------------------------------------------------------------
+      - name: Deploy Backend Service to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-backend-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_BACKEND_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deploy Worker Service to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-worker-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_WORKER_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      # ------------------------------------------------------------------------
+      # Step 5: Post-deployment Health Check Verification
+      # ------------------------------------------------------------------------
+      - name: Verify Live Service Health Probe
+        if: ${{ vars.BACKEND_PUBLIC_URL != '' }}
+        run: |
+          echo "Verifying health check probe at ${{ vars.BACKEND_PUBLIC_URL }}/api/v1/health"
+          curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
+            "${{ vars.BACKEND_PUBLIC_URL }}/api/v1/health"

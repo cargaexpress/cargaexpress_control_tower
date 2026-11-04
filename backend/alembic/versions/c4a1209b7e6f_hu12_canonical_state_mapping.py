@@ -3,16 +3,16 @@
 Revision ID: c4a1209b7e6f
 Revises: b7e24d51c8a9
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision: str = "c4a1209b7e6f"
-down_revision: Union[str, None] = "b7e24d51c8a9"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "b7e24d51c8a9"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 CANONICAL_STATUSES = (
     "CREATED",

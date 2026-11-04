@@ -25,6 +25,7 @@
     "/api/v1/health": {
       "get": {
         "tags": [
+          "Monitoring: Health & Readiness",
           "health"
         ],
         "summary": "Service health and connectivity probe",
@@ -47,6 +48,7 @@
     "/api/v1/ready": {
       "get": {
         "tags": [
+          "Monitoring: Health & Readiness",
           "health"
         ],
         "summary": "Readiness probe",
@@ -76,9 +78,433 @@
         }
       }
     },
+    "/api/v1/webhooks/{carrier_slug}": {
+      "post": {
+        "tags": [
+          "Integration: Webhooks",
+          "webhooks"
+        ],
+        "summary": "Receive Carrier Webhook",
+        "description": "Receive push tracking events from Type A carrier webhooks (F3 / RNF-01 / NFR-06).\n\nDecodes heterogeneous payloads and publishes to RabbitMQ queue `eventos_transportadora`\nfor asynchronous processing, guaranteeing response time < 200 ms (RNF-01).\nProtected by token or HMAC signature verification (NFR-06).",
+        "operationId": "receive_carrier_webhook_api_v1_webhooks__carrier_slug__post",
+        "parameters": [
+          {
+            "name": "carrier_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Carrier Slug"
+            }
+          },
+          {
+            "name": "content-type",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "application/json",
+              "title": "Content-Type"
+            }
+          },
+          {
+            "name": "X-Carrier-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Carrier-Token"
+            }
+          },
+          {
+            "name": "X-Webhook-Secret",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Webhook-Secret"
+            }
+          },
+          {
+            "name": "X-Signature-SHA256",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Signature-Sha256"
+            }
+          },
+          {
+            "name": "X-Hub-Signature-256",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Hub-Signature-256"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Receive Carrier Webhook Api V1 Webhooks  Carrier Slug  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/type-a": {
+      "post": {
+        "tags": [
+          "Integration: Connectors",
+          "connectors: type a"
+        ],
+        "summary": "Trigger Type A Sync",
+        "description": "Trigger periodic polling connector for Type A simulator receiver (F3 Airflow batch hook).\n\nQueries simulator receiver REST APIs, normalizes tracking statuses into canonical states,\nand updates WMS database with RN-01 and RN-02 compliance.",
+        "operationId": "trigger_type_a_sync_api_v1_sync_type_a_post",
+        "parameters": [
+          {
+            "name": "carrier_slug",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional carrier slug (alpha, beta, gamma, delta, epsilon). If omitted, syncs all 5 carriers.",
+              "title": "Carrier Slug"
+            },
+            "description": "Optional carrier slug (alpha, beta, gamma, delta, epsilon). If omitted, syncs all 5 carriers."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Max events to pull per carrier.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Max events to pull per carrier."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Trigger Type A Sync Api V1 Sync Type A Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/type-b": {
+      "post": {
+        "tags": [
+          "Integration: Connectors",
+          "connectors: type b"
+        ],
+        "summary": "Trigger Type B Sync",
+        "description": "Trigger periodic polling connector for Type B carriers (F4 / Airflow batch hook).\n\nQueries carrier REST APIs, respects rate limits with exponential backoff,\nand passes all tracking events through NormalizationService (RN-01 / RN-02).",
+        "operationId": "trigger_type_b_sync_api_v1_sync_type_b_post",
+        "parameters": [
+          {
+            "name": "carrier_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional carrier name to sync. If omitted, syncs all 4 Type B carriers.",
+              "title": "Carrier Name"
+            },
+            "description": "Optional carrier name to sync. If omitted, syncs all 4 Type B carriers."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Trigger Type B Sync Api V1 Sync Type B Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/type-c/sync": {
+      "post": {
+        "tags": [
+          "Integration: Connectors",
+          "connectors: type c"
+        ],
+        "summary": "Trigger Type C Sync",
+        "description": "Trigger pull synchronization for Type C batch files from carrier endpoints and MinIO S3.\n\nDownloads newly generated CSV/Excel files from Carrier servers or MinIO S3 bucket,\ndeduplicates against previously ingested files, and normalizes events to canonical states.",
+        "operationId": "trigger_type_c_sync_api_v1_sync_type_c_sync_post",
+        "parameters": [
+          {
+            "name": "carrier_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional carrier name. If omitted, synchronizes all Type C sources.",
+              "title": "Carrier Name"
+            },
+            "description": "Optional carrier name. If omitted, synchronizes all Type C sources."
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Source to pull from: 'endpoints', 'minio', or 'all'",
+              "default": "all",
+              "title": "Source"
+            },
+            "description": "Source to pull from: 'endpoints', 'minio', or 'all'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Trigger Type C Sync Api V1 Sync Type C Sync Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/type-c": {
+      "post": {
+        "tags": [
+          "Integration: Connectors",
+          "connectors: type c"
+        ],
+        "summary": "Trigger Type C Sync",
+        "description": "Trigger pull synchronization for Type C batch files from carrier endpoints and MinIO S3.\n\nDownloads newly generated CSV/Excel files from Carrier servers or MinIO S3 bucket,\ndeduplicates against previously ingested files, and normalizes events to canonical states.",
+        "operationId": "trigger_type_c_sync_api_v1_sync_type_c_post",
+        "parameters": [
+          {
+            "name": "carrier_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional carrier name. If omitted, synchronizes all Type C sources.",
+              "title": "Carrier Name"
+            },
+            "description": "Optional carrier name. If omitted, synchronizes all Type C sources."
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Source to pull from: 'endpoints', 'minio', or 'all'",
+              "default": "all",
+              "title": "Source"
+            },
+            "description": "Source to pull from: 'endpoints', 'minio', or 'all'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Trigger Type C Sync Api V1 Sync Type C Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/type-c/upload": {
+      "post": {
+        "tags": [
+          "Integration: Connectors",
+          "connectors: type c"
+        ],
+        "summary": "Upload Type C File",
+        "description": "Upload and ingest a Type C batch file (CSV or Excel).\n\nCleans known defects (repeated headers, total/summary rows),\nprevents duplicate ingestion via SHA-256 and filename tracking,\nand normalizes all valid tracking events using NormalizationService.",
+        "operationId": "upload_type_c_file_api_v1_sync_type_c_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_type_c_file_api_v1_sync_type_c_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Upload Type C File Api V1 Sync Type C Upload Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/state-mappings": {
       "get": {
         "tags": [
+          "Administration: State Mappings",
           "admin: state mapping"
         ],
         "summary": "List persisted state mappings (HU-12)",
@@ -158,6 +584,7 @@
       },
       "post": {
         "tags": [
+          "Administration: State Mappings",
           "admin: state mapping"
         ],
         "summary": "Create a new state mapping (HU-12)",
@@ -241,6 +668,7 @@
     "/api/v1/admin/state-mappings/resolve": {
       "get": {
         "tags": [
+          "Administration: State Mappings",
           "admin: state mapping"
         ],
         "summary": "Translate raw carrier status to canonical status (HU-12)",
@@ -331,6 +759,7 @@
     "/api/v1/admin/state-mappings/{mapping_id}": {
       "patch": {
         "tags": [
+          "Administration: State Mappings",
           "admin: state mapping"
         ],
         "summary": "Partially update an existing state mapping (HU-12)",
@@ -421,6 +850,7 @@
       },
       "delete": {
         "tags": [
+          "Administration: State Mappings",
           "admin: state mapping"
         ],
         "summary": "Delete an existing state mapping (HU-12)",
@@ -493,6 +923,7 @@
     "/api/v1/admin/carrier-state-mappings/{carrier_id}": {
       "get": {
         "tags": [
+          "Administration: State Mappings",
           "admin: carrier state mapping"
         ],
         "summary": "Retrieve state mappings for a specific carrier (HU-15)",
@@ -571,6 +1002,7 @@
       },
       "put": {
         "tags": [
+          "Administration: State Mappings",
           "admin: carrier state mapping"
         ],
         "summary": "Replace entire state mapping set for a carrier (HU-15)",
@@ -664,6 +1096,7 @@
     "/api/v1/orders": {
       "post": {
         "tags": [
+          "Operational: Orders",
           "orders"
         ],
         "summary": "Create a new order with lines and recipient (HU-13)",
@@ -745,6 +1178,7 @@
       },
       "get": {
         "tags": [
+          "Operational: Orders",
           "orders"
         ],
         "summary": "List orders with pagination (HU-13)",
@@ -811,6 +1245,7 @@
     "/api/v1/orders/{order_id}": {
       "get": {
         "tags": [
+          "Operational: Orders",
           "orders"
         ],
         "summary": "Retrieve order by ID (HU-13)",
@@ -873,6 +1308,7 @@
     "/api/v1/orders/{order_id}/status": {
       "patch": {
         "tags": [
+          "Operational: Orders",
           "orders"
         ],
         "summary": "Update order status (HU-13)",
@@ -945,6 +1381,7 @@
     "/api/v1/orders/{order_id}/shipping-labels": {
       "post": {
         "tags": [
+          "Operational: Orders",
           "orders"
         ],
         "summary": "Associate shipping label with an order (RN-07)",
@@ -1042,6 +1479,7 @@
       },
       "get": {
         "tags": [
+          "Operational: Orders",
           "orders"
         ],
         "summary": "List shipping labels for an order (RN-07)",
@@ -1111,10 +1549,2700 @@
           }
         }
       }
+    },
+    "/api/v1/carriers/me": {
+      "get": {
+        "tags": [
+          "Operational: Carriers",
+          "carriers"
+        ],
+        "summary": "Get My Carrier Profile",
+        "description": "Retrieve profile and integration information for the currently authenticated carrier.",
+        "operationId": "get_my_carrier_profile_api_v1_carriers_me_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/carriers": {
+      "get": {
+        "tags": [
+          "Operational: Carriers",
+          "carriers"
+        ],
+        "summary": "List All Carriers",
+        "description": "List all registered carriers in the Control Tower.",
+        "operationId": "list_all_carriers_api_v1_carriers_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CarrierRead"
+                  },
+                  "title": "Response List All Carriers Api V1 Carriers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/carriers/{carrier_id}": {
+      "get": {
+        "tags": [
+          "Operational: Carriers",
+          "carriers"
+        ],
+        "summary": "Get Carrier By Id",
+        "description": "Retrieve carrier details by carrier ID.",
+        "operationId": "get_carrier_by_id_api_v1_carriers__carrier_id__get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Carrier primary key",
+              "title": "Carrier Id"
+            },
+            "description": "Carrier primary key"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/orders/{order_id}": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "Get Order Sla Tracking",
+        "description": "Get SLA calculation, delivery deadlines, and compliance status for an order (RN-03, RN-07).",
+        "operationId": "get_order_sla_tracking_api_v1_sla_orders__order_id__get",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaTrackingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/at-risk": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "List At Risk Shipments",
+        "description": "Retrieve all shipments currently classified as at risk of breaching SLA (RN-04).",
+        "operationId": "list_at_risk_shipments_api_v1_sla_at_risk_get",
+        "parameters": [
+          {
+            "name": "country_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by destination country code",
+              "title": "Country Code"
+            },
+            "description": "Filter by destination country code"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SlaCalculationResult"
+                  },
+                  "title": "Response List At Risk Shipments Api V1 Sla At Risk Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/brand/metrics": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "Get Brand Sla Metrics",
+        "description": "Consult aggregated SLA compliance, shipment volume, breaches, and penalties for the authenticated brand.",
+        "operationId": "get_brand_sla_metrics_api_v1_sla_brand_metrics_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter from creation date",
+              "title": "Start Date"
+            },
+            "description": "Filter from creation date"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to creation date",
+              "title": "End Date"
+            },
+            "description": "Filter to creation date"
+          },
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional carrier ID filter",
+              "title": "Carrier Id"
+            },
+            "description": "Optional carrier ID filter"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandSlaMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/brand/shipments": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "List Brand Shipments Sla",
+        "description": "Consult detailed paginated shipment SLA compliance, tracking history, and penalties for the authenticated brand.",
+        "operationId": "list_brand_shipments_sla_api_v1_sla_brand_shipments_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "sla_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MET, BREACHED, PENDING",
+              "title": "Sla Status"
+            },
+            "description": "MET, BREACHED, PENDING"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedShipmentsSlaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/brand/history": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "Get Brand Sla History",
+        "description": "Consult daily historical SLA compliance and penalty trends for the authenticated brand.",
+        "operationId": "get_brand_sla_history_api_v1_sla_brand_history_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoricalSlaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/carrier/metrics": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "Get Carrier Sla Metrics",
+        "description": "Consult assigned shipment volume, SLA compliance, breaches, and attributable penalties for the carrier.",
+        "operationId": "get_carrier_sla_metrics_api_v1_sla_carrier_metrics_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "brand_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Brand Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierSlaMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/carrier/shipments": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "List Carrier Shipments Sla",
+        "description": "Consult detailed paginated assigned shipments, SLA status, and attributable penalties for the carrier.",
+        "operationId": "list_carrier_shipments_sla_api_v1_sla_carrier_shipments_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "brand_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Brand Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedShipmentsSlaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/carrier/history": {
+      "get": {
+        "tags": [
+          "Operational: SLA & Compliance",
+          "sla & compliance"
+        ],
+        "summary": "Get Carrier Sla History",
+        "description": "Consult daily historical SLA compliance and carrier-attributable penalty trends for the carrier.",
+        "operationId": "get_carrier_sla_history_api_v1_sla_carrier_history_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoricalSlaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts": {
+      "get": {
+        "tags": [
+          "Operational: Alerts",
+          "alerts & risk monitoring"
+        ],
+        "summary": "List Alerts",
+        "description": "List operational alerts for shipments at risk or with prolonged exceptions (RN-04).",
+        "operationId": "list_alerts_api_v1_alerts_get",
+        "parameters": [
+          {
+            "name": "alert_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by type: PREVENTIVE_24H or PROLONGED_EXCEPTION",
+              "title": "Alert Type"
+            },
+            "description": "Filter by type: PREVENTIVE_24H or PROLONGED_EXCEPTION"
+          },
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by carrier ID",
+              "title": "Carrier Id"
+            },
+            "description": "Filter by carrier ID"
+          },
+          {
+            "name": "is_resolved",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by resolution status (defaults to false for active alerts)",
+              "default": false,
+              "title": "Is Resolved"
+            },
+            "description": "Filter by resolution status (defaults to false for active alerts)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShipmentAlertRead"
+                  },
+                  "title": "Response List Alerts Api V1 Alerts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/scan": {
+      "post": {
+        "tags": [
+          "Operational: Alerts",
+          "alerts & risk monitoring",
+          "Internal Processes: Alerts"
+        ],
+        "summary": "Trigger controlled on-demand shipment risk scan (Internal process)",
+        "description": "Trigger an on-demand scan across all active shipments to identify risks and generate alerts.",
+        "operationId": "trigger_risk_scan_api_v1_alerts_scan_post",
+        "parameters": [
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertScanSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{alert_id}/resolve": {
+      "post": {
+        "tags": [
+          "Operational: Alerts",
+          "alerts & risk monitoring"
+        ],
+        "summary": "Resolve Alert",
+        "description": "Manually mark an active alert as resolved with resolution notes.",
+        "operationId": "resolve_alert_api_v1_alerts__alert_id__resolve_post",
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Alert Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentAlertRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/financial/attributions/tracking/{tracking_number}": {
+      "get": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties"
+        ],
+        "summary": "Get Tracking Attribution",
+        "description": "Query responsibility attribution for a shipment with tenant data isolation (BR-10).",
+        "operationId": "get_tracking_attribution_api_v1_financial_attributions_tracking__tracking_number__get",
+        "parameters": [
+          {
+            "name": "tracking_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tracking Number"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttributionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/financial/penalties": {
+      "get": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties"
+        ],
+        "summary": "List Client Penalties",
+        "description": "Expose an API allowing clients to query penalties attributed to their orders (FR-06, BR-10).",
+        "operationId": "list_client_penalties_api_v1_financial_penalties_get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional carrier ID filter",
+              "title": "Carrier Id"
+            },
+            "description": "Optional carrier ID filter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FreightPenaltyRead"
+                  },
+                  "title": "Response List Client Penalties Api V1 Financial Penalties Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/financial/carrier/{carrier_id}/penalties": {
+      "get": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties"
+        ],
+        "summary": "List Carrier Penalties",
+        "description": "Expose an API allowing carriers to query penalties attributed to them (FR-07).",
+        "operationId": "list_carrier_penalties_api_v1_financial_carrier__carrier_id__penalties_get",
+        "parameters": [
+          {
+            "name": "carrier_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Carrier Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FreightPenaltyRead"
+                  },
+                  "title": "Response List Carrier Penalties Api V1 Financial Carrier  Carrier Id  Penalties Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/financial/settlements/generate": {
+      "post": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties",
+          "Internal Processes: Financial Settlements"
+        ],
+        "summary": "Generate or retrieve a biweekly settlement period and netting calculation (Internal process)",
+        "description": "Generate or retrieve a biweekly settlement period and netting calculation (Admin only).",
+        "operationId": "generate_settlement_api_v1_financial_settlements_generate_post",
+        "parameters": [
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlementGenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialSettlementRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/financial/settlements/{settlement_id}": {
+      "get": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties"
+        ],
+        "summary": "Get Settlement By Id",
+        "description": "Retrieve details of a biweekly settlement period.",
+        "operationId": "get_settlement_by_id_api_v1_financial_settlements__settlement_id__get",
+        "parameters": [
+          {
+            "name": "settlement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Settlement Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialSettlementRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/financial/settlements/{settlement_id}/ledger": {
+      "get": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties"
+        ],
+        "summary": "List Settlement Ledger Entries",
+        "description": "Review detailed audit trail and ledger movements for a settlement.",
+        "operationId": "list_settlement_ledger_entries_api_v1_financial_settlements__settlement_id__ledger_get",
+        "parameters": [
+          {
+            "name": "settlement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Settlement Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FinancialLedgerEntryRead"
+                  },
+                  "title": "Response List Settlement Ledger Entries Api V1 Financial Settlements  Settlement Id  Ledger Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/financial/config/penalty-scales": {
+      "get": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties"
+        ],
+        "summary": "List Penalty Scale Configs",
+        "description": "Retrieve universal progressive penalty scale configurations.",
+        "operationId": "list_penalty_scale_configs_api_v1_financial_config_penalty_scales_get",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Configuration version",
+              "default": "v1.0",
+              "title": "Version"
+            },
+            "description": "Configuration version"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UniversalPenaltyConfigRead"
+                  },
+                  "title": "Response List Penalty Scale Configs Api V1 Financial Config Penalty Scales Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Operational: Financial",
+          "financial & penalties"
+        ],
+        "summary": "Create Or Update Penalty Scale Config",
+        "description": "Create or update a universal penalty scale level configuration (Admin only).",
+        "operationId": "create_or_update_penalty_scale_config_api_v1_financial_config_penalty_scales_post",
+        "parameters": [
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UniversalPenaltyConfigCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniversalPenaltyConfigRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/etl/run": {
+      "post": {
+        "tags": [
+          "Operational: Analytics",
+          "analytics & data warehouse",
+          "Internal Processes: Analytics ETL"
+        ],
+        "summary": "Execute the full analytical ETL/ELT pipeline (Internal process)",
+        "description": "Execute the full analytical ETL/ELT pipeline (Admin only).\n\nExtracts operational data from WMS orders, dispatches, tracking events,\nand financial calculations, transforms them into dimensional star schema,\nand logs data lineage.",
+        "operationId": "trigger_etl_run_api_v1_analytics_etl_run_post",
+        "parameters": [
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EtlBatchRunRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/etl/batches": {
+      "get": {
+        "tags": [
+          "Operational: Analytics",
+          "analytics & data warehouse"
+        ],
+        "summary": "List Etl Batches",
+        "description": "Audit ETL executions and data lineage tracking (Admin only).",
+        "operationId": "list_etl_batches_api_v1_analytics_etl_batches_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EtlBatchRunRead"
+                  },
+                  "title": "Response List Etl Batches Api V1 Analytics Etl Batches Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/facts/shipments-sla": {
+      "get": {
+        "tags": [
+          "Operational: Analytics",
+          "analytics & data warehouse"
+        ],
+        "summary": "Query Fact Shipments Sla",
+        "description": "Query analytical fact table for shipment SLA performance.",
+        "operationId": "query_fact_shipments_sla_api_v1_analytics_facts_shipments_sla_get",
+        "parameters": [
+          {
+            "name": "brand_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Brand Key"
+            }
+          },
+          {
+            "name": "carrier_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Carrier Key"
+            }
+          },
+          {
+            "name": "sla_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sla Status"
+            }
+          },
+          {
+            "name": "is_breached",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Breached"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FactShipmentSlaRead"
+                  },
+                  "title": "Response Query Fact Shipments Sla Api V1 Analytics Facts Shipments Sla Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/facts/penalties": {
+      "get": {
+        "tags": [
+          "Operational: Analytics",
+          "analytics & data warehouse"
+        ],
+        "summary": "Query Fact Penalties",
+        "description": "Query analytical fact table for financial penalties.",
+        "operationId": "query_fact_penalties_api_v1_analytics_facts_penalties_get",
+        "parameters": [
+          {
+            "name": "brand_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Brand Key"
+            }
+          },
+          {
+            "name": "carrier_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Carrier Key"
+            }
+          },
+          {
+            "name": "delay_level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Delay Level"
+            }
+          },
+          {
+            "name": "is_carrier_payable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Carrier Payable"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FactFinancialPenaltyRead"
+                  },
+                  "title": "Response Query Fact Penalties Api V1 Analytics Facts Penalties Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/kpis": {
+      "get": {
+        "tags": [
+          "Operational: Analytics",
+          "analytics & data warehouse"
+        ],
+        "summary": "Get Analytics Kpi Summary",
+        "description": "Query high-level analytical KPIs aggregated across fact tables.",
+        "operationId": "get_analytics_kpi_summary_api_v1_analytics_kpis_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsKpiSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AlertResolveRequest": {
+        "properties": {
+          "resolution_notes": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Resolution Notes",
+            "description": "Explanatory notes regarding how this risk/exception was resolved."
+          }
+        },
+        "type": "object",
+        "required": [
+          "resolution_notes"
+        ],
+        "title": "AlertResolveRequest"
+      },
+      "AlertScanSummary": {
+        "properties": {
+          "total_evaluated": {
+            "type": "integer",
+            "title": "Total Evaluated"
+          },
+          "alerts_generated": {
+            "type": "integer",
+            "title": "Alerts Generated"
+          },
+          "preventive_24h_alerts": {
+            "type": "integer",
+            "title": "Preventive 24H Alerts"
+          },
+          "prolonged_exception_alerts": {
+            "type": "integer",
+            "title": "Prolonged Exception Alerts"
+          },
+          "alerts_resolved": {
+            "type": "integer",
+            "title": "Alerts Resolved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_evaluated",
+          "alerts_generated",
+          "preventive_24h_alerts",
+          "prolonged_exception_alerts",
+          "alerts_resolved"
+        ],
+        "title": "AlertScanSummary"
+      },
+      "AnalyticsKpiSummary": {
+        "properties": {
+          "total_shipments": {
+            "type": "integer",
+            "title": "Total Shipments"
+          },
+          "compliant_shipments": {
+            "type": "integer",
+            "title": "Compliant Shipments"
+          },
+          "breached_shipments": {
+            "type": "integer",
+            "title": "Breached Shipments"
+          },
+          "at_risk_shipments": {
+            "type": "integer",
+            "title": "At Risk Shipments"
+          },
+          "compliance_rate_pct": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Compliance Rate Pct"
+          },
+          "total_freight_volume": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Freight Volume"
+          },
+          "total_penalties_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Penalties Amount"
+          },
+          "total_carrier_payable_penalties": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Carrier Payable Penalties"
+          },
+          "total_etl_batches_run": {
+            "type": "integer",
+            "title": "Total Etl Batches Run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_shipments",
+          "compliant_shipments",
+          "breached_shipments",
+          "at_risk_shipments",
+          "compliance_rate_pct",
+          "total_freight_volume",
+          "total_penalties_amount",
+          "total_carrier_payable_penalties",
+          "total_etl_batches_run"
+        ],
+        "title": "AnalyticsKpiSummary"
+      },
+      "AttributionRead": {
+        "properties": {
+          "attribution_id": {
+            "type": "integer",
+            "title": "Attribution Id"
+          },
+          "label_id": {
+            "type": "integer",
+            "title": "Label Id"
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "responsible_party": {
+            "type": "string",
+            "title": "Responsible Party",
+            "description": "DISTRIBUTION_CENTER, CARRIER, CLIENT, or UNDETERMINED"
+          },
+          "incident_type": {
+            "type": "string",
+            "title": "Incident Type"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "evidence_details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Details"
+          },
+          "order_created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Order Created At"
+          },
+          "dispatched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatched At"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "sla_deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Deadline"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attribution_id",
+          "label_id",
+          "order_id",
+          "carrier_id",
+          "tracking_number",
+          "responsible_party",
+          "incident_type",
+          "reason",
+          "order_created_at",
+          "created_at"
+        ],
+        "title": "AttributionRead"
+      },
+      "Body_upload_type_c_file_api_v1_sync_type_c_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "carrier_name": {
+            "type": "string",
+            "title": "Carrier Name",
+            "description": "Name of the Type C carrier (e.g. TransExpress Logistics, Rapido Andino, Logistica 360)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "carrier_name"
+        ],
+        "title": "Body_upload_type_c_file_api_v1_sync_type_c_upload_post"
+      },
+      "BrandSlaMetricsResponse": {
+        "properties": {
+          "brand_id": {
+            "type": "integer",
+            "title": "Brand Id"
+          },
+          "brand_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Name"
+          },
+          "total_shipments": {
+            "type": "integer",
+            "title": "Total Shipments"
+          },
+          "delivered_shipments": {
+            "type": "integer",
+            "title": "Delivered Shipments"
+          },
+          "compliant_shipments": {
+            "type": "integer",
+            "title": "Compliant Shipments"
+          },
+          "breached_shipments": {
+            "type": "integer",
+            "title": "Breached Shipments"
+          },
+          "at_risk_shipments": {
+            "type": "integer",
+            "title": "At Risk Shipments"
+          },
+          "delayed_shipments": {
+            "type": "integer",
+            "title": "Delayed Shipments"
+          },
+          "compliance_rate_pct": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Compliance Rate Pct"
+          },
+          "total_penalties_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Penalties Amount"
+          },
+          "approved_penalties_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Approved Penalties Amount"
+          },
+          "pending_penalties_count": {
+            "type": "integer",
+            "title": "Pending Penalties Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "brand_id",
+          "total_shipments",
+          "delivered_shipments",
+          "compliant_shipments",
+          "breached_shipments",
+          "at_risk_shipments",
+          "delayed_shipments",
+          "compliance_rate_pct",
+          "total_penalties_amount",
+          "approved_penalties_amount",
+          "pending_penalties_count"
+        ],
+        "title": "BrandSlaMetricsResponse"
+      },
+      "CarrierRead": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "integration_type": {
+            "type": "string",
+            "title": "Integration Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "name",
+          "integration_type",
+          "status"
+        ],
+        "title": "CarrierRead"
+      },
+      "CarrierSlaMetricsResponse": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "carrier_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Name"
+          },
+          "total_shipments": {
+            "type": "integer",
+            "title": "Total Shipments"
+          },
+          "delivered_shipments": {
+            "type": "integer",
+            "title": "Delivered Shipments"
+          },
+          "compliant_shipments": {
+            "type": "integer",
+            "title": "Compliant Shipments"
+          },
+          "breached_shipments": {
+            "type": "integer",
+            "title": "Breached Shipments"
+          },
+          "at_risk_shipments": {
+            "type": "integer",
+            "title": "At Risk Shipments"
+          },
+          "delayed_shipments": {
+            "type": "integer",
+            "title": "Delayed Shipments"
+          },
+          "compliance_rate_pct": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Compliance Rate Pct"
+          },
+          "carrier_payable_penalties_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Carrier Payable Penalties Amount"
+          },
+          "pending_penalties_count": {
+            "type": "integer",
+            "title": "Pending Penalties Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "total_shipments",
+          "delivered_shipments",
+          "compliant_shipments",
+          "breached_shipments",
+          "at_risk_shipments",
+          "delayed_shipments",
+          "compliance_rate_pct",
+          "carrier_payable_penalties_amount",
+          "pending_penalties_count"
+        ],
+        "title": "CarrierSlaMetricsResponse"
+      },
       "CarrierStateMappingEntry": {
         "properties": {
           "raw_status": {
@@ -1276,6 +4404,686 @@
           ]
         }
       },
+      "EtlBatchRunRead": {
+        "properties": {
+          "batch_id": {
+            "type": "integer",
+            "title": "Batch Id"
+          },
+          "pipeline_name": {
+            "type": "string",
+            "title": "Pipeline Name"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "records_extracted": {
+            "type": "integer",
+            "title": "Records Extracted"
+          },
+          "records_loaded": {
+            "type": "integer",
+            "title": "Records Loaded"
+          },
+          "records_rejected": {
+            "type": "integer",
+            "title": "Records Rejected"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batch_id",
+          "pipeline_name",
+          "started_at",
+          "status",
+          "records_extracted",
+          "records_loaded",
+          "records_rejected"
+        ],
+        "title": "EtlBatchRunRead"
+      },
+      "FactFinancialPenaltyRead": {
+        "properties": {
+          "fact_penalty_id": {
+            "type": "integer",
+            "title": "Fact Penalty Id"
+          },
+          "calculation_date_key": {
+            "type": "integer",
+            "title": "Calculation Date Key"
+          },
+          "brand_key": {
+            "type": "integer",
+            "title": "Brand Key"
+          },
+          "carrier_key": {
+            "type": "integer",
+            "title": "Carrier Key"
+          },
+          "status_key": {
+            "type": "integer",
+            "title": "Status Key"
+          },
+          "geo_key": {
+            "type": "integer",
+            "title": "Geo Key"
+          },
+          "penalty_id": {
+            "type": "integer",
+            "title": "Penalty Id"
+          },
+          "label_id": {
+            "type": "integer",
+            "title": "Label Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "incident_reference": {
+            "type": "string",
+            "title": "Incident Reference"
+          },
+          "responsible_party": {
+            "type": "string",
+            "title": "Responsible Party"
+          },
+          "delay_level": {
+            "type": "string",
+            "title": "Delay Level"
+          },
+          "calculation_status": {
+            "type": "string",
+            "title": "Calculation Status"
+          },
+          "freight_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Freight Amount"
+          },
+          "delay_business_days": {
+            "type": "integer",
+            "title": "Delay Business Days"
+          },
+          "penalty_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty Amount"
+          },
+          "is_carrier_payable": {
+            "type": "boolean",
+            "title": "Is Carrier Payable"
+          },
+          "is_client_owed": {
+            "type": "boolean",
+            "title": "Is Client Owed"
+          },
+          "etl_batch_id": {
+            "type": "integer",
+            "title": "Etl Batch Id"
+          },
+          "source_system": {
+            "type": "string",
+            "title": "Source System"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_penalty_id",
+          "calculation_date_key",
+          "brand_key",
+          "carrier_key",
+          "status_key",
+          "geo_key",
+          "penalty_id",
+          "label_id",
+          "tracking_number",
+          "incident_reference",
+          "responsible_party",
+          "delay_level",
+          "calculation_status",
+          "freight_amount",
+          "delay_business_days",
+          "is_carrier_payable",
+          "is_client_owed",
+          "etl_batch_id",
+          "source_system"
+        ],
+        "title": "FactFinancialPenaltyRead"
+      },
+      "FactShipmentSlaRead": {
+        "properties": {
+          "fact_sla_id": {
+            "type": "integer",
+            "title": "Fact Sla Id"
+          },
+          "dispatch_date_key": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatch Date Key"
+          },
+          "deadline_date_key": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Date Key"
+          },
+          "delivery_date_key": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Date Key"
+          },
+          "brand_key": {
+            "type": "integer",
+            "title": "Brand Key"
+          },
+          "carrier_key": {
+            "type": "integer",
+            "title": "Carrier Key"
+          },
+          "dc_key": {
+            "type": "integer",
+            "title": "Dc Key"
+          },
+          "status_key": {
+            "type": "integer",
+            "title": "Status Key"
+          },
+          "geo_key": {
+            "type": "integer",
+            "title": "Geo Key"
+          },
+          "label_id": {
+            "type": "integer",
+            "title": "Label Id"
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "brand_order_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Order Ref"
+          },
+          "sla_status": {
+            "type": "string",
+            "title": "Sla Status"
+          },
+          "responsible_party": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Party"
+          },
+          "freight_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Freight Amount"
+          },
+          "sla_target_days": {
+            "type": "integer",
+            "title": "Sla Target Days"
+          },
+          "actual_business_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Business Days"
+          },
+          "delay_business_days": {
+            "type": "integer",
+            "title": "Delay Business Days"
+          },
+          "is_sla_breached": {
+            "type": "boolean",
+            "title": "Is Sla Breached"
+          },
+          "is_at_risk": {
+            "type": "boolean",
+            "title": "Is At Risk"
+          },
+          "business_hours_remaining": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Hours Remaining"
+          },
+          "etl_batch_id": {
+            "type": "integer",
+            "title": "Etl Batch Id"
+          },
+          "source_system": {
+            "type": "string",
+            "title": "Source System"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact_sla_id",
+          "brand_key",
+          "carrier_key",
+          "dc_key",
+          "status_key",
+          "geo_key",
+          "label_id",
+          "order_id",
+          "tracking_number",
+          "sla_status",
+          "freight_amount",
+          "sla_target_days",
+          "delay_business_days",
+          "is_sla_breached",
+          "is_at_risk",
+          "etl_batch_id",
+          "source_system"
+        ],
+        "title": "FactShipmentSlaRead"
+      },
+      "FinancialLedgerEntryRead": {
+        "properties": {
+          "entry_id": {
+            "type": "integer",
+            "title": "Entry Id"
+          },
+          "settlement_id": {
+            "type": "integer",
+            "title": "Settlement Id"
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "brand_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Id"
+          },
+          "penalty_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty Id"
+          },
+          "entry_type": {
+            "type": "string",
+            "title": "Entry Type"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "settlement_id",
+          "carrier_id",
+          "entry_type",
+          "amount",
+          "currency",
+          "description",
+          "created_at"
+        ],
+        "title": "FinancialLedgerEntryRead"
+      },
+      "FinancialSettlementRead": {
+        "properties": {
+          "settlement_id": {
+            "type": "integer",
+            "title": "Settlement Id"
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "period_code": {
+            "type": "string",
+            "title": "Period Code"
+          },
+          "period_start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Start Date"
+          },
+          "period_end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End Date"
+          },
+          "total_penalties_count": {
+            "type": "integer",
+            "title": "Total Penalties Count"
+          },
+          "total_freight_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Freight Amount"
+          },
+          "total_owed_to_clients": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Owed To Clients"
+          },
+          "total_recoverable_from_carrier": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Recoverable From Carrier"
+          },
+          "net_settlement_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Settlement Amount"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "settlement_id",
+          "carrier_id",
+          "period_code",
+          "period_start_date",
+          "period_end_date",
+          "total_penalties_count",
+          "total_freight_amount",
+          "total_owed_to_clients",
+          "total_recoverable_from_carrier",
+          "status",
+          "created_at"
+        ],
+        "title": "FinancialSettlementRead"
+      },
+      "FreightPenaltyRead": {
+        "properties": {
+          "penalty_id": {
+            "type": "integer",
+            "title": "Penalty Id"
+          },
+          "label_id": {
+            "type": "integer",
+            "title": "Label Id"
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "brand_id": {
+            "type": "integer",
+            "title": "Brand Id"
+          },
+          "settlement_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "incident_reference": {
+            "type": "string",
+            "title": "Incident Reference"
+          },
+          "responsible_party": {
+            "type": "string",
+            "title": "Responsible Party"
+          },
+          "freight_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Freight Amount"
+          },
+          "delay_business_days": {
+            "type": "integer",
+            "title": "Delay Business Days"
+          },
+          "delay_level": {
+            "type": "string",
+            "title": "Delay Level"
+          },
+          "calculation_status": {
+            "type": "string",
+            "title": "Calculation Status"
+          },
+          "penalty_percentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty Percentage"
+          },
+          "base_penalty_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Penalty Amount"
+          },
+          "maximum_penalty_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Penalty Amount"
+          },
+          "penalty_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty Amount"
+          },
+          "is_carrier_payable": {
+            "type": "boolean",
+            "title": "Is Carrier Payable"
+          },
+          "is_client_owed": {
+            "type": "boolean",
+            "title": "Is Client Owed"
+          },
+          "contract_rule_applied": {
+            "type": "string",
+            "title": "Contract Rule Applied"
+          },
+          "calculated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Calculated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "penalty_id",
+          "label_id",
+          "order_id",
+          "carrier_id",
+          "brand_id",
+          "tracking_number",
+          "incident_reference",
+          "responsible_party",
+          "freight_amount",
+          "delay_business_days",
+          "delay_level",
+          "calculation_status",
+          "is_carrier_payable",
+          "is_client_owed",
+          "contract_rule_applied",
+          "calculated_at"
+        ],
+        "title": "FreightPenaltyRead"
+      },
       "HTTPErrorResponse": {
         "properties": {
           "detail": {
@@ -1354,6 +5162,63 @@
           "database"
         ],
         "title": "HealthResponse"
+      },
+      "HistoricalSlaItem": {
+        "properties": {
+          "period_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Date"
+          },
+          "total_shipments": {
+            "type": "integer",
+            "title": "Total Shipments"
+          },
+          "compliant_shipments": {
+            "type": "integer",
+            "title": "Compliant Shipments"
+          },
+          "breached_shipments": {
+            "type": "integer",
+            "title": "Breached Shipments"
+          },
+          "compliance_rate_pct": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Compliance Rate Pct"
+          },
+          "total_penalties_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Penalties Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_date",
+          "total_shipments",
+          "compliant_shipments",
+          "breached_shipments",
+          "compliance_rate_pct",
+          "total_penalties_amount"
+        ],
+        "title": "HistoricalSlaItem"
+      },
+      "HistoricalSlaResponse": {
+        "properties": {
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/HistoricalSlaItem"
+            },
+            "type": "array",
+            "title": "Periods"
+          }
+        },
+        "type": "object",
+        "required": [
+          "periods"
+        ],
+        "title": "HistoricalSlaResponse"
       },
       "OrderCreate": {
         "properties": {
@@ -1989,6 +5854,363 @@
           "status": "PICKED_UP"
         }
       },
+      "PaginatedShipmentsSlaResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ShipmentSlaSummaryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "PaginatedShipmentsSlaResponse"
+      },
+      "SettlementGenerateRequest": {
+        "properties": {
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "half": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 1.0,
+            "title": "Half",
+            "description": "1 for H1 (1-15), 2 for H2 (16-end of month)"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "carrier_id",
+          "year",
+          "month",
+          "half"
+        ],
+        "title": "SettlementGenerateRequest"
+      },
+      "ShipmentAlertRead": {
+        "properties": {
+          "alert_id": {
+            "type": "integer",
+            "title": "Alert Id"
+          },
+          "label_id": {
+            "type": "integer",
+            "title": "Label Id"
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "carrier_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Name"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "alert_type": {
+            "type": "string",
+            "title": "Alert Type",
+            "description": "PREVENTIVE_24H or PROLONGED_EXCEPTION"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "description": "WARNING or CRITICAL"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "hours_remaining": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours Remaining"
+          },
+          "exception_duration_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exception Duration Hours"
+          },
+          "exception_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exception Detail"
+          },
+          "is_resolved": {
+            "type": "boolean",
+            "title": "Is Resolved"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "resolution_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Notes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alert_id",
+          "label_id",
+          "carrier_id",
+          "tracking_number",
+          "alert_type",
+          "severity",
+          "message",
+          "is_resolved",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ShipmentAlertRead"
+      },
+      "ShipmentSlaSummaryItem": {
+        "properties": {
+          "label_id": {
+            "type": "integer",
+            "title": "Label Id"
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "brand_id": {
+            "type": "integer",
+            "title": "Brand Id"
+          },
+          "carrier_id": {
+            "type": "integer",
+            "title": "Carrier Id"
+          },
+          "carrier_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Name"
+          },
+          "brand_order_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Order Ref"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "dispatched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatched At"
+          },
+          "deadline_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Utc"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "sla_status": {
+            "type": "string",
+            "title": "Sla Status"
+          },
+          "is_at_risk": {
+            "type": "boolean",
+            "title": "Is At Risk",
+            "default": false
+          },
+          "delay_business_days": {
+            "type": "integer",
+            "title": "Delay Business Days",
+            "default": 0
+          },
+          "delay_level": {
+            "type": "string",
+            "title": "Delay Level",
+            "default": "NO_DELAY"
+          },
+          "responsible_party": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Party"
+          },
+          "penalty_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty Amount"
+          },
+          "calculation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calculation Status"
+          },
+          "is_carrier_payable": {
+            "type": "boolean",
+            "title": "Is Carrier Payable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "label_id",
+          "order_id",
+          "tracking_number",
+          "brand_id",
+          "carrier_id",
+          "status",
+          "sla_status"
+        ],
+        "title": "ShipmentSlaSummaryItem"
+      },
       "ShippingLabelCreate": {
         "properties": {
           "tracking_number": {
@@ -2165,6 +6387,183 @@
         ],
         "title": "ShippingLabelResponse",
         "description": "Output representation with canonical information of the associated shipping label (RN-07 / RN-01)."
+      },
+      "SlaCalculationResult": {
+        "properties": {
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "destination_country": {
+            "type": "string",
+            "title": "Destination Country"
+          },
+          "shipment_type_code": {
+            "type": "string",
+            "title": "Shipment Type Code"
+          },
+          "sla_business_days": {
+            "type": "integer",
+            "title": "Sla Business Days"
+          },
+          "dispatched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatched At"
+          },
+          "sla_start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Start Date"
+          },
+          "deadline_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Utc"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "is_at_risk": {
+            "type": "boolean",
+            "title": "Is At Risk",
+            "default": false
+          },
+          "risk_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Reason"
+          },
+          "business_hours_remaining": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Hours Remaining"
+          },
+          "exception_open_duration_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exception Open Duration Hours"
+          },
+          "sla_status": {
+            "type": "string",
+            "title": "Sla Status",
+            "description": "Compliance status: PENDING, MET (on time), BREACHED (late).",
+            "default": "PENDING"
+          },
+          "responsible_party": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Party"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracking_number",
+          "destination_country",
+          "shipment_type_code",
+          "sla_business_days"
+        ],
+        "title": "SlaCalculationResult"
+      },
+      "SlaTrackingResponse": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "brand_order_ref": {
+            "type": "string",
+            "title": "Brand Order Ref"
+          },
+          "destination_country": {
+            "type": "string",
+            "title": "Destination Country"
+          },
+          "shipment_type_code": {
+            "type": "string",
+            "title": "Shipment Type Code"
+          },
+          "labels_sla": {
+            "items": {
+              "$ref": "#/components/schemas/SlaCalculationResult"
+            },
+            "type": "array",
+            "title": "Labels Sla"
+          },
+          "overall_order_compliant": {
+            "type": "boolean",
+            "title": "Overall Order Compliant",
+            "default": true
+          },
+          "overall_at_risk": {
+            "type": "boolean",
+            "title": "Overall At Risk",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "brand_order_ref",
+          "destination_country",
+          "shipment_type_code",
+          "labels_sla"
+        ],
+        "title": "SlaTrackingResponse"
       },
       "StateMappingCreate": {
         "properties": {
@@ -2355,6 +6754,190 @@
           "raw_status": "En ruta de entrega"
         }
       },
+      "UniversalPenaltyConfigCreate": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": "v1.0"
+          },
+          "delay_level": {
+            "type": "string",
+            "title": "Delay Level",
+            "description": "NO_DELAY, LOW, MODERATE, HIGH, CRITICAL"
+          },
+          "min_delay_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Delay Days"
+          },
+          "max_delay_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Delay Days"
+          },
+          "penalty_percentage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty Percentage"
+          },
+          "maximum_cap_percentage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Cap Percentage"
+          },
+          "effective_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Effective Date"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "approval_status": {
+            "type": "string",
+            "title": "Approval Status",
+            "default": "PENDING_APPROVAL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "delay_level",
+          "effective_date"
+        ],
+        "title": "UniversalPenaltyConfigCreate"
+      },
+      "UniversalPenaltyConfigRead": {
+        "properties": {
+          "config_id": {
+            "type": "integer",
+            "title": "Config Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "delay_level": {
+            "type": "string",
+            "title": "Delay Level"
+          },
+          "min_delay_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Delay Days"
+          },
+          "max_delay_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Delay Days"
+          },
+          "penalty_percentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty Percentage"
+          },
+          "maximum_cap_percentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Cap Percentage"
+          },
+          "effective_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Effective Date"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "approval_status": {
+            "type": "string",
+            "title": "Approval Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "config_id",
+          "version",
+          "delay_level",
+          "effective_date",
+          "is_active",
+          "approval_status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UniversalPenaltyConfigRead"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2399,24 +6982,112 @@
   },
   "tags": [
     {
+      "name": "Operational: Orders",
+      "description": "Daily operations: order creation, detail query, status updates, and shipping labels."
+    },
+    {
+      "name": "Operational: Carriers",
+      "description": "Daily operations: carrier catalog query, detail view, and authenticated carrier profile."
+    },
+    {
+      "name": "Operational: SLA & Compliance",
+      "description": "Daily operations: SLA tracking, delivery deadlines, at-risk shipments, brand and carrier metrics."
+    },
+    {
+      "name": "Operational: Alerts",
+      "description": "Daily operations: operational alerts query for at-risk shipments/exceptions, and alert resolution."
+    },
+    {
+      "name": "Operational: Financial",
+      "description": "Daily operations: responsibility attributions, freight penalties, settlements, and penalty configurations."
+    },
+    {
+      "name": "Operational: Analytics",
+      "description": "Daily operations: high-level KPI metrics, SLA facts, and financial penalty facts consultation."
+    },
+    {
+      "name": "Integration: Webhooks",
+      "description": "External integration: push webhook tracking receiver with token and HMAC verification (Type A)."
+    },
+    {
+      "name": "Integration: Connectors",
+      "description": "External integration: polling connectors and batch file uploads for external carriers and simulators (Type A, B, C)."
+    },
+    {
+      "name": "Internal Processes: Alerts",
+      "description": "Controlled internal operations: on-demand automated risk scanning and preventive alert generation."
+    },
+    {
+      "name": "Internal Processes: Financial Settlements",
+      "description": "Controlled internal operations: biweekly financial netting settlement calculation and period generation."
+    },
+    {
+      "name": "Internal Processes: Analytics ETL",
+      "description": "Controlled internal operations: dimensional star-schema analytical ETL pipeline execution."
+    },
+    {
+      "name": "Administration: State Mappings",
+      "description": "Administrative operations: carrier raw status translation and canonical status mapping management."
+    },
+    {
+      "name": "Monitoring: Health & Readiness",
+      "description": "System monitoring: service availability health check and database connectivity readiness probe."
+    },
+    {
       "name": "health",
-      "description": "API health check and database connectivity probe."
+      "description": "Legacy alias: System health check."
     },
     {
       "name": "orders",
-      "description": "WMS order lifecycle management: creation, query by ID, paginated listing, and shipping labels."
+      "description": "Legacy alias: Orders operations."
+    },
+    {
+      "name": "sla & compliance",
+      "description": "Legacy alias: SLA and compliance."
+    },
+    {
+      "name": "alerts & risk monitoring",
+      "description": "Legacy alias: Alerts and risk monitoring."
+    },
+    {
+      "name": "financial & penalties",
+      "description": "Legacy alias: Financial and penalties."
+    },
+    {
+      "name": "analytics & data warehouse",
+      "description": "Legacy alias: Analytics and data warehouse."
+    },
+    {
+      "name": "webhooks",
+      "description": "Legacy alias: Webhooks."
+    },
+    {
+      "name": "connectors: type a",
+      "description": "Legacy alias: Connectors Type A."
+    },
+    {
+      "name": "connectors: type b",
+      "description": "Legacy alias: Connectors Type B."
+    },
+    {
+      "name": "connectors: type c",
+      "description": "Legacy alias: Connectors Type C."
     },
     {
       "name": "admin: carrier state mapping",
-      "description": "Carrier status mapping administration for canonical status normalization (HU-15)."
+      "description": "Legacy alias: Carrier state mapping admin."
     },
     {
       "name": "admin: state mapping",
-      "description": "CRUD operations and real-time cached status translation (HU-12)."
+      "description": "Legacy alias: State mapping admin."
+    },
+    {
+      "name": "carriers",
+      "description": "Legacy alias: Carriers catalog."
     },
     {
       "name": "openapi contract",
-      "description": "OpenAPI metadata and contract validation for the platform API surface."
+      "description": "OpenAPI metadata and contract validation."
     }
   ]
 }

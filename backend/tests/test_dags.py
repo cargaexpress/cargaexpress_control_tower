@@ -14,6 +14,38 @@ from dags.utils.control_tower_client import ControlTowerClient  # noqa: E402
 DAGS_DIR = REPO_ROOT / "dags"
 
 
+def test_control_tower_client_type_a_sync():
+    """Verify Type A sync triggers the expected POST endpoint."""
+    client = ControlTowerClient(base_url="http://test-server:8000")
+    fake_response = {
+        "status": "completed",
+        "results": [
+            {
+                "carrier": "alpha",
+                "total_fetched": 10,
+                "normalized": 10,
+                "anomalies": 0,
+                "errors": 0,
+            }
+        ],
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = fake_response
+
+    mock_requests = MagicMock()
+    mock_requests.post.return_value = mock_resp
+
+    with patch("dags.utils.control_tower_client.requests", mock_requests):
+        res = client.trigger_type_a_sync(carrier_slug="alpha", limit=25)
+        assert res["status"] == "completed"
+        assert len(res["results"]) == 1
+        mock_requests.post.assert_called_once()
+        args, kwargs = mock_requests.post.call_args
+        assert args[0] == "http://test-server:8000/api/v1/sync/type-a"
+        assert kwargs["params"] == {"carrier_slug": "alpha", "limit": 25}
+
+
 def test_control_tower_client_type_b_sync():
     """Verify Type B sync triggers the expected POST endpoint."""
     client = ControlTowerClient(base_url="http://test-server:8000")
@@ -76,6 +108,31 @@ def test_control_tower_client_type_c_upload(tmp_path: Path):
         assert kwargs["data"] == {"carrier_name": "TransExpress Logistics"}
 
 
+def test_control_tower_client_type_c_sync():
+    """Verify Type C remote sync triggers the expected POST endpoint."""
+    client = ControlTowerClient(base_url="http://test-server:8000")
+    fake_response = {
+        "status": "completed",
+        "total_files_evaluated": 2,
+        "results": [],
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = fake_response
+
+    mock_requests = MagicMock()
+    mock_requests.post.return_value = mock_resp
+
+    with patch("dags.utils.control_tower_client.requests", mock_requests):
+        res = client.trigger_type_c_sync(carrier_name="TransExpress Logistics", source="all")
+        assert res["status"] == "completed"
+        assert res["total_files_evaluated"] == 2
+        mock_requests.post.assert_called_once()
+        args, kwargs = mock_requests.post.call_args
+        assert args[0] == "http://test-server:8000/api/v1/sync/type-c/sync"
+        assert kwargs["params"] == {"source": "all", "carrier_name": "TransExpress Logistics"}
+
+
 def test_control_tower_client_health():
     """Verify health check probe against Control Tower backend."""
     client = ControlTowerClient(base_url="http://test-server:8000")
@@ -136,6 +193,31 @@ def test_dag_type_c_structure_and_decorators():
     assert '"type-c"' in content
 
 
+def test_dag_type_a_structure_and_decorators():
+    """Verify that dag_type_a_polling.py fulfills simulator pull requirements."""
+    dag_file = DAGS_DIR / "dag_type_a_polling.py"
+    assert dag_file.is_file(), f"Missing DAG file: {dag_file}"
+
+    tree = ast.parse(dag_file.read_text(encoding="utf-8"))
+
+    # Verify TaskFlow API
+    imports = [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    ]
+    assert "PythonOperator" not in imports
+    assert "dag" in imports
+    assert "task" in imports
+
+    content = dag_file.read_text(encoding="utf-8")
+    assert 'schedule="*/30 * * * *"' in content
+    assert '"type_a_pull_polling"' in content
+    assert '"retries": 3' in content
+    assert '"retry_exponential_backoff": True' in content
+
+
 def test_dag_type_b_structure_and_decorators():
     """Verify that dag_type_b_polling.py fulfills HU-27 / RIWI-135 requirements."""
     dag_file = DAGS_DIR / "dag_type_b_polling.py"
@@ -162,3 +244,38 @@ def test_dag_type_b_structure_and_decorators():
     # RIWI-138: Retries with exponential backoff
     assert '"retries": 3' in content
     assert '"retry_exponential_backoff": True' in content
+
+
+def test_dag_distributed_validation_structure_and_decorators():
+    """Verify that dag_distributed_validation.py fulfills HU-30 / RIWI-147 requirements."""
+    dag_file = DAGS_DIR / "dag_distributed_validation.py"
+    assert dag_file.is_file(), f"Missing DAG file: {dag_file}"
+
+    tree = ast.parse(dag_file.read_text(encoding="utf-8"))
+
+    imports = [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    ]
+    assert "PythonOperator" not in imports
+    assert "dag" in imports
+    assert "task" in imports
+
+    decorator_names = [
+        d.id
+        if isinstance(d, ast.Name)
+        else d.func.id
+        if isinstance(d, ast.Call) and isinstance(d.func, ast.Name)
+        else ""
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+        for d in node.decorator_list
+    ]
+    assert "dag" in decorator_names
+    assert "task" in decorator_names
+
+    content = dag_file.read_text(encoding="utf-8")
+    assert '"dag_distributed_validation"' in content
+    assert '"distributed"' in content

@@ -9,7 +9,7 @@ from app.schemas.health import HealthResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1", tags=["health"])
+router = APIRouter(prefix="/api/v1", tags=["Monitoring: Health & Readiness", "health"])
 
 
 @router.get(

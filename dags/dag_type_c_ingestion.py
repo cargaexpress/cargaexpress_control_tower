@@ -7,9 +7,9 @@ Airflow User Stories:
 
 Architecture:
 Uses Airflow TaskFlow API (@dag and @task decorators) for clean parameter passing
-and decoupled execution. Reuses Sprint 2 Type C Connector (HU-22 / TypeCConnectorService)
+and decoupled execution. Reuses Type C Connector (HU-22 / TypeCConnectorService)
 via ControlTowerClient to sanitize repeated headers, drop summary rows, deduplicate SHA-256
-hashes, and apply canonical state transitions.
+hashes, pull from MinIO S3 & carrier endpoints, and apply canonical state transitions.
 """
 
 from __future__ import annotations
@@ -71,6 +71,21 @@ def resolve_carrier_name(filename: str) -> str:
 )
 def type_c_file_ingestion_pipeline() -> None:
     """Orchestrates periodic scanning, connector upload, and file archival."""
+
+    @task
+    def sync_remote_type_c_sources() -> dict[str, Any]:
+        """Trigger remote pull synchronization from Type C carrier APIs and MinIO S3."""
+        client = ControlTowerClient()
+        logger.info("Starting scheduled Type C remote synchronization...")
+        try:
+            res = client.trigger_type_c_sync(source="all")
+            logger.info("Remote Type C sync completed: %s", res.get("status"))
+            return res
+        except Exception as exc:
+            logger.warning(
+                "Remote Type C sync probe failed: %s. Proceeding with local file scan.", exc
+            )
+            return {"status": "skipped", "warning": str(exc)}
 
     @task
     def scan_incoming_files() -> list[str]:
@@ -195,6 +210,7 @@ def type_c_file_ingestion_pipeline() -> None:
         logger.info("Total files archived in this run: %d", archived_count)
         return archived_count
 
+    _ = sync_remote_type_c_sources()
     incoming_files = scan_incoming_files()
     processed_results = ingest_batch_files(incoming_files)
     archive_processed_files(processed_results)

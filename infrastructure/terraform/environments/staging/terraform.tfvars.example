@@ -1,0 +1,25 @@
+# ==============================================================================
+# CargaExpress Infrastructure - Staging Variables Example
+# File: infrastructure/terraform/environments/staging/terraform.tfvars.example
+# ==============================================================================
+
+project_name       = "cargaexpress"
+environment        = "staging"
+aws_region         = "us-east-2"
+aws_account_id     = "123456789012"
+vpc_cidr           = "10.1.0.0/16"
+availability_zones = ["us-east-2a", "us-east-2b"]
+
+db_instance_class  = "db.t4g.small"
+db_name            = "cargaexpress_staging"
+db_admin_username  = "cargaexpress_admin"
+db_admin_password  = "REPLACE_WITH_SECURE_GENERATED_PASSWORD_MIN_16_CHARS"
+
+rabbitmq_password  = "REPLACE_WITH_SECURE_RABBITMQ_PASSWORD_MIN_16_CHARS"
+
+backend_image      = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-backend:staging"
+worker_image       = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-worker:staging"
+spark_image        = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-spark:staging"
+
+github_repository  = "cargaexpress/cargaexpress_control_tower"
+alert_email        = "devops-staging@cargaexpress.local"
