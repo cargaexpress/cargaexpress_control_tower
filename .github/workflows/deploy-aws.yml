@@ -1,15 +1,6 @@
 name: Deploy to AWS ECS Fargate (HU-40)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - 'scripts/**'
-      - 'deploy/**'
-      - 'Dockerfile.airflow'
-      - '.github/workflows/deploy-aws.yml'
   workflow_dispatch:
     inputs:
       environment:
