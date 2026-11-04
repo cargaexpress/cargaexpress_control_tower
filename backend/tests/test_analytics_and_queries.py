@@ -343,19 +343,18 @@ async def test_analytical_star_schema_etl_execution_and_lineage(db_session: Asyn
 
 
 @pytest.mark.asyncio
-async def test_analytical_data_quality_and_rejected_records(db_session: AsyncSession):
+async def test_analytical_data_quality_and_rejected_records(db_session: AsyncSession, monkeypatch):
     """Test that orphan/corrupted records are captured in etl_rejected_records rather than silently discarded."""
+    await _seed_test_data(db_session)
+    await db_session.commit()
+
     service = AnalyticalEtlService()
 
-    # Create an orphan label referencing a non-existent order
-    orphan_label = ShippingLabel(
-        order_id=999999999,  # Non-existent order
-        carrier_id=1,
-        tracking_number="TRK-ORPHAN-ERR",
-        status="IN_TRANSIT",
-    )
-    db_session.add(orphan_label)
-    await db_session.flush()
+    # Simulate an orphan record condition by having _fetch_order return None
+    async def mock_fetch_order(db: AsyncSession, order_id: int) -> Order | None:
+        return None
+
+    monkeypatch.setattr(service, "_fetch_order", mock_fetch_order)
 
     batch = await service.run_etl_pipeline(db_session, pipeline_name="test_rejection_pipeline")
     await db_session.commit()

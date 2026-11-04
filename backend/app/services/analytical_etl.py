@@ -252,6 +252,11 @@ class AnalyticalEtlService:
     # 2. End-to-End ETL Pipeline Execution & Data Lineage
     # =========================================================================
 
+    async def _fetch_order(self, db: AsyncSession, order_id: int) -> Order | None:
+        stmt_o = select(Order).where(Order.order_id == order_id)
+        res_o = await db.execute(stmt_o)
+        return res_o.scalar_one_or_none()
+
     async def run_etl_pipeline(
         self,
         db: AsyncSession,
@@ -301,9 +306,7 @@ class AnalyticalEtlService:
                 records_extracted += 1
 
                 # Load related order
-                stmt_o = select(Order).where(Order.order_id == label.order_id)
-                res_o = await db.execute(stmt_o)
-                order = res_o.scalar_one_or_none()
+                order = await self._fetch_order(db, label.order_id)
 
                 if not order:
                     records_rejected += 1
