@@ -395,7 +395,7 @@ class EtlRejectedRecord(Base):
 
     rejection_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     batch_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("etl_batch_runs.batch_id"), nullable=False
+        BigInteger, ForeignKey("etl_batch_runs.batch_id", ondelete="CASCADE"), nullable=False, index=True
     )
     source_table: Mapped[str] = mapped_column(String, nullable=False)
     source_record_id: Mapped[str] = mapped_column(String, nullable=False)

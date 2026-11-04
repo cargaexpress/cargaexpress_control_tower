@@ -55,7 +55,7 @@ class ShipmentSlaTracking(Base):
 
     tracking_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     label_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("shipping_labels.label_id"), nullable=False
+        BigInteger, ForeignKey("shipping_labels.label_id", ondelete="CASCADE"), nullable=False
     )
     tracking_number: Mapped[str] = mapped_column(String, nullable=False, index=True)
     destination_country: Mapped[str] = mapped_column(CHAR(2), nullable=False)
