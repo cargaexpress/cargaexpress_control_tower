@@ -59,13 +59,29 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
 
-      - name: Configure AWS Credentials via OIDC
+      - name: Validate AWS Secrets Configuration
+        if: ${{ secrets.AWS_ROLE_ARN == '' && (secrets.AWS_ACCESS_KEY_ID == '' || secrets.AWS_SECRET_ACCESS_KEY == '') }}
+        run: |
+          echo "::error::No AWS authentication credentials found in GitHub Repository Secrets."
+          echo "Please configure either AWS_ROLE_ARN (for OIDC role assumption) or both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in Settings > Secrets and variables > Actions."
+          exit 1
+
+      - name: Configure AWS Credentials (OIDC Role)
+        if: ${{ secrets.AWS_ROLE_ARN != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
           role-session-name: CargaExpressGitHubActions-${{ github.run_id }}
+
+      - name: Configure AWS Credentials (IAM Access Keys)
+        if: ${{ secrets.AWS_ROLE_ARN == '' && secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
