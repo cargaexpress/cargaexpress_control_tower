@@ -32,7 +32,7 @@ jobs:
     environment: production
 
     env:
-      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
       ECS_CLUSTER: ${{ vars.ECS_CLUSTER || 'cargaexpress-production' }}
       ECS_BACKEND_SERVICE: ${{ vars.ECS_BACKEND_SERVICE || 'cargaexpress-backend-service' }}
       ECS_WORKER_SERVICE: ${{ vars.ECS_WORKER_SERVICE || 'cargaexpress-worker-service' }}

@@ -11,7 +11,7 @@
   "containerDefinitions": [
     {
       "name": "cargaexpress-backend",
-      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cargaexpress-backend:latest",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-backend:latest",
       "essential": true,
       "portMappings": [
         {
@@ -104,34 +104,34 @@
       "secrets": [
         {
           "name": "DATABASE_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/database-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/database-url"
         },
         {
           "name": "RABBITMQ_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/rabbitmq-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/rabbitmq-url"
         },
         {
           "name": "API_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/api-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/api-key"
         },
         {
           "name": "ADMIN_API_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
         },
         {
           "name": "BRAND_API_KEYS",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/brand-api-keys"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/brand-api-keys"
         },
         {
           "name": "TYPE_B_CARRIERS_URLS",
-          "valueFrom": "arn:aws:ssm:us-east-1:<AWS_ACCOUNT_ID>:parameter/cargaexpress/production/type-b-carriers-urls"
+          "valueFrom": "arn:aws:ssm:us-east-2:<AWS_ACCOUNT_ID>:parameter/cargaexpress/production/type-b-carriers-urls"
         }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/cargaexpress-backend",
-          "awslogs-region": "us-east-1",
+          "awslogs-region": "us-east-2",
           "awslogs-stream-prefix": "ecs",
           "awslogs-create-group": "true"
         }

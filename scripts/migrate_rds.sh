@@ -46,7 +46,7 @@ Executes Alembic migrations against AWS RDS PostgreSQL database for CargaExpress
 
 Connection Options (provide DATABASE_URL or individual connection parameters):
   -u, --database-url <url>      Full connection URL (postgresql+asyncpg://user:pass@host:5432/db)
-  -H, --host <host>             RDS host endpoint (e.g. cargaexpress.c123.us-east-1.rds.amazonaws.com)
+  -H, --host <host>             RDS host endpoint (e.g. cargaexpress.c123.us-east-2.rds.amazonaws.com)
   -p, --port <port>             PostgreSQL port (default: 5432)
   -U, --user <user>             Database username (default: cargaexpress)
   -P, --password <password>     Database password (or via DB_PASSWORD env var)

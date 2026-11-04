@@ -19,7 +19,7 @@
   },
   "loadBalancers": [
     {
-      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:<AWS_ACCOUNT_ID>:targetgroup/tg-cargaexpress-backend/0123456789abcdef",
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-2:<AWS_ACCOUNT_ID>:targetgroup/tg-cargaexpress-backend/0123456789abcdef",
       "containerName": "cargaexpress-backend",
       "containerPort": 8000
     }

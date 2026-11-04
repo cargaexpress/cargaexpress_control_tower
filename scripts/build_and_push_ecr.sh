@@ -27,7 +27,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
 # Default parameters from environment or fallbacks
-AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_REGION="${AWS_REGION:-us-east-2}"
 AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-}"
 ECR_REGISTRY="${ECR_REGISTRY:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
@@ -43,7 +43,7 @@ Usage: $(basename "$0") [OPTIONS]
 Compiles and pushes CargaExpress multi-stage container images to Amazon ECR.
 
 Options:
-  -r, --region <region>         AWS Region (default: us-east-1, or \$AWS_REGION)
+  -r, --region <region>         AWS Region (default: us-east-2, or \$AWS_REGION)
   -a, --account-id <id>         AWS Account ID (default: \$AWS_ACCOUNT_ID or detected via STS)
   --registry <registry>         ECR registry URL (default: <account-id>.dkr.ecr.<region>.amazonaws.com)
   -t, --tag <tag>               Image tag (default: git short SHA or latest)

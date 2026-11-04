@@ -11,7 +11,7 @@
   "containerDefinitions": [
     {
       "name": "airflow-webserver",
-      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cargaexpress-airflow:latest",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-airflow:latest",
       "command": [
         "webserver"
       ],
@@ -75,30 +75,30 @@
       "secrets": [
         {
           "name": "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-db-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-db-url"
         },
         {
           "name": "AIRFLOW__CELERY__RESULT_BACKEND",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-result-backend"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-result-backend"
         },
         {
           "name": "AIRFLOW__CELERY__BROKER_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-broker-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-broker-url"
         },
         {
           "name": "AIRFLOW__CORE__FERNET_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-fernet-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-fernet-key"
         },
         {
           "name": "ADMIN_API_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
         }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/cargaexpress-airflow-webserver",
-          "awslogs-region": "us-east-1",
+          "awslogs-region": "us-east-2",
           "awslogs-stream-prefix": "ecs",
           "awslogs-create-group": "true"
         }
@@ -106,7 +106,7 @@
     },
     {
       "name": "airflow-scheduler",
-      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cargaexpress-airflow:latest",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-airflow:latest",
       "command": [
         "scheduler"
       ],
@@ -150,30 +150,30 @@
       "secrets": [
         {
           "name": "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-db-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-db-url"
         },
         {
           "name": "AIRFLOW__CELERY__RESULT_BACKEND",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-result-backend"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-result-backend"
         },
         {
           "name": "AIRFLOW__CELERY__BROKER_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-broker-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-celery-broker-url"
         },
         {
           "name": "AIRFLOW__CORE__FERNET_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-fernet-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/airflow-fernet-key"
         },
         {
           "name": "ADMIN_API_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/admin-api-key"
         }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/cargaexpress-airflow-scheduler",
-          "awslogs-region": "us-east-1",
+          "awslogs-region": "us-east-2",
           "awslogs-stream-prefix": "ecs",
           "awslogs-create-group": "true"
         }

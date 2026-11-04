@@ -11,7 +11,7 @@
   "containerDefinitions": [
     {
       "name": "cargaexpress-worker",
-      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cargaexpress-worker:latest",
+      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-worker:latest",
       "command": [
         "python",
         "-m",
@@ -67,18 +67,18 @@
       "secrets": [
         {
           "name": "DATABASE_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/database-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/database-url"
         },
         {
           "name": "RABBITMQ_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/rabbitmq-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/rabbitmq-url"
         }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/cargaexpress-worker",
-          "awslogs-region": "us-east-1",
+          "awslogs-region": "us-east-2",
           "awslogs-stream-prefix": "ecs",
           "awslogs-create-group": "true"
         }

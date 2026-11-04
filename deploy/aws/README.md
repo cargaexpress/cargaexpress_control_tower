@@ -52,7 +52,7 @@ Guía declarativa y manual operativo para el despliegue de la infraestructura de
 
 ## 3. Preparación de Secretos en AWS Secrets Manager
 
-Antes de desplegar los servicios en ECS, crear los siguientes secretos en **AWS Secrets Manager** (región `us-east-1`):
+Antes de desplegar los servicios en ECS, crear los siguientes secretos en **AWS Secrets Manager** (región `us-east-2`):
 
 ```bash
 # 1. Database URL para RDS PostgreSQL
@@ -111,8 +111,8 @@ Permite a Fargate descargar imágenes de ECR, escribir logs a CloudWatch y resol
         "ssm:GetParameters"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:us-east-1:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/*",
-        "arn:aws:ssm:us-east-1:<AWS_ACCOUNT_ID>:parameter/cargaexpress/production/*"
+        "arn:aws:secretsmanager:us-east-2:<AWS_ACCOUNT_ID>:secret:cargaexpress/production/*",
+        "arn:aws:ssm:us-east-2:<AWS_ACCOUNT_ID>:parameter/cargaexpress/production/*"
       ]
     }
   ]
