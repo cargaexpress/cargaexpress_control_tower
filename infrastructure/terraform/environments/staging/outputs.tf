@@ -3,6 +3,36 @@
 # File: infrastructure/terraform/environments/staging/outputs.tf
 # ==============================================================================
 
+output "aws_account_id" {
+  value       = local.aws_account_id
+  description = "Target AWS Account ID (auto-resolved from IAM session or TF_VAR_aws_account_id)"
+}
+
+output "backend_image_uri" {
+  value       = local.backend_image
+  description = "Dynamically concatenated Docker image URI for backend Receiver & Query APIs"
+}
+
+output "worker_image_uri" {
+  value       = local.worker_image
+  description = "Dynamically concatenated Docker image URI for background worker"
+}
+
+output "spark_image_uri" {
+  value       = local.spark_image
+  description = "Dynamically concatenated Docker image URI for Spark ETL batch"
+}
+
+output "vpc_id" {
+  value       = module.networking.vpc_id
+  description = "VPC ID of the staging networking tier"
+}
+
+output "s3_vpc_endpoint_id" {
+  value       = module.networking.s3_vpc_endpoint_id
+  description = "AWS Gateway VPC Endpoint ID for direct S3 Data Lake access ($0.00 transfer fees)"
+}
+
 output "alb_dns_name" {
   value       = module.ecs.alb_dns_name
   description = "Public URL and entry point for Webhooks and Query APIs"

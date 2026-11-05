@@ -23,6 +23,7 @@ resource "aws_athena_workgroup" "analytics" {
   configuration {
     enforce_workgroup_configuration    = true
     publish_cloudwatch_metrics_enabled = true
+    bytes_scanned_cutoff_per_query     = 10737418240 # 10 GB scan safeguard (~$0.05 max per query)
 
     result_configuration {
       output_location = "s3://${var.athena_results_bucket_name}/queries/"

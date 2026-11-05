@@ -62,3 +62,8 @@ output "rds_security_group_id" {
   value       = aws_security_group.rds.id
   description = "The ID of the RDS PostgreSQL security group"
 }
+
+output "s3_vpc_endpoint_id" {
+  value       = aws_vpc_endpoint.s3.id
+  description = "The ID of the S3 VPC Gateway Endpoint (direct zero-cost S3 routing)"
+}

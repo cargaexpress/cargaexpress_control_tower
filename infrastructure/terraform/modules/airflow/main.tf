@@ -64,8 +64,8 @@ resource "aws_ecs_task_definition" "webserver" {
   family                   = "${var.project_name}-${var.environment}-airflow-webserver"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024" # 1 vCPU
-  memory                   = "2048" # 2 GB RAM
+  cpu                      = "256"  # 0.25 vCPU
+  memory                   = "512"  # 512 MB RAM
   execution_role_arn       = var.ecs_execution_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -121,8 +121,8 @@ resource "aws_ecs_task_definition" "scheduler" {
   family                   = "${var.project_name}-${var.environment}-airflow-scheduler"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024" # 1 vCPU
-  memory                   = "2048" # 2 GB RAM
+  cpu                      = "256"  # 0.25 vCPU
+  memory                   = "512"  # 512 MB RAM
   execution_role_arn       = var.ecs_execution_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -171,8 +171,8 @@ resource "aws_ecs_task_definition" "celery_worker" {
   family                   = "${var.project_name}-${var.environment}-airflow-celery-worker"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024" # 1 vCPU
-  memory                   = "2048" # 2 GB RAM
+  cpu                      = "256"  # 0.25 vCPU
+  memory                   = "512"  # 512 MB RAM
   execution_role_arn       = var.ecs_execution_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -202,7 +202,7 @@ resource "aws_ecs_service" "celery_worker" {
   name            = "${var.project_name}-${var.environment}-airflow-worker-svc"
   cluster         = var.ecs_cluster_id
   task_definition = aws_ecs_task_definition.celery_worker.arn
-  desired_count   = 2
+  desired_count   = var.worker_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {

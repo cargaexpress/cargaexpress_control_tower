@@ -186,3 +186,56 @@ resource "aws_s3_bucket_lifecycle_configuration" "athena_results" {
     }
   }
 }
+
+# ------------------------------------------------------------------------------
+# 4. Strict TLS Encryption-in-Transit Bucket Policies (Deny Insecure HTTP)
+# ------------------------------------------------------------------------------
+resource "aws_s3_bucket_policy" "datalake_tls" {
+  bucket = aws_s3_bucket.datalake.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "EnforceTLSRequestsOnly"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.datalake.arn,
+          "${aws_s3_bucket.datalake.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_policy" "athena_results_tls" {
+  bucket = aws_s3_bucket.athena_results.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "EnforceTLSRequestsOnly"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.athena_results.arn,
+          "${aws_s3_bucket.athena_results.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  })
+}

@@ -114,3 +114,33 @@ variable "tags" {
   description = "Resource tags"
   default     = {}
 }
+
+variable "backend_desired_count" {
+  type        = number
+  description = "Desired number of Receiver and API task replicas"
+  default     = 1
+}
+
+variable "worker_desired_count" {
+  type        = number
+  description = "Desired number of background worker task replicas"
+  default     = 1
+}
+
+variable "secretsmanager_db_secret_arn" {
+  type        = string
+  description = "Secrets Manager ARN for database credentials and connection URL"
+  default     = ""
+}
+
+variable "secretsmanager_rabbitmq_secret_arn" {
+  type        = string
+  description = "Secrets Manager ARN for RabbitMQ credentials and connection URL"
+  default     = ""
+}
+
+variable "acm_certificate_arn" {
+  type        = string
+  description = "ACM Certificate ARN for ALB HTTPS listener (optional; set when SSL certificate is available)"
+  default     = null
+}

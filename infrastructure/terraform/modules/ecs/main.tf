@@ -86,7 +86,7 @@ resource "aws_lb_target_group" "api" {
 
   health_check {
     enabled             = true
-    path                = "/health"
+    path                = "/api/v1/health"
     port                = "8000"
     protocol            = "HTTP"
     interval            = 30
@@ -111,7 +111,7 @@ resource "aws_lb_target_group" "receiver" {
 
   health_check {
     enabled             = true
-    path                = "/health"
+    path                = "/api/v1/health"
     port                = "8000"
     protocol            = "HTTP"
     interval            = 15
@@ -126,11 +126,35 @@ resource "aws_lb_target_group" "receiver" {
   tags = var.tags
 }
 
-# ALB HTTP Listener
+# ALB HTTP Listener (Port 80 - forwards or redirects to HTTPS)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
+
+  default_action {
+    type             = var.acm_certificate_arn != null && var.acm_certificate_arn != "" ? "redirect" : "forward"
+    target_group_arn = var.acm_certificate_arn != null && var.acm_certificate_arn != "" ? null : aws_lb_target_group.api.arn
+
+    dynamic "redirect" {
+      for_each = var.acm_certificate_arn != null && var.acm_certificate_arn != "" ? [1] : []
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+}
+
+# ALB HTTPS Listener (Port 443 - SSL/TLS 1.3 Termination)
+resource "aws_lb_listener" "https" {
+  count             = var.acm_certificate_arn != null && var.acm_certificate_arn != "" ? 1 : 0
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.acm_certificate_arn
 
   default_action {
     type             = "forward"
@@ -139,8 +163,26 @@ resource "aws_lb_listener" "http" {
 }
 
 # Listener Rule: Route Webhook traffic strictly to Webhook Receiver Target Group
-resource "aws_lb_listener_rule" "receiver_rule" {
+resource "aws_lb_listener_rule" "receiver_http_rule" {
+  count        = var.acm_certificate_arn == null || var.acm_certificate_arn == "" ? 1 : 0
   listener_arn = aws_lb_listener.http.arn
+  priority     = 10
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.receiver.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/v1/webhooks/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "receiver_https_rule" {
+  count        = var.acm_certificate_arn != null && var.acm_certificate_arn != "" ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
   priority     = 10
 
   action {
@@ -169,8 +211,8 @@ resource "aws_ecs_task_definition" "receiver" {
   family                   = "${var.project_name}-${var.environment}-receiver"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"  # 0.5 vCPU
-  memory                   = "1024" # 1 GB RAM
+  cpu                      = "256"  # 0.25 vCPU
+  memory                   = "512"  # 512 MB RAM
   execution_role_arn       = var.ecs_execution_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -188,11 +230,11 @@ resource "aws_ecs_task_definition" "receiver" {
       ]
       environment = [
         { name = "APP_ENV", value = var.environment },
-        { name = "DATABASE_URL", value = local.async_db_url },
-        { name = "RABBITMQ_URL", value = var.rabbitmq_url },
         { name = "LOG_LEVEL", value = "INFO" }
       ]
       secrets = [
+        { name = "DATABASE_URL", valueFrom = "${var.secretsmanager_db_secret_arn}:DATABASE_URL::" },
+        { name = "RABBITMQ_URL", valueFrom = "${var.secretsmanager_rabbitmq_secret_arn}:RABBITMQ_URL::" },
         { name = "ADMIN_API_KEY", valueFrom = "${var.secretsmanager_app_secrets_arn}:ADMIN_API_KEY::" },
         { name = "API_KEY", valueFrom = "${var.secretsmanager_app_secrets_arn}:API_KEY::" },
         { name = "WEBHOOK_SECRET", valueFrom = "${var.secretsmanager_app_secrets_arn}:WEBHOOK_SECRET::" }
@@ -216,8 +258,8 @@ resource "aws_ecs_task_definition" "api" {
   family                   = "${var.project_name}-${var.environment}-api"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"  # 0.5 vCPU
-  memory                   = "1024" # 1 GB RAM
+  cpu                      = "256"  # 0.25 vCPU
+  memory                   = "512"  # 512 MB RAM
   execution_role_arn       = var.ecs_execution_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -235,15 +277,18 @@ resource "aws_ecs_task_definition" "api" {
       ]
       environment = [
         { name = "APP_ENV", value = var.environment },
-        { name = "DATABASE_URL", value = local.async_db_url },
-        { name = "RABBITMQ_URL", value = var.rabbitmq_url },
         { name = "LOG_LEVEL", value = "INFO" }
       ]
       secrets = [
+        { name = "DATABASE_URL", valueFrom = "${var.secretsmanager_db_secret_arn}:DATABASE_URL::" },
+        { name = "RABBITMQ_URL", valueFrom = "${var.secretsmanager_rabbitmq_secret_arn}:RABBITMQ_URL::" },
         { name = "ADMIN_API_KEY", valueFrom = "${var.secretsmanager_app_secrets_arn}:ADMIN_API_KEY::" },
         { name = "API_KEY", valueFrom = "${var.secretsmanager_app_secrets_arn}:API_KEY::" },
         { name = "BRAND_API_KEYS", valueFrom = "${var.secretsmanager_app_secrets_arn}:BRAND_API_KEYS::" },
-        { name = "CARRIER_API_KEYS", valueFrom = "${var.secretsmanager_app_secrets_arn}:CARRIER_API_KEYS::" }
+        { name = "CARRIER_API_KEYS", valueFrom = "${var.secretsmanager_app_secrets_arn}:CARRIER_API_KEYS::" },
+        { name = "TYPE_A_SIMULATOR_URL", valueFrom = "${var.secretsmanager_app_secrets_arn}:TYPE_A_SIMULATOR_URL::" },
+        { name = "TYPE_B_CARRIERS_URLS", valueFrom = "${var.secretsmanager_app_secrets_arn}:TYPE_B_CARRIERS_URLS::" },
+        { name = "TYPE_C_CARRIERS_URLS", valueFrom = "${var.secretsmanager_app_secrets_arn}:TYPE_C_CARRIERS_URLS::" }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -264,8 +309,8 @@ resource "aws_ecs_task_definition" "worker" {
   family                   = "${var.project_name}-${var.environment}-worker"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"  # 0.5 vCPU
-  memory                   = "1024" # 1 GB RAM
+  cpu                      = "256"  # 0.25 vCPU
+  memory                   = "512"  # 512 MB RAM
   execution_role_arn       = var.ecs_execution_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -277,11 +322,11 @@ resource "aws_ecs_task_definition" "worker" {
       command   = ["python", "-m", "app.worker"]
       environment = [
         { name = "APP_ENV", value = var.environment },
-        { name = "DATABASE_URL", value = local.async_db_url },
-        { name = "RABBITMQ_URL", value = var.rabbitmq_url },
         { name = "LOG_LEVEL", value = "INFO" }
       ]
       secrets = [
+        { name = "DATABASE_URL", valueFrom = "${var.secretsmanager_db_secret_arn}:DATABASE_URL::" },
+        { name = "RABBITMQ_URL", valueFrom = "${var.secretsmanager_rabbitmq_secret_arn}:RABBITMQ_URL::" },
         { name = "ADMIN_API_KEY", valueFrom = "${var.secretsmanager_app_secrets_arn}:ADMIN_API_KEY::" }
       ]
       logConfiguration = {
@@ -298,6 +343,50 @@ resource "aws_ecs_task_definition" "worker" {
   tags = var.tags
 }
 
+
+# 4.4 Seed Service Task Definition (DataCo Ingestion & DB Seeding Batch Task)
+resource "aws_ecs_task_definition" "seed" {
+  family                   = "${var.project_name}-${var.environment}-seed"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "1024" # 1 vCPU
+  memory                   = "2048" # 2 GB RAM
+  execution_role_arn       = var.ecs_execution_role_arn
+  task_role_arn            = var.ecs_task_role_arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "seed"
+      image     = var.backend_image
+      essential = true
+      command   = ["alembic", "upgrade", "head"]
+      environment = [
+        { name = "APP_ENV", value = var.environment },
+        { name = "LOG_LEVEL", value = "INFO" }
+      ]
+      secrets = [
+        { name = "DATABASE_URL", valueFrom = "${var.secretsmanager_db_secret_arn}:DATABASE_URL::" },
+        { name = "ADMIN_API_KEY", valueFrom = "${var.secretsmanager_app_secrets_arn}:ADMIN_API_KEY::" }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.worker.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "seed"
+        }
+      }
+    }
+  ])
+
+  tags = merge(
+    var.tags,
+    {
+      Role = "DatabaseSeedAndMigration"
+    }
+  )
+}
+
 # ------------------------------------------------------------------------------
 # 5. ECS Fargate Services (Running in Private App Subnets)
 # ------------------------------------------------------------------------------
@@ -307,7 +396,7 @@ resource "aws_ecs_service" "receiver" {
   name            = "${var.project_name}-${var.environment}-receiver-svc"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.receiver.arn
-  desired_count   = 2
+  desired_count   = var.backend_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -334,7 +423,7 @@ resource "aws_ecs_service" "api" {
   name            = "${var.project_name}-${var.environment}-api-svc"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.api.arn
-  desired_count   = 2
+  desired_count   = var.backend_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -361,7 +450,7 @@ resource "aws_ecs_service" "worker" {
   name            = "${var.project_name}-${var.environment}-worker-svc"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.worker.arn
-  desired_count   = 2
+  desired_count   = var.worker_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {

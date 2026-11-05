@@ -25,3 +25,9 @@ variable "tags" {
   description = "Resource tags"
   default     = {}
 }
+
+variable "create_oidc_provider" {
+  type        = bool
+  description = "Whether to create the GitHub OIDC provider resource (default true for fresh accounts)"
+  default     = true
+}

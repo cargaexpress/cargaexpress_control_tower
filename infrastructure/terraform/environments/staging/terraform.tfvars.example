@@ -1,25 +1,29 @@
 # ==============================================================================
-# CargaExpress Infrastructure - Staging Variables Example
+# CargaExpress Infrastructure - Staging Variables (Zero Secrets Example)
 # File: infrastructure/terraform/environments/staging/terraform.tfvars.example
+# ==============================================================================
+# NOTE: All sensitive credentials (db_admin_password, rabbitmq_password) and
+# the aws_account_id can be loaded automatically from environment variables:
+#   - AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY
+#   - TF_VAR_aws_account_id (optional; auto-detected from active IAM caller identity)
+#   - TF_VAR_db_admin_password (optional; auto-generated via random provider)
+#   - TF_VAR_rabbitmq_password (optional; auto-generated via random provider)
+# ECR image URIs are auto-concatenated from account, region, project, and env.
 # ==============================================================================
 
 project_name       = "cargaexpress"
 environment        = "staging"
 aws_region         = "us-east-2"
-aws_account_id     = "123456789012"
 vpc_cidr           = "10.1.0.0/16"
 availability_zones = ["us-east-2a", "us-east-2b"]
 
-db_instance_class  = "db.t4g.small"
+db_instance_class  = "db.t4g.micro"
 db_name            = "cargaexpress_staging"
 db_admin_username  = "cargaexpress_admin"
-db_admin_password  = "REPLACE_WITH_SECURE_GENERATED_PASSWORD_MIN_16_CHARS"
 
-rabbitmq_password  = "REPLACE_WITH_SECURE_RABBITMQ_PASSWORD_MIN_16_CHARS"
-
-backend_image      = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-backend:staging"
-worker_image       = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-worker:staging"
-spark_image        = "123456789012.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-spark:staging"
+backend_desired_count = 1
+worker_desired_count  = 1
 
 github_repository  = "cargaexpress/cargaexpress_control_tower"
 alert_email        = "devops-staging@cargaexpress.local"
+monthly_budget_limit = null # Set approved budget (e.g. 150) once approved by management

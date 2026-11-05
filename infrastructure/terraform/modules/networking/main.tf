@@ -141,7 +141,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  count          = length(aws_subnet.public)
+  count          = length(var.public_subnet_cidrs)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
@@ -164,7 +164,7 @@ resource "aws_route_table" "private_app" {
 }
 
 resource "aws_route_table_association" "private_app" {
-  count          = length(aws_subnet.private_app)
+  count          = length(var.private_app_subnet_cidrs)
   subnet_id      = aws_subnet.private_app[count.index].id
   route_table_id = aws_route_table.private_app.id
 }
@@ -182,7 +182,7 @@ resource "aws_route_table" "private_db" {
 }
 
 resource "aws_route_table_association" "private_db" {
-  count          = length(aws_subnet.private_db)
+  count          = length(var.private_db_subnet_cidrs)
   subnet_id      = aws_subnet.private_db[count.index].id
   route_table_id = aws_route_table.private_db.id
 }
@@ -218,7 +218,7 @@ resource "aws_security_group" "alb" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = merge(
@@ -311,6 +311,7 @@ resource "aws_security_group" "rabbitmq" {
     security_groups = [aws_security_group.airflow.id]
   }
 
+
   ingress {
     description = "RabbitMQ management UI from within VPC private app subnets only"
     from_port   = 15672
@@ -357,6 +358,14 @@ resource "aws_security_group" "rds" {
     security_groups = [aws_security_group.airflow.id]
   }
 
+  ingress {
+    description     = "PostgreSQL port 5432 from EC2 management host"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.rabbitmq.id]
+  }
+
   egress {
     description = "Allow outbound within VPC if needed for replication"
     from_port   = 0
@@ -369,6 +378,29 @@ resource "aws_security_group" "rds" {
     var.tags,
     {
       Name = "${var.project_name}-${var.environment}-rds-sg"
+    }
+  )
+}
+
+# ------------------------------------------------------------------------------
+# 9. VPC Gateway Endpoint for Amazon S3 (Cost Optimization & Security)
+# ------------------------------------------------------------------------------
+# Routes S3 Data Lake traffic privately over AWS network with 0 NAT GW transfer charges ($0.00/GB)
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids = [
+    aws_route_table.public.id,
+    aws_route_table.private_app.id,
+    aws_route_table.private_db.id
+  ]
+
+  tags = merge(
+    var.tags,
+    {
+      Name    = "${var.project_name}-${var.environment}-s3-vpc-endpoint"
+      Service = "Networking"
     }
   )
 }

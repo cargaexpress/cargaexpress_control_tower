@@ -71,11 +71,12 @@ resource "aws_secretsmanager_secret" "database" {
 resource "aws_secretsmanager_secret_version" "database" {
   secret_id = aws_secretsmanager_secret.database.id
   secret_string = jsonencode({
-    username = "cargaexpress_admin"
-    password = "CHANGE_ME_IN_PRODUCTION_VIA_SECRETS_MANAGER"
-    engine   = "postgres"
-    port     = 5432
-    database = "cargaexpress"
+    username     = "cargaexpress_admin"
+    password     = "CHANGE_ME_IN_SECRETS_MANAGER"
+    engine       = "postgres"
+    port         = 5432
+    database     = "cargaexpress"
+    DATABASE_URL = "postgresql+asyncpg://cargaexpress_admin:CHANGE_ME_PASSWORD@CHANGE_ME_RDS_HOST:5432/cargaexpress"
   })
 
   lifecycle {
@@ -96,9 +97,10 @@ resource "aws_secretsmanager_secret" "rabbitmq" {
 resource "aws_secretsmanager_secret_version" "rabbitmq" {
   secret_id = aws_secretsmanager_secret.rabbitmq.id
   secret_string = jsonencode({
-    username = "cargaexpress"
-    password = "CHANGE_ME_IN_PRODUCTION_VIA_SECRETS_MANAGER"
-    port     = 5672
+    username     = "cargaexpress"
+    password     = "CHANGE_ME_IN_SECRETS_MANAGER"
+    port         = 5672
+    RABBITMQ_URL = "amqp://cargaexpress:CHANGE_ME_PASSWORD@CHANGE_ME_RABBITMQ_HOST:5672/"
   })
 
   lifecycle {
@@ -281,6 +283,27 @@ resource "aws_iam_policy" "ecs_task_runtime" {
           "ecs:RunTask",
           "ecs:StopTask",
           "ecs:DescribeTasks"
+        ]
+        Resource = [
+          "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/${var.project_name}-${var.environment}-*",
+          "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task/${var.project_name}-${var.environment}-*/*"
+        ]
+      },
+      {
+        Sid    = "AllowAthenaAndGlueCatalog"
+        Effect = "Allow"
+        Action = [
+          "athena:StartQueryExecution",
+          "athena:GetQueryExecution",
+          "athena:GetQueryResults",
+          "athena:StopQueryExecution",
+          "athena:GetWorkGroup",
+          "glue:GetDatabase",
+          "glue:GetDatabases",
+          "glue:GetTable",
+          "glue:GetTables",
+          "glue:GetPartitions",
+          "glue:BatchCreatePartition"
         ]
         Resource = "*"
       },

@@ -110,3 +110,9 @@ variable "tags" {
   description = "Resource tags"
   default     = {}
 }
+
+variable "worker_desired_count" {
+  type        = number
+  description = "Desired number of Airflow Celery worker task replicas"
+  default     = 1
+}

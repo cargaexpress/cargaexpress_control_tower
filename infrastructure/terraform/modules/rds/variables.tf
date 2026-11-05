@@ -32,10 +32,16 @@ variable "admin_password" {
   sensitive   = true
 }
 
+variable "engine_version" {
+  type        = string
+  description = "PostgreSQL engine version"
+  default     = "16.10"
+}
+
 variable "instance_class" {
   type        = string
   description = "RDS DB instance class"
-  default     = "db.t4g.medium"
+  default     = "db.t4g.micro"
 }
 
 variable "allocated_storage" {
@@ -74,7 +80,7 @@ variable "enable_multi_az" {
 variable "backup_retention_period" {
   type        = number
   description = "Days of automated backup retention"
-  default     = 7
+  default     = 1
 }
 
 variable "deletion_protection" {
