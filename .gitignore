@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 !.env.production.example
+!.env.terraform.example
 backend/.env
 backend/.env.*
 !backend/.env.example
@@ -52,3 +53,14 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+
+# Local certificates and tunnels
+*.cer
+*.crt
+*.pem
+*.pbids
+*.tar.gz
+*tfplan*
+ssm_port_forward.json
+scripts/endpoint_test_results.json
+
