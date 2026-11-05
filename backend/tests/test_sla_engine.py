@@ -136,7 +136,7 @@ async def test_at_risk_detection_when_under_24_hours_and_not_out_for_delivery(
     dispatch = Dispatch(
         dc_id=dc.dc_id,
         carrier_id=carrier.carrier_id,
-        dispatched_at=datetime(2026, 11, 2, 10, 0, 0, tzinfo=UTC),
+        dispatched_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add(dispatch)
     await db_session.flush()
@@ -203,7 +203,7 @@ async def test_order_sla_endpoint_whole_order_compliance(
     dispatch = Dispatch(
         dc_id=dc.dc_id,
         carrier_id=carrier.carrier_id,
-        dispatched_at=datetime(2026, 11, 2, 9, 0, 0, tzinfo=UTC),
+        dispatched_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add(dispatch)
     await db_session.flush()
@@ -231,4 +231,5 @@ async def test_order_sla_endpoint_whole_order_compliance(
     data = response.json()
     assert data["order_id"] == order.order_id
     assert len(data["labels_sla"]) == 2
+
     assert data["overall_order_compliant"] is True
