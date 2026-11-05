@@ -1,4 +1,4 @@
-# CargaExpress Control Tower
+﻿# CargaExpress Control Tower
 
 Production-grade Backend API, Event Processing Engine, and Analytical Control Tower for multi-carrier logistics operations across Colombia, Mexico, and Peru.
 
@@ -155,23 +155,23 @@ Direct querying against Parquet files in S3 without VPNs or tunnels:
 
 ```text
 cargaexpress_control_tower/
-├── backend/                       # FastAPI application & business logic
-│   ├── alembic/                   # Alembic database migrations (12 revisions)
-│   ├── app/
-│   │   ├── api/v1/                # REST API routers (orders, analytics, health)
-│   │   ├── core/                  # Security, auth, configuration
-│   │   ├── models/                # SQLAlchemy ORM operational models
-│   │   └── schemas/               # Pydantic validation schemas
-│   └── Dockerfile                 # Hardened multi-stage build (299 MB)
-├── infrastructure/terraform/      # Terraform modules & environment definitions
-│   ├── bootstrap/                 # S3 state bucket & DynamoDB lock configuration
-│   ├── environments/
-│   │   ├── staging/               # Staging environment configuration
-│   │   └── production/            # Production environment configuration
-│   └── modules/                   # Reusable IaC modules (ECS, RDS, S3, Athena, etc.)
-├── scripts/                       # Operational automation & auditing scripts
-├── docker-compose.yml             # Local multi-container orchestration
-└── README.md                      # Project documentation root
+â”œâ”€â”€ backend/                       # FastAPI application & business logic
+â”‚   â”œâ”€â”€ alembic/                   # Alembic database migrations (12 revisions)
+â”‚   â”œâ”€â”€ app/
+â”‚   â”‚   â”œâ”€â”€ api/v1/                # REST API routers (orders, analytics, health)
+â”‚   â”‚   â”œâ”€â”€ core/                  # Security, auth, configuration
+â”‚   â”‚   â”œâ”€â”€ models/                # SQLAlchemy ORM operational models
+â”‚   â”‚   â””â”€â”€ schemas/               # Pydantic validation schemas
+â”‚   â””â”€â”€ Dockerfile                 # Hardened multi-stage build (299 MB)
+â”œâ”€â”€ infrastructure/terraform/      # Terraform modules & environment definitions
+â”‚   â”œâ”€â”€ bootstrap/                 # S3 state bucket & DynamoDB lock configuration
+â”‚   â”œâ”€â”€ environments/
+â”‚   â”‚   â”œâ”€â”€ staging/               # Staging environment configuration
+â”‚   â”‚   â””â”€â”€ production/            # Production environment configuration
+â”‚   â””â”€â”€ modules/                   # Reusable IaC modules (ECS, RDS, S3, Athena, etc.)
+â”œâ”€â”€ scripts/                       # Operational automation & auditing scripts
+â”œâ”€â”€ docker-compose.yml             # Local multi-container orchestration
+â””â”€â”€ README.md                      # Project documentation root
 ```
 
 ---
@@ -184,3 +184,4 @@ cargaexpress_control_tower/
   - `cargaexpress_admin`: DDL, schema migrations, and admin endpoints.
   - `powerbi_user`: Read-only access restricted to `SELECT` on public tables.
 - **Conventional Commits**: All codebase changes follow Conventional Commits 1.0.0 specifications (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`).
+
