@@ -1,135 +1,186 @@
-
 # CargaExpress Control Tower
 
-Backend API for the CargaExpress logistics control tower. The project centralizes shipment information and supports warehouse management operations.
+Production-grade Backend API, Event Processing Engine, and Analytical Control Tower for multi-carrier logistics operations across Colombia, Mexico, and Peru.
 
-## Technologies
+[![CI/CD Pipeline](https://github.com/cargaexpress/cargaexpress_control_tower/actions/workflows/ci.yml/badge.svg)](https://github.com/cargaexpress/cargaexpress_control_tower/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python: 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![AWS: Deployed](https://img.shields.io/badge/AWS-Staging_Operational-FF9900.svg?logo=amazon-aws&logoColor=white)](https://aws.amazon.com/)
 
-- Python
-- FastAPI
-- SQLAlchemy
-- Alembic
-- PostgreSQL
-- Docker
-- Docker Compose
+---
 
-## Requirements
+## 1. System Overview
 
-- Git
-- Docker Desktop
-- Docker Compose v2
+CargaExpress Control Tower centralizes freight lifecycle tracking, SLA compliance monitoring, operational penalty calculations, and carrier reconciliation across three heterogeneous integration tiers:
+- **Type A (Direct Webhooks)**: Real-time event ingestion over HMAC-SHA256 authenticated HTTP endpoints.
+- **Type B (Polling REST APIs)**: Scheduled extraction orchestrated by Apache Airflow across multi-engine carrier simulators.
+- **Type C (Batch SFTP/S3 Files)**: Scheduled CSV/EDI batch processing with checksum deduplication and quarantine validation.
 
-## Getting Started
+The system features an automated **dual architecture**:
+1. **OLTP (Operational Layer)**: 24 tables managing transactional orders, picking, dispatch, tracking events, anomaly detection, and operational ledger entries.
+2. **OLAP (Kimball Dimensional Model)**: 10 tables (6 conformed dimensions + 4 fact tables) synchronized between Amazon RDS PostgreSQL and AWS S3 Gold Layer (Parquet format) queried via Amazon Athena and visualized in Power BI Desktop.
+
+---
+
+## 2. Infrastructure & Cloud Architecture (AWS Staging)
+
+The platform is deployed and fully operational in **AWS `us-east-2` (Ohio)** under a strict multi-tier VPC topology managed by Terraform:
+
+```mermaid
+flowchart TD
+    subgraph Internet ["Public Internet"]
+        Client[Power BI / Swagger / WMS]
+    end
+
+    subgraph VPC ["AWS VPC: cargaexpress-staging-vpc (10.1.0.0/16)"]
+        subgraph PublicSubnets ["Public Subnets (us-east-2a / us-east-2b)"]
+            ALB["Application Load Balancer (ALB)\nHTTP: 80"]
+            NAT["NAT Gateway (Outbound Egress)"]
+        end
+
+        subgraph PrivateAppSubnets ["Private Application Subnets"]
+            ECS_API["ECS Fargate: FastAPI API (8000)"]
+            ECS_RCV["ECS Fargate: Receiver Service (8000)"]
+            ECS_WRK["ECS Fargate: Celery Worker"]
+            AF_SCH["ECS Fargate: Airflow Scheduler"]
+            AF_WEB["ECS Fargate: Airflow Webserver (8080)"]
+            AF_WRK["ECS Fargate: Airflow Worker"]
+            EC2_RMQ["EC2 Instance (t3.medium)\nRabbitMQ Broker (5672/15672) + SSM Bastion"]
+        end
+
+        subgraph PrivateDBSubnets ["Private Data Subnets"]
+            RDS[("Amazon RDS PostgreSQL 16.10\ndb.t4g.micro (20GB gp3)\n(Private Subnets - Port 5432)")]
+        end
+    end
+
+    subgraph DataLake ["AWS Analytical Storage"]
+        S3_GOLD[("S3 Datalake: s3://cargaexpress-datalake-staging-326204936524/gold/\n(Columnar Snappy Parquet)")]
+        GLUE["AWS Glue Data Catalog\n(cargaexpress_gold_staging)"]
+        ATHENA["Amazon Athena Engine v3\n(Workgroup: cargaexpress-analytics-staging)"]
+    end
+
+    Client -->|HTTP /docs| ALB
+    ALB --> ECS_API
+    ECS_API --> RDS
+    ECS_WRK --> EC2_RMQ
+    ECS_WRK --> RDS
+    AF_SCH --> RDS
+    AF_SCH --> S3_GOLD
+    GLUE -.-> S3_GOLD
+    ATHENA --> GLUE
+    Client -.->|Athena ODBC 443 / Power BI| ATHENA
+```
+
+### Staging Endpoints & Resources
+
+- **Public Swagger UI**: [http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/docs](http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/docs)
+- **Health Check Endpoint**: [http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/api/v1/health](http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/api/v1/health) (Returns `{"status":"ok","database":"up"}`)
+- **OpenAPI Schema**: [http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/openapi.json](http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/openapi.json) (43 routes active)
+- **Database Endpoint**: `cargaexpress-staging-postgres.cnmosmsqi0oq.us-east-2.rds.amazonaws.com:5432` (Private VPC access only)
+- **Bastion / SSM Target**: `i-004830098afc09efb` (Online)
+
+---
+
+## 3. Technology Stack
+
+- **Runtime & Language**: Python 3.12 (bytecode precompiled, multi-stage runtime).
+- **Web & Async Framework**: FastAPI, Uvicorn, AsyncPG, Pydantic v2.
+- **Data & ORM**: PostgreSQL 16.10, SQLAlchemy 2.0 (Async), Alembic (12 versioned migrations).
+- **Message Broker & Queues**: RabbitMQ 3.13 (Erlang 26), Celery 5.4.
+- **Orchestration**: Apache Airflow 2.9.3 (CeleryExecutor, dynamic polling DAGs).
+- **Analytical Engine & Storage**: Amazon S3, AWS Glue Data Catalog, Amazon Athena Engine v3, Apache Parquet (Snappy), Power BI Desktop.
+- **Infrastructure as Code (IaC)**: Terraform >= 1.10, AWS Systems Manager (SSM), AWS Secrets Manager, AWS KMS (CMK).
+
+---
+
+## 4. Local Development Quickstart
+
+### Prerequisites
+- Docker Desktop & Docker Compose v2
+- AWS CLI v2 (configured with IAM user credentials)
+- Python >= 3.12 and `uv`
 
 ### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/cargaexpress/cargaexpress_control_tower.git
 cd cargaexpress_control_tower
 ```
 
-### 2. Configure Environment Variables
-
-Create the environment file from the provided template.
-
-On Windows PowerShell:
-
+### 2. Configure Local Environment
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Configure the required variables in the `.env` file.
-
-### 3. Start the Application
-
-Run the following command from the project root:
-
+### 3. Run with Docker Compose
 ```bash
 docker compose up --build
 ```
-
-Docker Compose starts the backend API and PostgreSQL database.
-
-### 4. Access the Application
-
-- API: http://localhost:8000
+Access local endpoints:
 - API Documentation: http://localhost:8000/docs
 - Health Check: http://localhost:8000/api/v1/health
 
-### 5. Stop the Application
+---
 
-Press `Ctrl + C` to stop the running process.
+## 5. Power BI & Analytical Model Connectivity
 
-To stop and remove the containers:
+Power BI connects to CargaExpress through two authorized channels:
 
-```bash
-docker compose down
-```
+### Option A: Amazon Athena (Direct S3 Gold Layer - Recommended)
+Direct querying against Parquet files in S3 without VPNs or tunnels:
+- **Connector**: Amazon Athena
+- **Server / Region**: `us-east-2`
+- **Catalog**: `AwsDataCatalog`
+- **Database**: `cargaexpress_gold_staging`
+- **Workgroup**: `cargaexpress-analytics-staging`
+- **S3 Output Location**: `s3://cargaexpress-athena-results-staging-326204936524/`
 
-Persistent database data is preserved when using this command.
-
-## Project Structure
-
-```text
-cargaexpress_control_tower/
-├── backend/
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-└── README.md
-```
-
-## Development
-
-The project is under active development. New features, requirements, and technical decisions are documented separately as development progresses.
-
-## Repository
-
-https://github.com/cargaexpress/cargaexpress_control_tower
-
-
-
-
-## Database Visualization
-
-Developers can optionally install a PostgreSQL extension in Visual Studio Code to connect to the database and visualize tables, schemas, and database structures.
-
-Recommended extension: [PostgreSQL by Microsoft](https://marketplace.visualstudio.com/items?itemName=ms-ossdata.vscode-postgresql)
-
-This extension is optional and is intended to make database inspection easier during development.
-
-To connect, use the PostgreSQL connection settings defined in the project's environment variables.
-
-Note: Database migrations are managed through Alembic. To review migration history and schema changes, check the migration files in the project.
-
-## Backend Containerization & Docker Optimization
-
-The backend uses a multi-stage Dockerfile (backend/Dockerfile) optimized for production environments:
-- **Multi-Stage Build**: Separates dependency installation (builder using uv) from the lightweight runtime image (final based on python:3.12-slim).
-- **Security Hardening**: Executes under non-root user appuser (UID 1000) and completely excludes uv, gcc, and build tools from the final image.
-- **Image Optimization**: Reduces container disk size from 488 MB (single-stage) down to 299 MB (-38.7%), with compressed size reduced by ~50% (~69.6 MB).
-- Detailed documentation, build commands, and benchmarks are available in [backend/README.md](backend/README.md).
+### Option B: PostgreSQL Database (via Encrypted AWS SSM Tunnel)
+1. Open the secure SSM port-forwarding session in PowerShell:
+   ```powershell
+   aws ssm start-session `
+     --target i-004830098afc09efb `
+     --document-name AWS-StartPortForwardingSessionToRemoteHost `
+     --parameters portNumber=5432,localPortNumber=5453,host=cargaexpress-staging-postgres.cnmosmsqi0oq.us-east-2.rds.amazonaws.com `
+     --region us-east-2
+   ```
+2. Connect Power BI to:
+   - **Server**: `localhost:5453`
+   - **Database**: `cargaexpress_staging`
+   - **User**: `powerbi_user` (Read-only analytics user)
 
 ---
 
-## Docker Image Optimization & Benchmark Report (Entregable E-13 / RIWI-168)
+## 6. Repository Structure
 
-As part of Sprint 3 and User Story HU-35 (RIWI-168), all Docker workloads across the CargaExpress ecosystem (Backend, Airflow, and Simulators A, B, and C) have been refactored to hardened multi-stage builds.
+```text
+cargaexpress_control_tower/
+├── backend/                       # FastAPI application & business logic
+│   ├── alembic/                   # Alembic database migrations (12 revisions)
+│   ├── app/
+│   │   ├── api/v1/                # REST API routers (orders, analytics, health)
+│   │   ├── core/                  # Security, auth, configuration
+│   │   ├── models/                # SQLAlchemy ORM operational models
+│   │   └── schemas/               # Pydantic validation schemas
+│   └── Dockerfile                 # Hardened multi-stage build (299 MB)
+├── infrastructure/terraform/      # Terraform modules & environment definitions
+│   ├── bootstrap/                 # S3 state bucket & DynamoDB lock configuration
+│   ├── environments/
+│   │   ├── staging/               # Staging environment configuration
+│   │   └── production/            # Production environment configuration
+│   └── modules/                   # Reusable IaC modules (ECS, RDS, S3, Athena, etc.)
+├── scripts/                       # Operational automation & auditing scripts
+├── docker-compose.yml             # Local multi-container orchestration
+└── README.md                      # Project documentation root
+```
 
-### Ecosystem Benchmark Summary
+---
 
-| Component / Subsystem | Base / Single-Stage | Multi-Stage Optimized | Compressed Transfer Size | Footprint Reduction | Runtime User | Key Optimizations |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Backend (Control Tower API)** | python:3.12 (488 MB) | python:3.12-slim | **299 MB** | 69.6 MB | **-38.7%** | appuser (1000) | Stripped uv & gcc; bytecode compiled; /api/v1/ready healthcheck. |
-| **Airflow Orchestrator (Custom)** | Standard setup (~2.3 GB) | apache/airflow:2.9.3 pre-baked | **2.01 GB** | 407 MB | **-290 MB** | airflow (50000) | Alpine PostgreSQL & RabbitMQ; demo DAGs disabled; worker tuning. |
-| **Simulator A (Push Webhooks)** | python:3.12 (390 MB) | python:3.12-slim 3-stage | **205 MB** | 49.5 MB | **-47.4%** | app (10001) | Dedicated SQLite storage volume; isolated test stage. |
-| **Simulator B - Carrier A (PostgreSQL)** | python:3.12-slim (485 MB) | python:3.12-slim multi-stage | **305 MB** | 71.0 MB | **-37.1%** | appuser (1000) | Compiled virtualenv; stripped build tools; automatic migrations. |
-| **Simulator B - Carrier B (MySQL)** | python:3.12-slim (460 MB) | python:3.12-slim multi-stage | **278 MB** | 65.2 MB | **-39.5%** | appuser (1000) | Native PyMySQL driver; pre-compiled wheels. |
-| **Simulator B - Carrier C (MongoDB)** | python:3.12-slim (435 MB) | python:3.12-slim multi-stage | **249 MB** | 58.8 MB | **-42.7%** | appuser (1000) | Lean pymongo runtime; zero relational database overhead. |
-| **Simulator B - Carrier D (SQLite)** | python:3.12-slim (455 MB) | python:3.12-slim multi-stage | **277 MB** | 65.1 MB | **-39.1%** | appuser (1000) | Pre-configured /data directory with UID 1000 ownership. |
-| **Simulator B - Tools (Seed / Generator)** | python:3.12-slim (425 MB) | python:3.12-slim multi-stage | **258 MB** | 60.4 MB | **-39.3%** | appuser (1000) | Batch seed and background generator running as unprivileged user. |
-| **Simulator C (Batch Files & WMS Seed)** | python:3.12-slim (430 MB) | python:3.12-slim multi-stage | **257 MB** | 60.7 MB | **-40.2%** | seeduser (1000) | Frozen lockfile; uv binary stripped from final image. |
+## 7. Security & Compliance Standards
 
-For detailed operational guides and architecture references:
-- **Backend Build Guide**: See [backend/README.md](backend/README.md)
-- **Airflow Orchestration & Benchmark Details**: See [AIRFLOW_SETUP.md](AIRFLOW_SETUP.md)
+- **Zero Open Database Ingress**: Port 5432 is strictly bound to private subnets; `0.0.0.0/0` is permanently forbidden.
+- **Encrypted Secrets Lifecycle**: All passwords and API keys are stored in AWS Secrets Manager and encrypted with KMS CMK `2235219b-e9c1-424d-aac8-bcee68017222`.
+- **Role-Based Access Control**:
+  - `cargaexpress_admin`: DDL, schema migrations, and admin endpoints.
+  - `powerbi_user`: Read-only access restricted to `SELECT` on public tables.
+- **Conventional Commits**: All codebase changes follow Conventional Commits 1.0.0 specifications (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`).
