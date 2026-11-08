@@ -139,8 +139,8 @@ resource "aws_s3_object" "gold_prefix" {
 # 3. S3 Bucket for Athena Query Results
 # ------------------------------------------------------------------------------
 resource "aws_s3_bucket" "athena_results" {
-  bucket        = "${var.project_name}-athena-results-${var.environment}-${var.aws_account_id}"
-  force_destroy = false
+  bucket        = "${var.project_name}-athena-queries-${var.environment}-${var.aws_account_id}"
+  force_destroy = true
 
   tags = merge(
     var.tags,
