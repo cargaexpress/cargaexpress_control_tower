@@ -15,7 +15,7 @@ echo ======================================================================
 echo.
 
 aws ssm start-session ^
-  --target i-004830098afc09efb ^
+  --target i-0ab95d8c9ecd34970 ^
   --document-name AWS-StartPortForwardingSessionToRemoteHost ^
   --parameters file://ssm_port_forward.json ^
   --region us-east-2

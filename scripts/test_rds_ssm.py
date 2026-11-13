@@ -3,7 +3,7 @@ import json
 import time
 
 region = 'us-east-2'
-instance_id = 'i-004830098afc09efb'
+instance_id = 'i-0ab95d8c9ecd34970'
 
 # Check socket to RDS 5432
 commands = [

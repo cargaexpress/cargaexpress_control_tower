@@ -74,11 +74,11 @@ flowchart TD
 
 ### Staging Endpoints & Resources
 
-- **Public Swagger UI**: [http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/docs](http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/docs)
-- **Health Check Endpoint**: [http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/api/v1/health](http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/api/v1/health) (Returns `{"status":"ok","database":"up"}`)
-- **OpenAPI Schema**: [http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/openapi.json](http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com/openapi.json) (43 routes active)
+- **Public Swagger UI**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/docs](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/docs)
+- **Health Check Endpoint**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/api/v1/health](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/api/v1/health) (Returns `{"status":"ok","database":"up"}`)
+- **OpenAPI Schema**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/openapi.json](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/openapi.json) (43 routes active)
 - **Database Endpoint**: `cargaexpress-staging-postgres.cnmosmsqi0oq.us-east-2.rds.amazonaws.com:5432` (Private VPC access only)
-- **Bastion / SSM Target**: `i-004830098afc09efb` (Online)
+- **Bastion / SSM Target**: `i-0ab95d8c9ecd34970` (Online)
 
 ---
 
@@ -139,7 +139,7 @@ Direct querying against Parquet files in S3 without VPNs or tunnels:
 1. Open the secure SSM port-forwarding session in PowerShell:
    ```powershell
    aws ssm start-session `
-     --target i-004830098afc09efb `
+     --target i-0ab95d8c9ecd34970 `
      --document-name AWS-StartPortForwardingSessionToRemoteHost `
      --parameters portNumber=5432,localPortNumber=5453,host=cargaexpress-staging-postgres.cnmosmsqi0oq.us-east-2.rds.amazonaws.com `
      --region us-east-2

@@ -3,7 +3,7 @@ import urllib.error
 import json
 import time
 
-BASE_URL = "http://cargaexpress-staging-alb-353383531.us-east-2.elb.amazonaws.com"
+BASE_URL = "http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com"
 
 # Keys
 SYSTEM_KEY = "CHANGE_ME_API_KEY_32_CHARS_MINIMUM"

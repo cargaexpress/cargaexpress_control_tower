@@ -17,8 +17,9 @@ resource "aws_glue_catalog_database" "gold" {
 # 2. Amazon Athena Workgroup
 # ------------------------------------------------------------------------------
 resource "aws_athena_workgroup" "analytics" {
-  name        = "${var.project_name}-analytics-${var.environment}"
-  description = "Athena workgroup for CargaExpress BI and ad-hoc analytical queries"
+  name          = "${var.project_name}-analytics-${var.environment}"
+  description   = "Athena workgroup for CargaExpress BI and ad-hoc analytical queries"
+  force_destroy = true
 
   configuration {
     enforce_workgroup_configuration    = true
