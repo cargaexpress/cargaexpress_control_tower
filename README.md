@@ -75,7 +75,9 @@ flowchart TD
 ### Staging Endpoints & Resources
 
 - **Public Swagger UI**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/docs](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/docs)
+- **Apache Airflow Web UI**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com:8080](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com:8080) (Credentials: `admin` / `admin`)
 - **Health Check Endpoint**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/api/v1/health](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/api/v1/health) (Returns `{"status":"ok","database":"up"}`)
+- **Airflow Health Endpoint**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com:8080/health](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com:8080/health)
 - **OpenAPI Schema**: [http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/openapi.json](http://cargaexpress-staging-alb-1216143878.us-east-2.elb.amazonaws.com/openapi.json) (43 routes active)
 - **Database Endpoint**: `cargaexpress-staging-postgres.cnmosmsqi0oq.us-east-2.rds.amazonaws.com:5432` (Private VPC access only)
 - **Bastion / SSM Target**: `i-0ab95d8c9ecd34970` (Online)

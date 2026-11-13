@@ -485,8 +485,21 @@ class AnalyticalEtlService:
             for anom in res_e.scalars().all():
                 records_extracted += 1
                 c_key = carrier_map.get(anom.carrier_id)
-                if not c_key:
+                if not c_key or anom.label_id is None:
                     records_rejected += 1
+                    db.add(
+                        EtlRejectedRecord(
+                            batch_id=batch.batch_id,
+                            source_table="tracking_anomalies",
+                            source_record_id=str(anom.anomaly_id),
+                            rejection_reason=(
+                                "Missing carrier dimension key"
+                                if not c_key
+                                else "Tracking anomaly has no associated shipping label (UNKNOWN_TRACKING_NUMBER)"
+                            ),
+                            raw_payload=f"anomaly_id={anom.anomaly_id}, tracking={anom.tracking_number}",
+                        )
+                    )
                     continue
 
                 event_date_key = self.to_date_key(anom.created_at) or self.to_date_key(date.today())

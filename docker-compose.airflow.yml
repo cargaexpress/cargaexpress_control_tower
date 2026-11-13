@@ -15,11 +15,19 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__WORKERS: 2
     CONTROL_TOWER_API_URL: ${CONTROL_TOWER_API_URL:-http://backend:8000}
     ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+    API_KEY: ${API_KEY:-}
+    OLAP_DATABASE_DSN: postgresql://${POSTGRES_USER:-cargaexpress}:${POSTGRES_PASSWORD:-change_me_local_only}@db:5432/${POSTGRES_DB:-cargaexpress}
+    GOLD_S3_BUCKET: ${GOLD_S3_BUCKET:-cargaexpress-datalake-staging-326204936524}
+    GLUE_DATABASE: ${GLUE_DATABASE:-cargaexpress_gold_staging}
+    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-2}
+    AWS_SHARED_CREDENTIALS_FILE: /home/airflow/.aws/credentials
+    AWS_CONFIG_FILE: /home/airflow/.aws/config
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
     - ./data:/opt/airflow/data
+    - ${HOME:-${USERPROFILE}}/.aws:/home/airflow/.aws:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     airflow-db:

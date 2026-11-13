@@ -279,3 +279,25 @@ def test_dag_distributed_validation_structure_and_decorators():
     content = dag_file.read_text(encoding="utf-8")
     assert '"dag_distributed_validation"' in content
     assert '"distributed"' in content
+
+
+def test_dag_analytical_etl_structure_and_decorators():
+    """Verify that dag_analytical_etl.py schedules 30-min OLAP & Gold Layer sync via TaskFlow API."""
+    dag_file = DAGS_DIR / "dag_analytical_etl.py"
+    assert dag_file.is_file(), f"Missing DAG file: {dag_file}"
+
+    tree = ast.parse(dag_file.read_text(encoding="utf-8"))
+    imports = [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    ]
+    assert "PythonOperator" not in imports
+    assert "dag" in imports
+    assert "task" in imports
+
+    content = dag_file.read_text(encoding="utf-8")
+    assert 'schedule="*/30 * * * *"' in content
+    assert '"analytical_etl_pipeline"' in content
+    assert "export_olap_to_s3_gold" in content

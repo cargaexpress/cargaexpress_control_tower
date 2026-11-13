@@ -28,12 +28,14 @@ class ControlTowerClient:
         self,
         base_url: str | None = None,
         api_key: str | None = None,
+        admin_api_key: str | None = None,
         timeout: int = 60,
     ) -> None:
         self.base_url = (
             base_url or os.getenv("CONTROL_TOWER_API_URL", "http://backend:8000")
         ).rstrip("/")
-        self.api_key = api_key or os.getenv("ADMIN_API_KEY", "")
+        self.admin_api_key = admin_api_key or os.getenv("ADMIN_API_KEY", "")
+        self.api_key = api_key or os.getenv("API_KEY", "") or self.admin_api_key
         self.timeout = timeout
 
     def _get_headers(self) -> dict[str, str]:
@@ -43,6 +45,8 @@ class ControlTowerClient:
         }
         if self.api_key:
             headers["X-API-Key"] = self.api_key
+        if self.admin_api_key:
+            headers["X-Admin-Token"] = self.admin_api_key
         return headers
 
     def trigger_type_a_sync(
@@ -249,3 +253,48 @@ class ControlTowerClient:
         req = urllib.request.Request(endpoint, headers=self._get_headers(), method="GET")
         with urllib.request.urlopen(req, timeout=10) as response:
             return json.loads(response.read().decode("utf-8"))  # type: ignore[no-any-return]
+
+    def _post_json(self, path: str, timeout: int | None = None) -> dict[str, Any]:
+        """Send an authenticated POST request to an internal Control Tower endpoint."""
+        endpoint = f"{self.base_url}{path}"
+        effective_timeout = timeout or self.timeout
+        if requests is not None:
+            resp = requests.post(endpoint, headers=self._get_headers(), timeout=effective_timeout)
+            resp.raise_for_status()
+            return resp.json()  # type: ignore[no-any-return]
+
+        import urllib.request
+
+        req = urllib.request.Request(endpoint, data=b"", headers=self._get_headers(), method="POST")
+        with urllib.request.urlopen(req, timeout=effective_timeout) as response:
+            return json.loads(response.read().decode("utf-8"))  # type: ignore[no-any-return]
+
+    def _get_json(self, path: str, timeout: int | None = None) -> dict[str, Any]:
+        """Send an authenticated GET request to a Control Tower endpoint."""
+        endpoint = f"{self.base_url}{path}"
+        effective_timeout = timeout or self.timeout
+        if requests is not None:
+            resp = requests.get(endpoint, headers=self._get_headers(), timeout=effective_timeout)
+            resp.raise_for_status()
+            return resp.json()  # type: ignore[no-any-return]
+
+        import urllib.request
+
+        req = urllib.request.Request(endpoint, headers=self._get_headers(), method="GET")
+        with urllib.request.urlopen(req, timeout=effective_timeout) as response:
+            return json.loads(response.read().decode("utf-8"))  # type: ignore[no-any-return]
+
+    def trigger_risk_scan(self) -> dict[str, Any]:
+        """Trigger shipment risk monitoring scan (POST /api/v1/alerts/scan)."""
+        logger.info("Triggering shipment risk scan via Control Tower backend...")
+        return self._post_json("/api/v1/alerts/scan")
+
+    def trigger_analytical_etl(self) -> dict[str, Any]:
+        """Execute full analytical ETL pipeline (POST /api/v1/analytics/etl/run)."""
+        logger.info("Triggering analytical ETL pipeline via Control Tower backend...")
+        return self._post_json("/api/v1/analytics/etl/run", timeout=120)
+
+    def get_analytics_kpis(self) -> dict[str, Any]:
+        """Fetch analytical KPI summary (GET /api/v1/analytics/kpis)."""
+        logger.info("Fetching analytical KPI summary from Control Tower backend...")
+        return self._get_json("/api/v1/analytics/kpis")

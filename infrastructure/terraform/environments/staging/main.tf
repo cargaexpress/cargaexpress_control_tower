@@ -143,6 +143,7 @@ module "airflow" {
   rabbitmq_url                      = module.rabbitmq.amqp_url
   secretsmanager_airflow_secret_arn = module.security.secretsmanager_airflow_secret_arn
   kms_key_arn                       = module.security.kms_key_arn
+  airflow_target_group_arn          = module.ecs.airflow_target_group_arn
   tags                              = local.common_tags
 }
 

@@ -38,7 +38,7 @@ resource "aws_cloudwatch_log_group" "spark_etl" {
 # 2. Common Airflow Environment Configuration
 # ------------------------------------------------------------------------------
 locals {
-  airflow_db_conn = "postgresql+psycopg2://${var.db_user}:${var.db_password}@${var.db_host}:${var.db_port}/${var.airflow_db_name}"
+  airflow_db_conn = "postgresql+psycopg2://${var.db_user}:${urlencode(var.db_password)}@${var.db_host}:${var.db_port}/${var.airflow_db_name}"
 
   common_airflow_env = [
     { name = "AIRFLOW__CORE__EXECUTOR", value = "CeleryExecutor" },
@@ -48,7 +48,8 @@ locals {
     { name = "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION", value = "true" },
     { name = "AIRFLOW__CORE__LOAD_EXAMPLES", value = "false" },
     { name = "AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK", value = "true" },
-    { name = "AIRFLOW__WEBSERVER__WORKERS", value = "2" }
+    { name = "AIRFLOW__WEBSERVER__WORKERS", value = "2" },
+    { name = "AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT", value = "300" }
   ]
 
   common_airflow_secrets = [
@@ -64,8 +65,8 @@ resource "aws_ecs_task_definition" "webserver" {
   family                   = "${var.project_name}-${var.environment}-airflow-webserver"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"  # 0.25 vCPU
-  memory                   = "512"  # 512 MB RAM
+  cpu                      = "1024" # 1 vCPU
+  memory                   = "2048" # 2 GB RAM
   execution_role_arn       = var.ecs_execution_role_arn
   task_role_arn            = var.ecs_task_role_arn
 
@@ -99,16 +100,26 @@ resource "aws_ecs_task_definition" "webserver" {
 }
 
 resource "aws_ecs_service" "webserver" {
-  name            = "${var.project_name}-${var.environment}-airflow-webserver-svc"
-  cluster         = var.ecs_cluster_id
-  task_definition = aws_ecs_task_definition.webserver.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "${var.project_name}-${var.environment}-airflow-webserver-svc"
+  cluster                           = var.ecs_cluster_id
+  task_definition                   = aws_ecs_task_definition.webserver.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 300
 
   network_configuration {
     subnets          = var.private_app_subnet_ids
     security_groups  = [var.airflow_security_group_id]
     assign_public_ip = false
+  }
+
+  dynamic "load_balancer" {
+    for_each = var.airflow_target_group_arn != null && var.airflow_target_group_arn != "" ? [1] : []
+    content {
+      target_group_arn = var.airflow_target_group_arn
+      container_name   = "airflow-webserver"
+      container_port   = 8080
+    }
   }
 
   tags = var.tags

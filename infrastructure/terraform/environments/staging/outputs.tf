@@ -38,6 +38,11 @@ output "alb_dns_name" {
   description = "Public URL and entry point for Webhooks and Query APIs"
 }
 
+output "airflow_url" {
+  value       = "http://${module.ecs.alb_dns_name}:8080"
+  description = "Public URL for Apache Airflow Web UI via ALB"
+}
+
 output "rds_endpoint" {
   value       = module.rds.endpoint
   description = "Connection endpoint for RDS PostgreSQL"

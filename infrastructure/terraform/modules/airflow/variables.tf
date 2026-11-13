@@ -116,3 +116,9 @@ variable "worker_desired_count" {
   description = "Desired number of Airflow Celery worker task replicas"
   default     = 1
 }
+
+variable "airflow_target_group_arn" {
+  type        = string
+  description = "Target group ARN for Airflow Webserver on ALB"
+  default     = null
+}

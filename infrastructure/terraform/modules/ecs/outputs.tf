@@ -52,3 +52,8 @@ output "receiver_target_group_arn" {
   value       = aws_lb_target_group.receiver.arn
   description = "Target group ARN for Webhook Receiver"
 }
+
+output "airflow_target_group_arn" {
+  value       = aws_lb_target_group.airflow.arn
+  description = "Target group ARN for Apache Airflow Webserver UI"
+}

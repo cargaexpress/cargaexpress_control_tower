@@ -126,6 +126,43 @@ resource "aws_lb_target_group" "receiver" {
   tags = var.tags
 }
 
+# Target Group: Apache Airflow Webserver UI (Port 8080)
+resource "aws_lb_target_group" "airflow" {
+  name        = "${var.project_name}-${var.environment}-af-tg"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    path                = "/health"
+    port                = "8080"
+    protocol            = "HTTP"
+    interval            = 30
+    timeout             = 10
+    healthy_threshold   = 2
+    unhealthy_threshold = 5
+    matcher             = "200,302"
+  }
+
+  deregistration_delay = 15
+
+  tags = var.tags
+}
+
+# ALB HTTP Listener for Airflow UI (Port 8080)
+resource "aws_lb_listener" "airflow" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 8080
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.airflow.arn
+  }
+}
+
 # ALB HTTP Listener (Port 80 - forwards or redirects to HTTPS)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
