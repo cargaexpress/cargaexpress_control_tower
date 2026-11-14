@@ -8,7 +8,7 @@
 # ------------------------------------------------------------------------------
 resource "aws_s3_bucket" "datalake" {
   bucket        = "${var.project_name}-datalake-${var.environment}-${var.aws_account_id}"
-  force_destroy = false
+  force_destroy = true
 
   tags = merge(
     var.tags,
