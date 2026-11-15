@@ -31,7 +31,7 @@ router = APIRouter(
     "/etl/run",
     response_model=EtlBatchRunRead,
     tags=["Internal Processes: Analytics ETL"],
-    summary="Execute the full analytical ETL/ELT pipeline (Internal process)",
+    summary="Execute analytical ETL pipeline",
 )
 async def trigger_etl_run(
     db: AsyncSession = Depends(get_db),

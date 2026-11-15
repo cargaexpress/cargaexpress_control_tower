@@ -124,7 +124,7 @@ async def list_carrier_penalties(
     "/settlements/generate",
     response_model=FinancialSettlementRead,
     tags=["Internal Processes: Financial Settlements"],
-    summary="Generate or retrieve a biweekly settlement period and netting calculation (Internal process)",
+    summary="Generate biweekly settlement period and netting calculation",
 )
 async def generate_settlement(
     payload: SettlementGenerateRequest,

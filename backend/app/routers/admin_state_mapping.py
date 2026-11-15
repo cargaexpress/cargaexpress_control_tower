@@ -30,8 +30,7 @@ MAPPING_NOT_FOUND = "Mapping does not exist."
 @router.get(
     "",
     response_model=list[StateMappingRead],
-    summary="List persisted state mappings (HU-12)",
-    description="Retrieve all configured status mappings, optionally filtered by carrier ID.",
+    summary="List persisted state mappings",
     responses={
         200: {"description": "List of state mappings retrieved successfully."},
         401: {
@@ -52,8 +51,7 @@ async def list_mappings(
 @router.get(
     "/resolve",
     response_model=StateMappingResolved,
-    summary="Translate raw carrier status to canonical status (HU-12)",
-    description="Translate a carrier's raw status to the normalized canonical status using the in-memory cache.",
+    summary="Translate raw carrier status to canonical status",
     responses={
         200: {"description": "Status resolved successfully.", "model": StateMappingResolved},
         401: {
@@ -79,8 +77,7 @@ async def resolve_mapping(
     "",
     response_model=StateMappingRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new state mapping (HU-12)",
-    description="Register a new single mapping between a carrier's raw status and a canonical status.",
+    summary="Create a new state mapping",
     responses={
         201: {"description": "State mapping created successfully.", "model": StateMappingRead},
         401: {
@@ -111,8 +108,7 @@ async def create_mapping(
 @router.patch(
     "/{mapping_id}",
     response_model=StateMappingRead,
-    summary="Partially update an existing state mapping (HU-12)",
-    description="Modify the raw status or canonical status of an existing mapping by its ID.",
+    summary="Partially update an existing state mapping",
     responses={
         200: {"description": "State mapping updated successfully.", "model": StateMappingRead},
         401: {
@@ -141,7 +137,7 @@ async def update_mapping(
 @router.delete(
     "/{mapping_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete an existing state mapping (HU-12)",
+    summary="Delete an existing state mapping",
     description="Remove a state mapping record by its primary key ID.",
     responses={
         204: {"description": "State mapping deleted successfully."},

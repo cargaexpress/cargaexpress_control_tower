@@ -1,8 +1,11 @@
 import logging
+import re
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -28,99 +31,39 @@ logging.basicConfig(level=getattr(logging, settings.log_level))
 logger = logging.getLogger("cargaexpress")
 
 openapi_tags = [
-    # =========================================================================
-    # Group A: Operational API (Daily Control Tower operations)
-    # =========================================================================
-    {
-        "name": "Operational: Orders",
-        "description": "Daily operations: order creation, detail query, status updates, and shipping labels.",
-    },
-    {
-        "name": "Operational: Carriers",
-        "description": "Daily operations: carrier catalog query, detail view, and authenticated carrier profile.",
-    },
-    {
-        "name": "Operational: SLA & Compliance",
-        "description": "Daily operations: SLA tracking, delivery deadlines, at-risk shipments, brand and carrier metrics.",
-    },
-    {
-        "name": "Operational: Alerts",
-        "description": "Daily operations: operational alerts query for at-risk shipments/exceptions, and alert resolution.",
-    },
-    {
-        "name": "Operational: Financial",
-        "description": "Daily operations: responsibility attributions, freight penalties, settlements, and penalty configurations.",
-    },
-    {
-        "name": "Operational: Analytics",
-        "description": "Daily operations: high-level KPI metrics, SLA facts, and financial penalty facts consultation.",
-    },
-    # =========================================================================
-    # Group B: Integration API (External carriers and simulators)
-    # =========================================================================
-    {
-        "name": "Integration: Webhooks",
-        "description": "External integration: push webhook tracking receiver with token and HMAC verification (Type A).",
-    },
-    {
-        "name": "Integration: Connectors",
-        "description": "External integration: polling connectors and batch file uploads for external carriers and simulators (Type A, B, C).",
-    },
-    # =========================================================================
-    # Group C: Internal Process API (Controlled operations for internal services)
-    # =========================================================================
-    {
-        "name": "Internal Processes: Alerts",
-        "description": "Controlled internal operations: on-demand automated risk scanning and preventive alert generation.",
-    },
-    {
-        "name": "Internal Processes: Financial Settlements",
-        "description": "Controlled internal operations: biweekly financial netting settlement calculation and period generation.",
-    },
-    {
-        "name": "Internal Processes: Analytics ETL",
-        "description": "Controlled internal operations: dimensional star-schema analytical ETL pipeline execution.",
-    },
-    # =========================================================================
-    # Group D: Administration API (State mapping configuration)
-    # =========================================================================
-    {
-        "name": "Administration: State Mappings",
-        "description": "Administrative operations: carrier raw status translation and canonical status mapping management.",
-    },
-    # =========================================================================
-    # Group E: Monitoring API (Health and readiness probes)
-    # =========================================================================
-    {
-        "name": "Monitoring: Health & Readiness",
-        "description": "System monitoring: service availability health check and database connectivity readiness probe.",
-    },
-    # =========================================================================
+    # Group A: Operational API
+    {"name": "Operational: Orders"},
+    {"name": "Operational: Carriers"},
+    {"name": "Operational: SLA & Compliance"},
+    {"name": "Operational: Alerts"},
+    {"name": "Operational: Financial"},
+    {"name": "Operational: Analytics"},
+    # Group B: Integration API
+    {"name": "Integration: Webhooks"},
+    {"name": "Integration: Connectors"},
+    # Group C: Internal Process API
+    {"name": "Internal Processes: Alerts"},
+    {"name": "Internal Processes: Financial Settlements"},
+    {"name": "Internal Processes: Analytics ETL"},
+    # Group D: Administration API
+    {"name": "Administration: State Mappings"},
+    # Group E: Monitoring API
+    {"name": "Monitoring: Health & Readiness"},
     # Legacy Compatibility Tags
-    # =========================================================================
-    {"name": "health", "description": "Legacy alias: System health check."},
-    {"name": "orders", "description": "Legacy alias: Orders operations."},
-    {"name": "sla & compliance", "description": "Legacy alias: SLA and compliance."},
-    {
-        "name": "alerts & risk monitoring",
-        "description": "Legacy alias: Alerts and risk monitoring.",
-    },
-    {"name": "financial & penalties", "description": "Legacy alias: Financial and penalties."},
-    {
-        "name": "analytics & data warehouse",
-        "description": "Legacy alias: Analytics and data warehouse.",
-    },
-    {"name": "webhooks", "description": "Legacy alias: Webhooks."},
-    {"name": "connectors: type a", "description": "Legacy alias: Connectors Type A."},
-    {"name": "connectors: type b", "description": "Legacy alias: Connectors Type B."},
-    {"name": "connectors: type c", "description": "Legacy alias: Connectors Type C."},
-    {
-        "name": "admin: carrier state mapping",
-        "description": "Legacy alias: Carrier state mapping admin.",
-    },
-    {"name": "admin: state mapping", "description": "Legacy alias: State mapping admin."},
-    {"name": "carriers", "description": "Legacy alias: Carriers catalog."},
-    {"name": "openapi contract", "description": "OpenAPI metadata and contract validation."},
+    {"name": "health"},
+    {"name": "orders"},
+    {"name": "sla & compliance"},
+    {"name": "alerts & risk monitoring"},
+    {"name": "financial & penalties"},
+    {"name": "analytics & data warehouse"},
+    {"name": "webhooks"},
+    {"name": "connectors: type a"},
+    {"name": "connectors: type b"},
+    {"name": "connectors: type c"},
+    {"name": "admin: carrier state mapping"},
+    {"name": "admin: state mapping"},
+    {"name": "carriers"},
+    {"name": "openapi contract"},
 ]
 
 
@@ -154,10 +97,6 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title="CargaExpress Supply Chain API",
         version="1.0.0",
-        description=(
-            "CargaExpress Control Tower Logistics: APIs for WMS order orchestration, "
-            "carrier tracking, dynamic state mapping, and exception management."
-        ),
         openapi_tags=openapi_tags,
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url="/redoc" if settings.app_env != "production" else None,
@@ -166,9 +105,43 @@ def create_app() -> FastAPI:
 
     if settings.app_env != "production":
 
-        @application.get("/docs/api/openapi.json")
+        @application.get("/docs/api/openapi.json", tags=["openapi contract"], summary="OpenAPI Schema")
         async def docs_api_openapi_json() -> JSONResponse:
             return JSONResponse(application.openapi())
+
+    def custom_openapi() -> dict[str, Any]:
+        if application.openapi_schema:
+            return application.openapi_schema
+        openapi_schema = get_openapi(
+            title=application.title,
+            version=application.version,
+            openapi_version=application.openapi_version,
+            description=None,
+            routes=application.routes,
+            tags=application.openapi_tags,
+            servers=application.servers,
+            terms_of_service=application.terms_of_service,
+            contact=application.contact,
+            license_info=application.license_info,
+        )
+        for path, path_item in openapi_schema.get("paths", {}).items():
+            for method, op in path_item.items():
+                if method.lower() in {"get", "post", "put", "patch", "delete"}:
+                    op.pop("description", None)
+                    if "summary" in op and op["summary"]:
+                        op["summary"] = re.sub(
+                            r"\s*\((?:HU-\d+|RN-\d+|FR-\d+|BR-\d+|F\d+|Internal process)[^)]*\)",
+                            "",
+                            op["summary"],
+                        ).strip()
+                    if "tags" in op and op["tags"]:
+                        primary_tags = [t for t in op["tags"] if ":" in t]
+                        if primary_tags:
+                            op["tags"] = [primary_tags[0]]
+        application.openapi_schema = openapi_schema
+        return application.openapi_schema
+
+    application.openapi = custom_openapi
 
     application.include_router(health.router)
     application.include_router(webhooks.router)

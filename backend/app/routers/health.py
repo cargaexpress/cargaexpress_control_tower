@@ -17,7 +17,6 @@ router = APIRouter(prefix="/api/v1", tags=["Monitoring: Health & Readiness", "he
     response_model=HealthResponse,
     status_code=status.HTTP_200_OK,
     summary="Service health and connectivity probe",
-    description="Check service availability and report database connection status. Always returns HTTP 200 with connectivity detail (up/down).",
     responses={
         200: {
             "description": "Service health status and database connectivity.",
@@ -42,7 +41,6 @@ async def health_check(db: AsyncSession = Depends(get_db)) -> HealthResponse:
     response_model=HealthResponse,
     status_code=status.HTTP_200_OK,
     summary="Readiness probe",
-    description="Returns 200 only when the database is reachable.",
     responses={
         200: {"description": "The service is ready to serve traffic.", "model": HealthResponse},
         503: {"description": "The database is not reachable.", "model": HealthResponse},

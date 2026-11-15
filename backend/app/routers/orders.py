@@ -33,8 +33,7 @@ router = APIRouter(
     "",
     response_model=OrderRead,
     status_code=http_status.HTTP_201_CREATED,
-    summary="Create a new order with lines and recipient (HU-13)",
-    description="Create an order with its mandatory child lines and recipient details. Validates that referenced brand, distribution center, and shipment type exist.",
+    summary="Create a new order with lines and recipient",
     responses={
         201: {"description": "Order created successfully.", "model": OrderRead},
         400: {"description": "Bad request or invalid input.", "model": HTTPErrorResponse},
@@ -68,8 +67,7 @@ async def create_order(
     "",
     response_model=OrderListResponse,
     status_code=http_status.HTTP_200_OK,
-    summary="List orders with pagination (HU-13)",
-    description="Retrieve a paginated list of orders, including total count and pagination metadata.",
+    summary="List orders with pagination",
     responses={
         200: {"description": "List of orders retrieved successfully.", "model": OrderListResponse},
         422: {"description": "Validation error in pagination query parameters."},
@@ -95,8 +93,7 @@ async def list_orders(
     "/{order_id}",
     response_model=OrderRead,
     status_code=http_status.HTTP_200_OK,
-    summary="Retrieve order by ID (HU-13)",
-    description="Retrieve full details for a single order by its ID, including recipient and order lines.",
+    summary="Retrieve order by ID",
     responses={
         200: {"description": "Order retrieved successfully.", "model": OrderRead},
         404: {"description": "Order not found.", "model": HTTPErrorResponse},
@@ -119,8 +116,7 @@ async def get_order(
     "/{order_id}/status",
     response_model=OrderRead,
     status_code=http_status.HTTP_200_OK,
-    summary="Update order status (HU-13)",
-    description="Update the canonical lifecycle status of an existing order.",
+    summary="Update order status",
     responses={
         200: {"description": "Order status updated successfully.", "model": OrderRead},
         404: {"description": "Order not found.", "model": HTTPErrorResponse},
@@ -152,7 +148,7 @@ async def update_order_status(
     "/{order_id}/shipping-labels",
     response_model=ShippingLabelResponse,
     status_code=http_status.HTTP_201_CREATED,
-    summary="Associate shipping label with an order (RN-07)",
+    summary="Associate shipping label with an order",
     responses={
         201: {
             "description": "Shipping label created and associated successfully",
@@ -200,7 +196,7 @@ async def create_shipping_label(
     "/{order_id}/shipping-labels",
     response_model=list[ShippingLabelResponse],
     status_code=http_status.HTTP_200_OK,
-    summary="List shipping labels for an order (RN-07)",
+    summary="List shipping labels for an order",
     responses={
         200: {
             "description": "List of shipping labels associated with order",

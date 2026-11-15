@@ -34,8 +34,7 @@ def _to_response(carrier: Carrier, rows: list[StateMapping]) -> CarrierStateMapp
 @router.get(
     "/{carrier_id}",
     response_model=CarrierStateMappingResponse,
-    summary="Retrieve state mappings for a specific carrier (HU-15)",
-    description="Retrieve all current status mappings configured for the given carrier directly from the database.",
+    summary="Retrieve state mappings for a specific carrier",
     responses={
         200: {
             "description": "Carrier state mappings retrieved successfully.",
@@ -62,8 +61,7 @@ async def get_carrier_mapping(
 @router.put(
     "/{carrier_id}",
     response_model=CarrierStateMappingResponse,
-    summary="Replace entire state mapping set for a carrier (HU-15)",
-    description="Synchronize and replace the complete set of status mappings for a carrier in an atomic transaction.",
+    summary="Replace entire state mapping set for a carrier",
     responses={
         200: {
             "description": "Carrier state mappings synchronized successfully.",

@@ -75,7 +75,7 @@ async def list_alerts(
     "/scan",
     response_model=AlertScanSummary,
     tags=["Internal Processes: Alerts"],
-    summary="Trigger controlled on-demand shipment risk scan (Internal process)",
+    summary="Trigger on-demand shipment risk scan",
 )
 async def trigger_risk_scan(
     db: AsyncSession = Depends(get_db),
