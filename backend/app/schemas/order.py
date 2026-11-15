@@ -267,7 +267,9 @@ class OrderRead(BaseModel):
         examples=["2026-10-13T10:00:00Z"],
     )
     order_lines: list[OrderLineRead] = Field(..., description="Items associated with the order.")
-    recipient: OrderRecipientRead = Field(..., description="Order recipient details.")
+    recipient: OrderRecipientRead | None = Field(
+        default=None, description="Order recipient details."
+    )
 
 
 class OrderListResponse(BaseModel):
