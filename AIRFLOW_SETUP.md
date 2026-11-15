@@ -239,3 +239,89 @@ All Docker workloads across the CargaExpress platform have been refactored to ha
 - **Over 1.1 GB Disk Space Saved**: Across all container images in the platform.
 - **Runtime Security Compliance**: 100% of application and simulation containers run under non-root users (UID 1000, 10001, 50000).
 - **Fast CI/CD Deployments**: Multi-stage layering and pre-compiled bytecode provide reusable image cache and faster cloud pulls.
+
+---
+
+## 9. Remote Logging to Amazon S3 & CloudWatch Logs Architecture
+
+### 9.1 Overview & Operational Workflow
+To guarantee log persistence, avoid local container disk saturation, and enable seamless cross-worker log inspection without disrupting developers or operators:
+1. **Airflow Task Execution**: Celery workers stream logs locally while tasks run, and upon task completion, the native `S3TaskHandler` automatically uploads the full task log to the S3 bucket (`s3://${GOLD_S3_BUCKET}/airflow/logs/<dag_id>/<task_id>/<execution_date>/<try_number>.log`).
+2. **Transparent Query Experience**: When an operator navigates to the Airflow Webserver UI (`http://localhost:8080`), clicks any task instance, and opens the **Log** tab, the webserver retrieves and streams the log file directly from S3. The interface and user experience remain identical to local execution.
+3. **Local & Historical Fallback**: The host directory `./logs` remains mounted to `/opt/airflow/logs`. If S3 connectivity is unavailable or remote logging is explicitly disabled (`AIRFLOW__LOGGING__REMOTE_LOGGING=false`), Airflow automatically falls back to local disk logging.
+
+### 9.2 Minimum IAM Policy (Least-Privilege Principle)
+Apply the following least-privilege policy to the Airflow execution IAM role or user:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AirflowS3RemoteLoggingStorage",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::cargaexpress-datalake-staging-326204936524/airflow/logs/*"
+    },
+    {
+      "Sid": "AirflowS3BucketListing",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::cargaexpress-datalake-staging-326204936524",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "airflow/logs/*"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+### 9.3 Cost Analysis & Financial Impact
+In strict accordance with project financial governance, reusing existing AWS infrastructure yields negligible overhead:
+- **S3 Storage (Standard)**: ~$0.023 per GB/month. Assuming 500 MB of monthly compressed execution logs: **<$0.02 USD / month**.
+- **S3 API Requests (PUT/GET)**: $0.005 per 1,000 PUT requests, $0.0004 per 1,000 GET requests. For 20,000 task executions/month: **~$0.10 USD / month**.
+- **No Paid Data Pipelines**: Amazon Data Firehose or paid third-party ingestion aggregators are omitted to avoid recurring hourly standing charges.
+- **Estimated Total S3 Remote Logging Cost**: **< $0.15 USD / month**.
+
+### 9.4 Log Inspection Runbook
+
+#### Local Environment
+* **Airflow Web UI**: Open `http://localhost:8080`, click on DAG -> Run -> Task -> **Log**.
+* **Airflow Containers via Docker CLI**:
+  ```bash
+  docker compose -f docker-compose.airflow.yml logs -f --tail=100 airflow-scheduler
+  docker compose -f docker-compose.airflow.yml logs -f --tail=100 airflow-worker
+  docker compose -f docker-compose.airflow.yml logs -f --tail=100 airflow-webserver
+  ```
+* **FastAPI Backend**:
+  ```bash
+  docker compose logs -f --tail=100 backend
+  ```
+
+#### AWS Production Environment
+* **FastAPI Real-Time Live Stream (CloudWatch Logs)**:
+  ```bash
+  aws logs tail /cargaexpress/backend --follow --region us-east-2
+  ```
+* **FastAPI Filter Errors (CloudWatch Logs)**:
+  ```bash
+  aws logs filter-log-events --log-group-name /cargaexpress/backend --filter-pattern "ERROR" --region us-east-2
+  ```
+* **Historical Airflow Logs on S3 (AWS CLI)**:
+  ```bash
+  aws s3 ls s3://cargaexpress-datalake-staging-326204936524/airflow/logs/ --recursive
+  ```
+* **Download Specific Task Log from S3**:
+  ```bash
+  aws s3 cp s3://cargaexpress-datalake-staging-326204936524/airflow/logs/type_b_pull_polling/poll_type_b_carriers/ ./task_run.log
+  ```
+

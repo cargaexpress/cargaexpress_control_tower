@@ -9,7 +9,7 @@ SEED_FILE = (
     Path(__file__).resolve().parent.parent
     / "alembic"
     / "versions"
-    / "c4a1209b7e6f_hu12_canonical_state_mapping.py"
+    / "c4a1209b7e6f_canonical_state_mapping.py"
 )
 
 SEED_12_FILE = (
