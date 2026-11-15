@@ -1,5 +1,6 @@
-import subprocess
 import json
+import subprocess
+
 
 def run_json(cmd):
     try:
@@ -7,6 +8,7 @@ def run_json(cmd):
         return json.loads(res.stdout)
     except Exception as e:
         return {"error": str(e), "stderr": getattr(e, "stderr", None)}
+
 
 print("================================================================================")
 print("              CARGAEXPRESS STAGING - COMPREHENSIVE SYSTEM AUDIT                 ")
@@ -18,7 +20,7 @@ roles_to_check = [
     "cargaexpress-staging-ecs-execution-role",
     "cargaexpress-staging-ecs-task-role",
     "cargaexpress-staging-rabbitmq-ec2-role",
-    "cargaexpress-staging-github-actions-role"
+    "cargaexpress-staging-github-actions-role",
 ]
 for role in roles_to_check:
     print(f"\n* Role: {role}")
@@ -35,10 +37,12 @@ secrets = [
     "cargaexpress/staging/database",
     "cargaexpress/staging/rabbitmq",
     "cargaexpress/staging/airflow",
-    "cargaexpress/staging/app_secrets"
+    "cargaexpress/staging/app_secrets",
 ]
 for s in secrets:
-    val = run_json(["aws", "secretsmanager", "get-secret-value", "--secret-id", s, "--region", "us-east-2"])
+    val = run_json(
+        ["aws", "secretsmanager", "get-secret-value", "--secret-id", s, "--region", "us-east-2"]
+    )
     if "error" in val:
         print(f"  [FAIL] {s}: {val['error']}")
     else:
@@ -57,7 +61,17 @@ for inst in instances:
     print(f"  Platform: {inst.get('PlatformName')} {inst.get('PlatformVersion')}")
 
 # Check RDS Security Group Ingress Rules
-rds_sg = run_json(["aws", "ec2", "describe-security-groups", "--group-names", "cargaexpress-staging-rds-sg", "--region", "us-east-2"])
+rds_sg = run_json(
+    [
+        "aws",
+        "ec2",
+        "describe-security-groups",
+        "--group-names",
+        "cargaexpress-staging-rds-sg",
+        "--region",
+        "us-east-2",
+    ]
+)
 if "SecurityGroups" in rds_sg and rds_sg["SecurityGroups"]:
     sg = rds_sg["SecurityGroups"][0]
     print(f"\n* RDS Security Group ({sg['GroupId']}) Ingress Rules:")
@@ -76,9 +90,13 @@ services_to_check = [
     "cargaexpress-staging-airflow-worker-svc",
     "cargaexpress-staging-api-svc",
     "cargaexpress-staging-receiver-svc",
-    "cargaexpress-staging-worker-svc"
+    "cargaexpress-staging-worker-svc",
 ]
-svcs_data = run_json(["aws", "ecs", "describe-services", "--cluster", cluster_name, "--services"] + services_to_check + ["--region", "us-east-2"])
+svcs_data = run_json(
+    ["aws", "ecs", "describe-services", "--cluster", cluster_name, "--services"]
+    + services_to_check
+    + ["--region", "us-east-2"]
+)
 for svc in svcs_data.get("services", []):
     name = svc.get("serviceName")
     desired = svc.get("desiredCount")
@@ -97,13 +115,19 @@ tasks = run_json(["aws", "ecs", "list-tasks", "--cluster", cluster_name, "--regi
 task_arns = tasks.get("taskArns", [])
 print(f"  Total running/pending tasks in cluster: {len(task_arns)}")
 if task_arns:
-    task_details = run_json(["aws", "ecs", "describe-tasks", "--cluster", cluster_name, "--tasks"] + task_arns[:10] + ["--region", "us-east-2"])
+    task_details = run_json(
+        ["aws", "ecs", "describe-tasks", "--cluster", cluster_name, "--tasks"]
+        + task_arns[:10]
+        + ["--region", "us-east-2"]
+    )
     for t in task_details.get("tasks", []):
         t_def = t.get("taskDefinitionArn").split("/")[-1]
         last_status = t.get("lastStatus")
         desired_status = t.get("desiredStatus")
         containers = [c.get("name") + ":" + c.get("lastStatus") for c in t.get("containers", [])]
-        print(f"  - Task {t.get('taskArn').split('/')[-1]}: Def={t_def}, Status={last_status}/{desired_status}, Containers={containers}")
+        print(
+            f"  - Task {t.get('taskArn').split('/')[-1]}: Def={t_def}, Status={last_status}/{desired_status}, Containers={containers}"
+        )
 
 print("\n================================================================================")
 print("                              AUDIT FINISHED                                    ")

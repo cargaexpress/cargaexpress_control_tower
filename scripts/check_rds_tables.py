@@ -1,9 +1,9 @@
-import subprocess
 import json
+import subprocess
 import time
 
-region = 'us-east-2'
-instance_id = 'i-004830098afc09efb'
+region = "us-east-2"
+instance_id = "i-004830098afc09efb"
 
 # Run psql inside docker or python script on EC2
 script = """
@@ -27,28 +27,53 @@ EOF
 python3 /tmp/check_db.py
 """
 
-res = subprocess.run([
-    'aws', 'ssm', 'send-command',
-    '--instance-ids', instance_id,
-    '--document-name', 'AWS-RunShellScript',
-    '--parameters', json.dumps({'commands': [script]}),
-    '--region', region,
-    '--query', 'Command.CommandId',
-    '--output', 'text'
-], capture_output=True, text=True)
+res = subprocess.run(
+    [
+        "aws",
+        "ssm",
+        "send-command",
+        "--instance-ids",
+        instance_id,
+        "--document-name",
+        "AWS-RunShellScript",
+        "--parameters",
+        json.dumps({"commands": [script]}),
+        "--region",
+        region,
+        "--query",
+        "Command.CommandId",
+        "--output",
+        "text",
+    ],
+    capture_output=True,
+    text=True,
+)
 
 cmd_id = res.stdout.strip()
-print('Command ID:', cmd_id)
+print("Command ID:", cmd_id)
 
 time.sleep(6)
 
-inv = subprocess.run([
-    'aws', 'ssm', 'get-command-invocation',
-    '--command-id', cmd_id,
-    '--instance-id', instance_id,
-    '--region', region,
-    '--query', '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}',
-    '--output', 'json'
-], capture_output=True, text=True, encoding='utf-8', errors='replace')
+inv = subprocess.run(
+    [
+        "aws",
+        "ssm",
+        "get-command-invocation",
+        "--command-id",
+        cmd_id,
+        "--instance-id",
+        instance_id,
+        "--region",
+        region,
+        "--query",
+        "{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}",
+        "--output",
+        "json",
+    ],
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+)
 
 print(inv.stdout)

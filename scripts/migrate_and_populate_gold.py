@@ -1,22 +1,23 @@
 import asyncio
+import io
 import os
 import sys
-from urllib.parse import quote_plus
-from datetime import datetime, UTC, date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-import io
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
-import boto3
+from urllib.parse import quote_plus
+
 import asyncpg
+import boto3
+import pandas as pd
 
 backend_dir = os.path.abspath("backend")
 sys.path.insert(0, backend_dir)
 
 db_user = os.environ.get("DB_USER", "cargaexpress_admin")
 db_pass = os.environ.get("DB_PASS", "IYUMOYnnHnk{$j(4S]Qx{zLx")
-db_host = os.environ.get("DB_HOST", "cargaexpress-staging-postgres.cnmosmsqi0oq.us-east-2.rds.amazonaws.com")
+db_host = os.environ.get(
+    "DB_HOST", "cargaexpress-staging-postgres.cnmosmsqi0oq.us-east-2.rds.amazonaws.com"
+)
 db_port = int(os.environ.get("DB_PORT", "5432"))
 db_name = os.environ.get("DB_NAME", "cargaexpress_staging")
 
@@ -31,13 +32,19 @@ print("1. RUNNING ALEMBIC MIGRATIONS ON RDS (IDEMPOTENT)")
 print("=" * 70)
 
 from alembic.config import Config
+
 from alembic import command
 
 alembic_ini_path = os.path.join(backend_dir, "alembic.ini")
 if not os.path.exists(alembic_ini_path):
     alembic_ini_path = "alembic.ini"
 alembic_cfg = Config(alembic_ini_path)
-alembic_cfg.set_main_option("script_location", os.path.join(backend_dir, "alembic") if os.path.exists(os.path.join(backend_dir, "alembic")) else "alembic")
+alembic_cfg.set_main_option(
+    "script_location",
+    os.path.join(backend_dir, "alembic")
+    if os.path.exists(os.path.join(backend_dir, "alembic"))
+    else "alembic",
+)
 alembic_cfg.set_main_option("sqlalchemy.url", async_db_url.replace("%", "%%"))
 
 command.upgrade(alembic_cfg, "head")
@@ -47,24 +54,25 @@ print("=" * 70)
 print("2. SEEDING OPERATIONAL DATA & RUNNING ANALYTICAL ETL")
 print("=" * 70)
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.models.brand import Brand
 from app.models.carrier import Carrier
-from app.models.distribution_center import DistributionCenter
-from app.models.shipment_type import ShipmentType
-from app.models.order import Order
 from app.models.dispatch import Dispatch
-from app.models.shipping_label import ShippingLabel
+from app.models.distribution_center import DistributionCenter
 from app.models.financial import UniversalPenaltyConfig
-from app.services.sla_engine import SlaEngineService
-from app.services.financial_engine import FinancialEngineService
+from app.models.order import Order
+from app.models.shipment_type import ShipmentType
+from app.models.shipping_label import ShippingLabel
 from app.services.analytical_etl import AnalyticalEtlService
+from app.services.financial_engine import FinancialEngineService
+from app.services.sla_engine import SlaEngineService
 
 engine = create_async_engine(async_db_url)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
 
 async def populate():
     async with async_session() as db:
@@ -192,7 +200,10 @@ async def populate():
         etl = AnalyticalEtlService(sla_engine=sla_engine)
         batch = await etl.run_etl_pipeline(db)
         await db.commit()
-        print(f"[OK] Analytical ETL Batch {batch.batch_id} completed: records_loaded={batch.records_loaded}, status={batch.status}")
+        print(
+            f"[OK] Analytical ETL Batch {batch.batch_id} completed: records_loaded={batch.records_loaded}, status={batch.status}"
+        )
+
 
 asyncio.run(populate())
 
@@ -211,18 +222,15 @@ tables = [
     "dim_geographies",
     "dim_shipment_statuses",
     "fact_shipments_sla",
-    "fact_financial_penalties"
+    "fact_financial_penalties",
 ]
+
 
 async def export_to_s3():
     conn = await asyncpg.connect(
-        user=db_user,
-        password=db_pass,
-        database=db_name,
-        host=db_host,
-        port=db_port
+        user=db_user, password=db_pass, database=db_name, host=db_host, port=db_port
     )
-    
+
     for tbl in tables:
         rows = await conn.fetch(f"SELECT * FROM {tbl}")
         if rows:
@@ -241,23 +249,24 @@ async def export_to_s3():
             df = pd.DataFrame(data)
         else:
             df = pd.DataFrame()
-            
+
         print(f"Table {tbl}: {len(df)} rows")
-        
+
         buffer = io.BytesIO()
         df.to_parquet(buffer, index=False, engine="pyarrow")
         buffer.seek(0)
-        
+
         s3_key = f"gold/{tbl}/{tbl}.parquet"
         s3.put_object(
             Bucket=bucket_name,
             Key=s3_key,
             Body=buffer.getvalue(),
-            ContentType="application/octet-stream"
+            ContentType="application/octet-stream",
         )
         print(f"  -> Uploaded s3://{bucket_name}/{s3_key} ({len(buffer.getvalue())} bytes)")
-        
+
     await conn.close()
+
 
 asyncio.run(export_to_s3())
 

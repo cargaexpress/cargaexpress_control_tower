@@ -1,10 +1,10 @@
 import asyncio
+import csv
 import os
 import sys
-import csv
-from urllib.parse import quote_plus
-from datetime import datetime, UTC, date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from urllib.parse import quote_plus
 
 backend_dir = os.path.abspath("backend")
 sys.path.insert(0, backend_dir)
@@ -25,24 +25,25 @@ print("=" * 70)
 print("1. POPULATING OPERATIONAL & ANALYTICAL DATA ON RDS")
 print("=" * 70)
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.models.brand import Brand
 from app.models.carrier import Carrier
-from app.models.distribution_center import DistributionCenter
-from app.models.shipment_type import ShipmentType
-from app.models.order import Order
 from app.models.dispatch import Dispatch
-from app.models.shipping_label import ShippingLabel
+from app.models.distribution_center import DistributionCenter
 from app.models.financial import UniversalPenaltyConfig
-from app.services.sla_engine import SlaEngineService
-from app.services.financial_engine import FinancialEngineService
+from app.models.order import Order
+from app.models.shipment_type import ShipmentType
+from app.models.shipping_label import ShippingLabel
 from app.services.analytical_etl import AnalyticalEtlService
+from app.services.financial_engine import FinancialEngineService
+from app.services.sla_engine import SlaEngineService
 
 engine = create_async_engine(async_db_url)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
 
 async def populate():
     async with async_session() as db:
@@ -170,7 +171,10 @@ async def populate():
         etl = AnalyticalEtlService(sla_engine=sla_engine)
         batch = await etl.run_etl_pipeline(db)
         await db.commit()
-        print(f"[OK] Analytical ETL Batch {batch.batch_id} completed: records_loaded={batch.records_loaded}, status={batch.status}")
+        print(
+            f"[OK] Analytical ETL Batch {batch.batch_id} completed: records_loaded={batch.records_loaded}, status={batch.status}"
+        )
+
 
 asyncio.run(populate())
 
@@ -188,19 +192,16 @@ tables = [
     "dim_geographies",
     "dim_shipment_statuses",
     "fact_shipments_sla",
-    "fact_financial_penalties"
+    "fact_financial_penalties",
 ]
 
 export_dir = os.path.join(os.environ.get("TEMP", "."), "olap_export")
 os.makedirs(export_dir, exist_ok=True)
 
+
 async def dump_csv():
     conn = await asyncpg.connect(
-        user=db_user,
-        password=db_pass,
-        database=db_name,
-        host=db_host,
-        port=db_port
+        user=db_user, password=db_pass, database=db_name, host=db_host, port=db_port
     )
     for tbl in tables:
         rows = await conn.fetch(f"SELECT * FROM {tbl}")
@@ -217,6 +218,7 @@ async def dump_csv():
                 pass
         print(f"Dumped {tbl}: {len(rows)} rows to {csv_path}")
     await conn.close()
+
 
 asyncio.run(dump_csv())
 print(f"[OK] All 8 tables dumped to {export_dir}")

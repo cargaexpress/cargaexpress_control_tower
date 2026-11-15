@@ -1,9 +1,9 @@
 import asyncio
 import os
 import sys
-from urllib.parse import quote_plus
-from datetime import datetime, UTC, date, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from urllib.parse import quote_plus
 
 backend_dir = os.path.abspath("backend")
 sys.path.insert(0, backend_dir)
@@ -25,6 +25,7 @@ print("1. RUNNING ALEMBIC MIGRATIONS ON RDS (via SSM Tunnel localhost:5453)")
 print("=" * 70)
 
 from alembic.config import Config
+
 from alembic import command
 
 alembic_ini_path = os.path.join(backend_dir, "alembic.ini")
@@ -39,19 +40,21 @@ print("=" * 70)
 print("2. SEEDING OPERATIONAL DATA & RUNNING ANALYTICAL ETL")
 print("=" * 70)
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
-from app.services.analytical_etl import AnalyticalEtlService
-from app.models.carrier import Carrier
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
 from app.models.brand import Brand
+from app.models.carrier import Carrier
+from app.models.financial import FreightPenalty
 from app.models.order import Order
 from app.models.shipping_label import ShippingLabel
 from app.models.sla_tracking import ShipmentSlaTracking
-from app.models.financial import FreightPenalty
+from app.services.analytical_etl import AnalyticalEtlService
 
 engine = create_async_engine(async_db_url)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
 
 async def populate_and_run_etl():
     async with async_session() as db:
@@ -96,8 +99,8 @@ async def populate_and_run_etl():
                 db.add(order)
                 await db.flush()
 
-                is_delivered = (idx % 2 == 0)
-                is_breached = (idx % 3 == 0)
+                is_delivered = idx % 2 == 0
+                is_breached = idx % 3 == 0
 
                 label = ShippingLabel(
                     order_id=order.id,
@@ -147,7 +150,10 @@ async def populate_and_run_etl():
         etl_service = AnalyticalEtlService()
         batch = await etl_service.run_etl_pipeline(db)
         await db.commit()
-        print(f"[OK] ETL Batch {batch.batch_id} completed: status={batch.status}, records_loaded={batch.records_loaded}")
+        print(
+            f"[OK] ETL Batch {batch.batch_id} completed: status={batch.status}, records_loaded={batch.records_loaded}"
+        )
+
 
 asyncio.run(populate_and_run_etl())
 print("[ALL DONE] RDS PostgreSQL is fully migrated, seeded, and analytical model populated!")

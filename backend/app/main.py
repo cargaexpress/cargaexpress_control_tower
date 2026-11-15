@@ -105,7 +105,9 @@ def create_app() -> FastAPI:
 
     if settings.app_env != "production":
 
-        @application.get("/docs/api/openapi.json", tags=["openapi contract"], summary="OpenAPI Schema")
+        @application.get(
+            "/docs/api/openapi.json", tags=["openapi contract"], summary="OpenAPI Schema"
+        )
         async def docs_api_openapi_json() -> JSONResponse:
             return JSONResponse(application.openapi())
 
@@ -124,7 +126,7 @@ def create_app() -> FastAPI:
             contact=application.contact,
             license_info=application.license_info,
         )
-        for path, path_item in openapi_schema.get("paths", {}).items():
+        for _path, path_item in openapi_schema.get("paths", {}).items():
             for method, op in path_item.items():
                 if method.lower() in {"get", "post", "put", "patch", "delete"}:
                     op.pop("description", None)
@@ -141,7 +143,7 @@ def create_app() -> FastAPI:
         application.openapi_schema = openapi_schema
         return application.openapi_schema
 
-    application.openapi = custom_openapi
+    application.openapi = custom_openapi  # type: ignore[method-assign]
 
     application.include_router(health.router)
     application.include_router(webhooks.router)

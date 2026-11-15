@@ -95,4 +95,3 @@ async def check_db_connectivity(engine_override: AsyncEngine | None = None) -> b
         return val == 1
     except Exception:
         return False
-

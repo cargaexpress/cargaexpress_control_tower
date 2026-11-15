@@ -1,12 +1,12 @@
-import subprocess
 import json
+import subprocess
 import time
 
 region = "us-east-2"
 instance_id = "i-0ab95d8c9ecd34970"
 
 # Read local migrate_and_populate_gold.py
-with open("scripts/migrate_and_populate_gold.py", "r", encoding="utf-8") as f:
+with open("scripts/migrate_and_populate_gold.py", encoding="utf-8") as f:
     script_content = f.read()
 
 bash_commands = f"""cat << 'EOF' > /tmp/build/scripts/migrate_and_populate_gold.py
@@ -24,15 +24,28 @@ docker run --rm -u root \\
 """
 
 print("=== Sending Seeding & Analytical ETL SSM Command ===")
-res = subprocess.run([
-    "aws", "ssm", "send-command",
-    "--instance-ids", instance_id,
-    "--document-name", "AWS-RunShellScript",
-    "--parameters", json.dumps({"commands": [bash_commands]}),
-    "--region", region,
-    "--query", "Command.CommandId",
-    "--output", "text"
-], capture_output=True, text=True, check=True)
+res = subprocess.run(
+    [
+        "aws",
+        "ssm",
+        "send-command",
+        "--instance-ids",
+        instance_id,
+        "--document-name",
+        "AWS-RunShellScript",
+        "--parameters",
+        json.dumps({"commands": [bash_commands]}),
+        "--region",
+        region,
+        "--query",
+        "Command.CommandId",
+        "--output",
+        "text",
+    ],
+    capture_output=True,
+    text=True,
+    check=True,
+)
 
 cmd_id = res.stdout.strip()
 print(f"[OK] SSM Command launched with ID: {cmd_id}")
@@ -40,19 +53,32 @@ print("Waiting for Seeding and Analytical ETL to finish...")
 
 while True:
     time.sleep(8)
-    inv = subprocess.run([
-        "aws", "ssm", "get-command-invocation",
-        "--command-id", cmd_id,
-        "--instance-id", instance_id,
-        "--region", region,
-        "--query", "{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}",
-        "--output", "json"
-    ], capture_output=True, text=True, encoding="utf-8", errors="replace")
-    
+    inv = subprocess.run(
+        [
+            "aws",
+            "ssm",
+            "get-command-invocation",
+            "--command-id",
+            cmd_id,
+            "--instance-id",
+            instance_id,
+            "--region",
+            region,
+            "--query",
+            "{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}",
+            "--output",
+            "json",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
     data = json.loads(inv.stdout)
     status = data.get("Status")
     print(f"Current SSM Status: {status}")
-    
+
     if status in ["Success", "Failed", "Cancelled", "TimedOut"]:
         print("\n=== Command Output ===")
         print(data.get("Output", ""))

@@ -13,9 +13,7 @@ from app.database import (
     execute_raw_transaction,
 )
 from app.models.carrier import Carrier
-from app.models.distribution_center import DistributionCenter
 from app.models.order import Order
-from app.models.shipment_type import ShipmentType
 from tests.conftest import TestSessionLocal, test_engine
 
 
@@ -76,7 +74,9 @@ async def test_orm_transaction_rollback_on_integrity_error(db_session: AsyncSess
     await db_session.rollback()
 
     # Verify session is still healthy and operational after rollback
-    healthy_query = await db_session.execute(select(Carrier).where(Carrier.name == "Unique Carrier"))
+    healthy_query = await db_session.execute(
+        select(Carrier).where(Carrier.name == "Unique Carrier")
+    )
     assert healthy_query.scalar_one_or_none() is not None
 
 
@@ -93,7 +93,7 @@ async def test_raw_sql_decoupled_gateway():
 
     # Insert test data using raw DML command
     rowcount = await execute_raw_command(
-        'INSERT INTO carriers (name, integration_type, status) VALUES (:name, :type, :status)',
+        "INSERT INTO carriers (name, integration_type, status) VALUES (:name, :type, :status)",
         {"name": "Raw Gateway Carrier", "type": "TYPE_B", "status": "ACTIVE"},
         engine_override=test_engine,
     )
@@ -101,7 +101,7 @@ async def test_raw_sql_decoupled_gateway():
 
     # Query test data using raw query returning dictionaries
     rows = await execute_raw_query(
-        'SELECT name, integration_type, status FROM carriers WHERE name = :name',
+        "SELECT name, integration_type, status FROM carriers WHERE name = :name",
         {"name": "Raw Gateway Carrier"},
         engine_override=test_engine,
     )
@@ -115,7 +115,7 @@ async def test_raw_sql_atomic_transaction_rollback_on_failure():
     """Verify that multiple raw SQL statements execute atomically with automatic rollback."""
     # Seed one carrier
     await execute_raw_command(
-        'INSERT INTO carriers (name, integration_type, status) VALUES (:name, :type, :status)',
+        "INSERT INTO carriers (name, integration_type, status) VALUES (:name, :type, :status)",
         {"name": "Pre-existing Carrier", "type": "TYPE_B", "status": "ACTIVE"},
         engine_override=test_engine,
     )
@@ -123,21 +123,21 @@ async def test_raw_sql_atomic_transaction_rollback_on_failure():
     # Attempt a batch where the second statement has an invalid syntax / non-existent table
     failing_batch = [
         (
-            'INSERT INTO carriers (name, integration_type, status) VALUES (:name, :type, :status)',
+            "INSERT INTO carriers (name, integration_type, status) VALUES (:name, :type, :status)",
             {"name": "Batch Carrier 1", "type": "TYPE_B", "status": "ACTIVE"},
         ),
         (
-            'INSERT INTO non_existent_table_xyz (col) VALUES (:val)',
+            "INSERT INTO non_existent_table_xyz (col) VALUES (:val)",
             {"val": "will fail"},
         ),
     ]
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await execute_raw_transaction(failing_batch, engine_override=test_engine)
 
     # Assert that "Batch Carrier 1" was rolled back and does not exist
     rows = await execute_raw_query(
-        'SELECT name FROM carriers WHERE name = :name',
+        "SELECT name FROM carriers WHERE name = :name",
         {"name": "Batch Carrier 1"},
         engine_override=test_engine,
     )

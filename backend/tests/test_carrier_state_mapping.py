@@ -17,7 +17,9 @@ from app.models.state_mapping import StateMapping
 from app.services.state_mapping_cache import state_mapping_cache
 
 BASE = "/api/v1/admin/carrier-state-mappings"
-RESOLVE = "/api/v1/admin/state-mappings/resolve"  # State mappings resolve endpoint reading from cache
+RESOLVE = (
+    "/api/v1/admin/state-mappings/resolve"  # State mappings resolve endpoint reading from cache
+)
 ADMIN = {"X-Admin-Token": "test-admin-key"}
 
 

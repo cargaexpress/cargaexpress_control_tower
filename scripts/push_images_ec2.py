@@ -1,9 +1,8 @@
-import subprocess
 import json
-import time
+import subprocess
 
-region = 'us-east-2'
-instance_id = 'i-004830098afc09efb'
+region = "us-east-2"
+instance_id = "i-004830098afc09efb"
 
 # Script to patch env.py, build and push to ECR
 script = """
@@ -71,15 +70,27 @@ docker push 326204936524.dkr.ecr.us-east-2.amazonaws.com/cargaexpress-worker:sta
 echo "=== PUSH_COMPLETE ==="
 """
 
-res = subprocess.run([
-    'aws', 'ssm', 'send-command',
-    '--instance-ids', instance_id,
-    '--document-name', 'AWS-RunShellScript',
-    '--parameters', json.dumps({'commands': [script]}),
-    '--region', region,
-    '--query', 'Command.CommandId',
-    '--output', 'text'
-], capture_output=True, text=True)
+res = subprocess.run(
+    [
+        "aws",
+        "ssm",
+        "send-command",
+        "--instance-ids",
+        instance_id,
+        "--document-name",
+        "AWS-RunShellScript",
+        "--parameters",
+        json.dumps({"commands": [script]}),
+        "--region",
+        region,
+        "--query",
+        "Command.CommandId",
+        "--output",
+        "text",
+    ],
+    capture_output=True,
+    text=True,
+)
 
 cmd_id = res.stdout.strip()
-print('Command ID:', cmd_id)
+print("Command ID:", cmd_id)
