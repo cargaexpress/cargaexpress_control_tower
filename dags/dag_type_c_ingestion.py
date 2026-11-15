@@ -1,13 +1,13 @@
 """Automated batch file ingestion pipeline for Type C carriers (Source F5).
 
-Airflow User Stories:
-- HU-28 (RIWI-139): Type-C file ingestion DAG
-- HU-26 (RIWI-131): Set up Airflow in Docker
-- HU-29 (RIWI-143): CeleryExecutor distributed task orchestration
+Pipeline Specification:
+- Scheduled batch file ingestion for carrier tracking updates
+- MinIO S3 and local storage staging
+- CeleryExecutor distributed task orchestration
 
 Architecture:
 Uses Airflow TaskFlow API (@dag and @task decorators) for clean parameter passing
-and decoupled execution. Reuses Type C Connector (HU-22 / TypeCConnectorService)
+and decoupled execution. Reuses Type C Connector (TypeCConnectorService)
 via ControlTowerClient to sanitize repeated headers, drop summary rows, deduplicate SHA-256
 hashes, pull from MinIO S3 & carrier endpoints, and apply canonical state transitions.
 """

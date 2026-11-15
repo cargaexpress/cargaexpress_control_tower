@@ -22,9 +22,9 @@ async def process_queued_event(
     """Consumes an event message from `eventos_transportadora` and applies canonical normalization.
 
     Enforces business rules:
-    - RN-01: Translates raw_status to canonical_status using cached mapping.
-    - RN-02: Protects terminal states and writes to tracking_anomalies.
-    - RN-07: Propagates order status when all shipping labels are delivered.
+    - Translates raw_status to canonical_status using cached mapping.
+    - Protects terminal states and writes to tracking_anomalies.
+    - Propagates order status when all shipping labels are delivered.
     """
     if isinstance(event_data, dict):
         msg = QueuedWebhookMessage.from_dict(event_data)

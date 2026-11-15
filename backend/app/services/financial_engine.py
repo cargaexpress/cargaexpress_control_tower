@@ -42,7 +42,7 @@ class FinancialEngineService:
         self.sla_engine = sla_engine or SlaEngineService()
 
     # =========================================================================
-    # 1. Responsibility Attribution Engine (FR-04, BR-05)
+    # 1. Responsibility Attribution Engine
     # =========================================================================
 
     async def attribute_shipment_responsibility(
@@ -233,7 +233,7 @@ class FinancialEngineService:
         return attr
 
     # =========================================================================
-    # 2. Universal Progressive Penalty Scale Engine (FR-04, BR-06)
+    # 2. Universal Progressive Penalty Scale Engine
     # =========================================================================
 
     @staticmethod
@@ -539,7 +539,7 @@ class FinancialEngineService:
         return penalty
 
     # =========================================================================
-    # 3. Biweekly Settlement Engine (FR-05, BR-08)
+    # 3. Biweekly Settlement Engine
     # =========================================================================
 
     def compute_half_month_period(self, year: int, month: int, half: int) -> tuple[str, date, date]:

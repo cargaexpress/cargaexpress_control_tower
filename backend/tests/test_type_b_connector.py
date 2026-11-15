@@ -225,8 +225,8 @@ async def test_type_b_connector_exhausts_retries_on_persistent_rate_limit(db_ses
 
 
 @pytest.mark.asyncio
-async def test_type_b_connector_enforces_rn02_anomaly_on_terminal_status(db_session):
-    """Subtask 2 & 3: Reusing normalization ensures RN-02 is preserved during sync."""
+async def test_type_b_connector_enforces_terminal_status_protection(db_session):
+    """Reusing normalization ensures terminal status immutability is preserved during sync."""
     await _seed_test_carrier_b(db_session)
 
     mock_transport = httpx.MockTransport(
@@ -260,7 +260,7 @@ async def test_type_b_connector_enforces_rn02_anomaly_on_terminal_status(db_sess
     assert summary.anomalies == 1
     assert summary.normalized == 0
 
-    # Verify label remains DELIVERED (RN-02)
+    # Verify label remains DELIVERED
     label = (
         await db_session.execute(
             select(ShippingLabel).where(ShippingLabel.tracking_number == "TRK-TYPEB-DELIVERED")

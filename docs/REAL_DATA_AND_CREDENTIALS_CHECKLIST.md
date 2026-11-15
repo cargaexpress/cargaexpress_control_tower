@@ -129,7 +129,7 @@ When enabling automated deployment workflows via GitHub Actions:
   - Column mapping definitions (handling heterogeneous headers such as `guia`, `tracking_number`, `awb`).
 
 ### 4. SLA & Financial Engine Configuration
-- **SLA Rule RN-03**:
+- **SLA Calculation Rule**:
   - Daily cutoff: 16:00 local time. Orders dispatched after 16:00 start SLA on the next business day.
   - Calendar exclusions: Sundays and destination country public holidays fetched via Nager.Date API (CO, MX, PE) and cached in `calendar_holidays`.
 - **Financial Penalties**:

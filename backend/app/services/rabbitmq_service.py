@@ -173,7 +173,7 @@ class RabbitMQService:
     ) -> QueuedWebhookMessage:
         """Serialize and publish decoded webhook event to `eventos_transportadora`.
 
-        Guarantees sub-millisecond publishing latency complying with RNF-01 (< 200 ms).
+        Guarantees sub-millisecond publishing latency complying with low response latency (< 200 ms).
         """
         message_id = str(uuid.uuid4())
         queued_msg = QueuedWebhookMessage(

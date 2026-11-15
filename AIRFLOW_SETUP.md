@@ -1,12 +1,11 @@
 # Airflow Deployment and Operations Guide with CeleryExecutor and RabbitMQ
 
-This document details the architecture, configuration, and operational runbook for the distributed orchestration environment of **CargaExpress (Sprint 3)**, covering:
-- **HU-26 (RIWI-131)**: Set up Airflow in Docker
-- **HU-27 (RIWI-135)**: Pull polling DAG for type-B carriers (Source F4 - Every 30 min with TaskFlow API and retries)
-- **HU-28 (RIWI-139)**: Type-C file ingestion DAG (Source F5 - Batch processing every 4 h with defect sanitization)
-- **HU-29 (RIWI-143)**: Configure CeleryExecutor in Airflow connected to RabbitMQ
-- **HU-30 (RIWI-147)**: Scale workers and validate distributed execution (Deliverable E-12: Operational Runbook)
-- **HU-35 (RIWI-168)**: Optimize simulator and Airflow Dockerfiles (Deliverable E-13: Benchmark Report)
+This document details the architecture, configuration, and operational runbook for the distributed orchestration environment of **CargaExpress**, covering:
+- Setting up Airflow in Docker with CeleryExecutor and RabbitMQ
+- Pull polling DAG for type-B carriers (Source F4 - Every 30 min with TaskFlow API and retries)
+- Type-C file ingestion DAG (Source F5 - Batch processing every 4 h with defect sanitization)
+- Distributed task execution and horizontal worker scaling (Operational Runbook)
+- Container optimization and benchmark report
 
 ---
 
@@ -109,19 +108,19 @@ Orchestrates periodic batch pull sync against the Type A Webhook Simulator Recei
 - **Resilience**: 3 retries with exponential backoff (`retry_exponential_backoff=True`) and a 20-minute ceiling.
 - **Workflow**:
   1. `verify_backend_readiness`: Verifies backend API readiness.
-  2. `poll_type_a_carriers`: Triggers `POST /api/v1/sync/type-a` to query simulator events, map raw statuses to RN-02 canonical states, and update WMS.
+  2. `poll_type_a_carriers`: Triggers `POST /api/v1/sync/type-a` to query simulator events, map raw statuses to canonical states, and update WMS.
   3. `evaluate_polling_metrics`: Aggregates normalized events, records anomalies, and logs warning alerts on errors.
 
-### B. Type B Pull Polling Pipeline (`type_b_pull_polling`) - HU-27 (RIWI-135)
+### B. Type B Pull Polling Pipeline (`type_b_pull_polling`)
 Executes scheduled REST polling against the 4 Type B carriers:
 - **Schedule**: `*/30 * * * *` (every 30 minutes).
 - **Resilience**: 3 retries with exponential backoff (`retry_exponential_backoff=True`) and a 20-minute ceiling to absorb carrier rate limits.
 - **Workflow**:
   1. `verify_backend_readiness`: Verifies backend API readiness.
-  2. `poll_type_b_carriers`: Triggers `POST /api/v1/sync/type-b` to query REST APIs, map raw statuses to RN-02 canonical states, and update WMS.
+  2. `poll_type_b_carriers`: Triggers `POST /api/v1/sync/type-b` to query REST APIs, map raw statuses to canonical states, and update WMS.
   3. `evaluate_polling_metrics`: Aggregates normalized events, records anomalies, and logs warning alerts on errors.
 
-### B. Type C Batch File Ingestion Pipeline (`type_c_file_ingestion`) - HU-28 (RIWI-139)
+### C. Type C Batch File Ingestion Pipeline (`type_c_file_ingestion`)
 Processes periodic batch files (CSV/XLSX) in `data/type_C_simulation_data/`:
 - **Schedule**: `0 */4 * * *` (every 4 hours).
 - **Workflow**:
@@ -129,7 +128,7 @@ Processes periodic batch files (CSV/XLSX) in `data/type_C_simulation_data/`:
   2. `ingest_batch_files`: Resolves carrier name and uploads file to `POST /api/v1/sync/type-c/upload`, dropping repeated headers, stripping summary rows, checking SHA-256 idempotency, and normalizing events.
   3. `archive_processed_files`: Moves completed files to the `processed/` subfolder with timestamp prefixes.
 
-### C. Distributed Validation Pipeline (`dag_distributed_validation`) - HU-30 (RIWI-147)
+### D. Distributed Validation Pipeline (`dag_distributed_validation`)
 Audits task distribution across Celery workers and RabbitMQ:
 - **Workflow**:
   1. `init_distributed_test`: Captures dispatcher metadata and timestamp.
@@ -138,7 +137,7 @@ Audits task distribution across Celery workers and RabbitMQ:
 
 ---
 
-## 5. Horizontal Worker Scaling (HU-30 / RIWI-147)
+## 5. Horizontal Worker Scaling
 
 ### 5.1 Scalability Mechanism
 In `docker-compose.airflow.yml`, `airflow-worker` omits a static `container_name`, enabling native Docker Compose horizontal scaling.
@@ -207,9 +206,9 @@ docker compose -f docker-compose.airflow.yml down
 
 ---
 
-## 8. Container Optimization & Benchmark Report (Deliverable E-13 / RIWI-168)
+## 8. Container Optimization & Benchmark Report
 
-As part of Sprint 3 and User Story HU-35 (RIWI-168), all Docker workloads across the CargaExpress platform have been refactored to hardened multi-stage builds.
+All Docker workloads across the CargaExpress platform have been refactored to hardened multi-stage builds.
 
 ### 8.1 Airflow Optimization Strategy
 1. **Lightweight Base Images**:
@@ -222,7 +221,7 @@ As part of Sprint 3 and User Story HU-35 (RIWI-168), all Docker workloads across
    - `AIRFLOW__WEBSERVER__WORKERS: 2`: Bounds webserver memory usage.
    - `AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10`: Mitigates scheduler CPU consumption.
 
-### 8.2 Consolidated Benchmark Summary (Deliverable E-13)
+### 8.2 Consolidated Benchmark Summary
 
 | Component / Subsystem | Base / Single-Stage | Multi-Stage Optimized | Compressed Transfer Size | Footprint Reduction | Runtime User | Key Optimizations |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

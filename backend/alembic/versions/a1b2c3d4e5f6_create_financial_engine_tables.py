@@ -1,4 +1,4 @@
-"""Create financial engine tables: attributions, penalties, settlements, and ledger (FR-04, FR-05, BR-05, BR-06, BR-08)
+"""Create financial engine tables: attributions, penalties, settlements, and ledger.
 
 Revision ID: a1b2c3d4e5f6
 Revises: f3a4b5c6d7e8

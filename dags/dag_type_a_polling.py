@@ -124,7 +124,7 @@ def type_a_pull_polling_pipeline() -> None:
             )
         if total_anomalies > 0:
             logger.info(
-                "Identified %d state transition anomalies (RN-02 recorded).", total_anomalies
+                "Identified %d state transition anomalies (terminal state violations recorded).", total_anomalies
             )
 
         return metrics

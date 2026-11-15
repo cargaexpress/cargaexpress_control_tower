@@ -469,7 +469,7 @@ def test_biweekly_settlement_boundaries():
 async def test_financial_api_endpoints_and_tenant_isolation(
     client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):
-    """Test client penalties API, ensuring strict tenant isolation (BR-10)."""
+    """Test client penalties API, ensuring strict tenant isolation."""
     dispatch_time = datetime(2026, 11, 2, 8, 0, 0, tzinfo=UTC)
 
     # 1. Seed shipment for Brand 1
@@ -507,7 +507,7 @@ async def test_financial_api_endpoints_and_tenant_isolation(
     assert data1[0]["tracking_number"] == "TRK-TENANT-01"
     assert data1[0]["brand_id"] == brand1.brand_id
 
-    # Brand 1 attempts to query attribution for Brand 2's tracking -> Must be 403 Forbidden (BR-10)
+    # Brand 1 attempts to query attribution for Brand 2's tracking -> Must be 403 Forbidden
     resp_forbidden = await client.get(
         f"/api/v1/financial/attributions/tracking/{label2.tracking_number}",
         headers={"X-API-Key": api_key_brand1},

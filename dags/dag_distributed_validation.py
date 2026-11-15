@@ -1,11 +1,10 @@
 """Distributed task execution validation and audit pipeline for CeleryExecutor on RabbitMQ.
 
-User Stories:
-- HU-30 (RIWI-147): Scale workers and validate distributed execution
-  - RIWI-146: Spin up at least 2 Celery worker containers
-  - RIWI-148: Create a test DAG with parallel tasks
-  - RIWI-149: Review each worker's logs to confirm distribution
-  - RIWI-150: Document final configuration in the runbook (Deliverable E-12)
+Verification Specification:
+- Spin up multiple Celery worker containers
+- Parallel probe execution across workers
+- Worker log and host inspection to confirm workload distribution
+- Document operational configuration in runbook
 
 Architecture:
 Uses Airflow TaskFlow API (@dag and @task decorators) for fan-out / fan-in parallel
@@ -144,7 +143,7 @@ def distributed_execution_audit_pipeline() -> None:
         is_distributed = len(distinct_hosts) >= 2 or len(distinct_pids) >= 2
 
         logger.info("=" * 80)
-        logger.info("          AUDIT REPORT: DISTRIBUTED TASK EXECUTION (HU-30)")
+        logger.info("          AUDIT REPORT: DISTRIBUTED TASK EXECUTION")
         logger.info("=" * 80)
         logger.info("Coordinator Host:        %s", init_meta.get("coordinator_host"))
         logger.info("Total Parallel Probes:   %d", len(probes))

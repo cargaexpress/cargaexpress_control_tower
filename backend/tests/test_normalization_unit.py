@@ -1,4 +1,4 @@
-"""Unit tests for NormalizationService and business rules (RN-01, RN-02, RN-07)."""
+"""Unit tests for NormalizationService and status propagation rules."""
 
 from decimal import Decimal
 
@@ -174,7 +174,7 @@ async def test_normalize_propagates_in_transit_and_out_for_delivery_to_order(db_
 
 @pytest.mark.asyncio
 async def test_normalize_delivered_order_propagation_when_split(db_session):
-    """RN-07: Order only transitions to DELIVERED when all labels are delivered."""
+    """Order only transitions to DELIVERED when all shipping labels are delivered."""
     _, order, label1, label2 = await _seed_test_data(db_session)
 
     # Deliver label 1: label 2 is still CREATED -> order should NOT be DELIVERED

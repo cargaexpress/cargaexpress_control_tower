@@ -19,7 +19,7 @@ from app.services.sla_engine import SlaEngineService
 
 @pytest.mark.asyncio
 async def test_sla_calculation_friday_after_cutoff_with_monday_holiday(db_session: AsyncSession):
-    """Validate Worked Example SCN-02 / CA-02:
+    """Validate delivery deadline calculation worked example:
 
     Dispatched on Friday at 17:00 (after 16:00 cutoff).
     SLA is 2 business days.
@@ -66,9 +66,9 @@ async def test_sla_calculation_friday_after_cutoff_with_monday_holiday(db_sessio
 
 @pytest.mark.asyncio
 async def test_sla_cross_country_uses_destination_calendar(db_session: AsyncSession):
-    """Validate SCN-12: DC in Mexico, destination in Peru.
+    """Validate cross-country delivery deadline calculation: DC in Mexico, destination in Peru.
 
-    Uses the destination calendar (Peru holidays) rather than Mexico (ADR-0010).
+    Uses the destination calendar (Peru holidays) rather than Mexico.
     """
     engine = SlaEngineService()
 
@@ -112,7 +112,7 @@ async def test_sla_cross_country_uses_destination_calendar(db_session: AsyncSess
 async def test_at_risk_detection_when_under_24_hours_and_not_out_for_delivery(
     db_session: AsyncSession,
 ):
-    """Validate RN-04: At-risk classification when <= 24 business hours remain and status != OUT_FOR_DELIVERY."""
+    """Validate at-risk classification when <= 24 business hours remain and status != OUT_FOR_DELIVERY."""
     # Seed Order and Label
     brand = Brand(name="TestBrand", tier="TIER_1", is_active=True)
     dc = DistributionCenter(code="DC-TEST", name="Test DC", city="Bogota", country_code="CO")
@@ -167,7 +167,7 @@ async def test_at_risk_detection_when_under_24_hours_and_not_out_for_delivery(
     assert "remaining before deadline" in result.risk_reason
     assert result.sla_status == "PENDING"
 
-    # Now verify that if status changes to OUT_FOR_DELIVERY, it is NOT at risk (SCN-09)
+    # Now verify that if status changes to OUT_FOR_DELIVERY, it is NOT at risk
     label.status = "OUT_FOR_DELIVERY"
     result_out = await engine.evaluate_shipment_sla(db_session, label, current_time_utc=eval_time)
     assert result_out.is_at_risk is False
@@ -177,7 +177,7 @@ async def test_at_risk_detection_when_under_24_hours_and_not_out_for_delivery(
 async def test_order_sla_endpoint_whole_order_compliance(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """Validate RN-07 / HU-33: Endpoint GET /api/v1/sla/orders/{id}.
+    """Validate endpoint GET /api/v1/sla/orders/{id}.
 
     Whole order is compliant only if ALL labels are delivered on time.
     """

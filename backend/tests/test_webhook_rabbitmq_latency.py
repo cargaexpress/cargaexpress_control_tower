@@ -1,7 +1,7 @@
 """Subtask 4: Measure the endpoint's p95 latency after the RabbitMQ queuing change.
 
 Acceptance Criteria:
-- The webhook endpoint responds in less than 200 ms (RNF-01).
+- The webhook endpoint responds in less than 200 ms.
 - The message remains in the queue for later processing.
 """
 
@@ -94,7 +94,7 @@ async def test_webhook_endpoint_p95_latency_under_200ms(client, db_session):
     avg_lat = statistics.mean(sorted_latencies)
 
     print(
-        f"\n[LATENCY REPORT - RNF-01]\n"
+        f"\n[LATENCY REPORT - WEBHOOK ASYNC INGESTION]\n"
         f"Total requests: {num_requests}\n"
         f"Min latency:   {min_lat:.2f} ms\n"
         f"Average:       {avg_lat:.2f} ms\n"

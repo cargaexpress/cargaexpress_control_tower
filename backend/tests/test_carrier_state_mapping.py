@@ -1,4 +1,4 @@
-"""HU-15: GET/PUT /api/v1/admin/carrier-state-mappings/{carrier_id}.
+"""Tests for carrier state mapping admin endpoints: GET/PUT /api/v1/admin/carrier-state-mappings/{carrier_id}.
 
 Uses fixtures from conftest.py (isolated test database). Data is seeded
 using `db_session`, never touching runtime DB, so tests work whether
@@ -17,7 +17,7 @@ from app.models.state_mapping import StateMapping
 from app.services.state_mapping_cache import state_mapping_cache
 
 BASE = "/api/v1/admin/carrier-state-mappings"
-RESOLVE = "/api/v1/admin/state-mappings/resolve"  # HU-12 endpoint reading from cache
+RESOLVE = "/api/v1/admin/state-mappings/resolve"  # State mappings resolve endpoint reading from cache
 ADMIN = {"X-Admin-Token": "test-admin-key"}
 
 
@@ -70,7 +70,7 @@ async def _put(client, carrier_id, mappings):
     return await client.put(f"{BASE}/{carrier_id}", json=body, headers=ADMIN)
 
 
-# ---------- RIWI-73: GET ----------
+# ---------- Carrier State Mapping: GET ----------
 
 
 async def test_get_returns_the_mapping_of_that_carrier_only_and_sorted(
@@ -114,7 +114,7 @@ async def test_get_always_shows_what_is_in_the_database_even_with_a_warm_cache(
     assert _as_dict(response.json()) == {"A": "CREATED", "B": "DELIVERED"}
 
 
-# ---------- RIWI-74: PUT ----------
+# ---------- Carrier State Mapping: PUT ----------
 
 
 async def test_put_replaces_the_whole_mapping(client, db_session, carrier_id):
@@ -244,7 +244,7 @@ async def test_admin_token_is_required(client, carrier_id, monkeypatch, method):
     assert (await client.request(method, url, headers=ADMIN, **kwargs)).status_code == 503
 
 
-# ---------- RIWI-75: change is reflected without restarting the service ----------
+# ---------- Dynamic Cache Invalidation: change is reflected without restarting the service ----------
 
 
 async def test_put_change_is_reflected_without_restarting_the_service(
@@ -275,7 +275,7 @@ async def test_put_change_is_reflected_without_restarting_the_service(
     assert await state_mapping_cache.translate(carrier_id, "NEW") == "CREATED"
     assert await state_mapping_cache.translate(carrier_id, "LOST") is None
 
-    # ...in HU-12 endpoint resolving via cache...
+    # ...in state mappings resolve endpoint via cache...
     resolved = await client.get(
         RESOLVE, params={"carrier_id": carrier_id, "raw_status": "SENT"}, headers=ADMIN
     )

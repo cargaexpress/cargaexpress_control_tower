@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Script to export FastAPI OpenAPI contract to docs/api/openapi.json.
 
-Meets deliverable E-05 (FastAPI I & II):
 - Loads the FastAPI application.
 - Generates JSON schema with readable indentation (2 spaces).
 - Saves the file to docs/api/openapi.json.
@@ -17,8 +16,10 @@ CURRENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = CURRENT_DIR.parent
 BACKEND_DIR = REPO_ROOT / "backend"
 
-if str(BACKEND_DIR) not in sys.path:
+if BACKEND_DIR.is_dir() and str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
+elif str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 # Minimal environment variables to initialize Settings() without error when no .env is loaded
 os.environ.setdefault(

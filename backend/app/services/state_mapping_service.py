@@ -1,4 +1,4 @@
-"""Service layer for state mapping CRUD operations (HU-12).
+"""Service layer for state mapping CRUD operations.
 
 Isolates database persistence and cache invalidation from HTTP routing concerns.
 """

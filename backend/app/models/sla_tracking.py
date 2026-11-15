@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class CalendarHoliday(Base):
-    """Destination country public holidays cache and fallback table (RN-03)."""
+    """Destination country public holidays cache and fallback table."""
 
     __tablename__ = "calendar_holidays"
     __table_args__ = (
@@ -43,7 +43,7 @@ class CalendarHoliday(Base):
 
 
 class ShipmentSlaTracking(Base):
-    """Calculated SLA metrics, deadlines, and risk assessment for shipments (RN-03, RN-04)."""
+    """Calculated SLA metrics, deadlines, and risk assessment for shipments."""
 
     __tablename__ = "shipment_sla_tracking"
     __table_args__ = (
@@ -67,7 +67,7 @@ class ShipmentSlaTracking(Base):
     deadline_utc: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Risk detection (RN-04)
+    # Risk detection
     is_at_risk: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     risk_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     business_hours_remaining: Mapped[float | None] = mapped_column(nullable=True)

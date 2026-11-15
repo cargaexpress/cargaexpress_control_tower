@@ -178,7 +178,7 @@ async def _seed_test_infrastructure(db_session):
         tracking_number="TRK-GAMMA-001",
         status="CREATED",
     )
-    # Shipping Label already DELIVERED for RN-02 tests
+    # Shipping Label already DELIVERED for terminal state tests
     label_delivered = ShippingLabel(
         label_id=4,
         order_id=order.order_id,
@@ -318,10 +318,10 @@ async def test_webhook_gamma_spanish_json_normalizes_to_canonical_status(
 
 
 @pytest.mark.asyncio
-async def test_webhook_rn02_delivered_status_cannot_be_reverted_and_records_anomaly(
+async def test_webhook_delivered_status_cannot_be_reverted_and_records_anomaly(
     client, db_session, default_mock_rabbitmq
 ):
-    """Subtask 3: RN-02 & CA-01.
+    """Terminal status protection.
 
     When an event 'IN_TRANSIT' arrives for an already 'DELIVERED' label:
     1. The label's status MUST NOT change (remains DELIVERED).
@@ -345,7 +345,7 @@ async def test_webhook_rn02_delivered_status_cannot_be_reverted_and_records_anom
     consumed = await process_queued_event(default_mock_rabbitmq.published_messages[-1], db_session)
     assert consumed.is_anomaly is True
     assert consumed.new_status == "DELIVERED"
-    assert "RN-02" in consumed.anomaly_reason
+    assert "Final status cannot be reverted" in consumed.anomaly_reason
 
     # 1. Verify label status is still DELIVERED
     refreshed_label = (

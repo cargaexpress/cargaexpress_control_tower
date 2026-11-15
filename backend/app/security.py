@@ -136,7 +136,7 @@ async def verify_carrier_webhook_auth(
     x_signature: str | None = Header(default=None, alias="X-Signature-SHA256"),
     x_hub_signature: str | None = Header(default=None, alias="X-Hub-Signature-256"),
 ) -> None:
-    """Validate incoming carrier webhook authentication and payload integrity (NFR-06).
+    """Validate incoming carrier webhook authentication and payload integrity.
 
     Supports:
     1. Direct bearer/header tokens: X-Carrier-Token or X-Webhook-Secret.

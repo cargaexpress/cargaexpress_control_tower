@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     state_mapping_cache_ttl_seconds: int = Field(default=300, gt=0)
 
-    # Webhook Security Configuration (NFR-06 / Carrier Webhook Authentication)
+    # Webhook Security Configuration (Carrier Webhook Authentication)
     webhook_secret: str = ""
     carrier_webhook_tokens: dict[str, str] = Field(default_factory=dict)
 
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     type_c_max_retries: int = 3
     type_c_retry_base_delay_seconds: float = 0.5
 
-    # RabbitMQ Message Broker Configuration (RNF-01 / Webhook Queue)
+    # RabbitMQ Message Broker Configuration (Webhook Queue)
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
     rabbitmq_exchange: str = "eventos_exchange"
     rabbitmq_queue: str = "eventos_transportadora"

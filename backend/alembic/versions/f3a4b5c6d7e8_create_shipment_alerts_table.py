@@ -1,4 +1,4 @@
-"""Create shipment alerts table (RN-04)
+"""Create shipment alerts table.
 
 Revision ID: f3a4b5c6d7e8
 Revises: e2f3a4b5c6d7

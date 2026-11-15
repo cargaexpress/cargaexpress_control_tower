@@ -24,7 +24,7 @@ async def trigger_type_a_sync(
     """Trigger periodic polling connector for Type A simulator receiver (F3 Airflow batch hook).
 
     Queries simulator receiver REST APIs, normalizes tracking statuses into canonical states,
-    and updates WMS database with RN-01 and RN-02 compliance.
+    and updates WMS database with canonical status and terminal state immutability compliance.
     """
     service = TypeAConnectorService()
 

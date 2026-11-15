@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class ShipmentAlert(Base):
-    """Operational risk and SLA alerts for shipments (RN-04).
+    """Operational risk and SLA alerts for shipments.
 
     Alert Types:
     - PREVENTIVE_24H: <= 24 business hours to deadline and not OUT_FOR_DELIVERY.

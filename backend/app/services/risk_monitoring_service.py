@@ -15,7 +15,7 @@ logger = logging.getLogger("cargaexpress.risk_monitoring")
 
 
 class RiskMonitoringService:
-    """Evaluates shipments for operational risks and generates automatic alerts (RN-04).
+    """Evaluates shipments for operational risks and generates automatic alerts.
 
     Alert Conditions:
     1. Preventive 24h Alert:

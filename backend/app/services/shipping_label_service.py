@@ -18,11 +18,11 @@ async def create_shipping_label_for_order(
     payload: ShippingLabelCreate,
     tenant_brand_id: int | None = None,
 ) -> ShippingLabel:
-    """Associate and create a shipping label for an existing order (RN-07).
+    """Associate and create a shipping label for an existing order.
 
     Validations:
     1. Order existence (404 if missing).
-    2. Multitenant isolation (RN-10): If tenant_brand_id is provided, order must belong to that brand.
+    2. Multitenant isolation: If tenant_brand_id is provided, order must belong to that brand.
     3. Carrier existence (404 if missing).
     4. Uniqueness of tracking_number: cannot be already assigned to any shipping label.
     """
@@ -68,11 +68,11 @@ async def get_shipping_labels_by_order(
     order_id: int,
     tenant_brand_id: int | None = None,
 ) -> list[ShippingLabel]:
-    """Return the list of shipping labels associated with an order (RN-07).
+    """Return the list of shipping labels associated with an order.
 
     Validations:
     1. Order existence (404 if missing).
-    2. Multitenant isolation (RN-10): If tenant_brand_id is provided, order must belong to that brand.
+    2. Multitenant isolation: If tenant_brand_id is provided, order must belong to that brand.
     """
     order = await db.get(Order, order_id)
     if order is None:

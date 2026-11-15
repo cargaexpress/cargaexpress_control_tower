@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 class ShipmentAttribution(Base):
-    """Stores responsibility attribution for shipment delays and incidents (FR-04, BR-05).
+    """Stores responsibility attribution for shipment delays and incidents.
 
     Responsible Parties:
     - DISTRIBUTION_CENTER: Delay occurring from order creation until dispatch.
@@ -80,7 +80,7 @@ class ShipmentAttribution(Base):
 
 
 class FreightPenalty(Base):
-    """Calculated financial penalties applied to freight costs (FR-04, BR-06).
+    """Calculated financial penalties applied to freight costs.
 
     Penalty Rule:
     - Calculated as a percentage of the shipment freight cost.
@@ -148,7 +148,7 @@ class FreightPenalty(Base):
 
 
 class FinancialSettlement(Base):
-    """Biweekly settlement period and netting calculation per carrier (FR-05, BR-08).
+    """Biweekly settlement period and netting calculation per carrier.
 
     Netting Rule:
     - Half-month calendar periods:

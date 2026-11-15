@@ -7,7 +7,7 @@ from app.models.state_mapping import CanonicalStatus
 
 
 class ShippingLabelCreate(BaseModel):
-    """Input payload to register and associate a shipping label with an order (RN-07)."""
+    """Input payload to register and associate a shipping label with an order."""
 
     tracking_number: str = Field(
         ...,
@@ -36,7 +36,7 @@ class ShippingLabelCreate(BaseModel):
     )
     status: CanonicalStatus = Field(
         default="CREATED",
-        description="Initial canonical status of the shipping label according to RN-01.",
+        description="Initial canonical status of the shipping label according to the canonical catalog.",
         examples=["CREATED"],
     )
 
@@ -49,7 +49,7 @@ class ShippingLabelCreate(BaseModel):
 
 
 class ShippingLabelResponse(BaseModel):
-    """Output representation with canonical information of the associated shipping label (RN-07 / RN-01)."""
+    """Output representation with canonical information of the associated shipping label."""
 
     model_config = ConfigDict(from_attributes=True)
 

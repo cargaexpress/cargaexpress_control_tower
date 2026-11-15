@@ -1,16 +1,15 @@
 """Periodic pull polling DAG for Type B carriers (Source F4).
 
-Airflow User Stories:
-- HU-27 (RIWI-135): Pull polling DAG for type-B carriers
-  - RIWI-136: Schedule interval every 30 minutes (*/30 * * * *)
-  - RIWI-137: Reuses Type B connector service from HU-21
-  - RIWI-138: Configure retries with exponential backoff and rate limit resilience
+Pipeline Specification:
+- Schedule interval every 30 minutes (*/30 * * * *)
+- Reuses Type B connector service
+- Configured with retries, exponential backoff, and rate limit resilience
 
 Architecture:
 Uses Airflow TaskFlow API (@dag and @task decorators).
 Triggers Control Tower Type B polling connector (POST /api/v1/sync/type-b) which queries
 simulated carrier REST APIs, respects rate limits with backoff, normalizes tracking statuses
-to the 8 canonical states, and updates WMS database.
+to canonical states, and updates WMS database.
 """
 
 from __future__ import annotations
@@ -129,7 +128,7 @@ def type_b_pull_polling_pipeline() -> None:
             )
         if total_anomalies > 0:
             logger.info(
-                "Identified %d state transition anomalies (RN-02 recorded).", total_anomalies
+                "Identified %d state transition anomalies (terminal state violations recorded).", total_anomalies
             )
 
         return metrics

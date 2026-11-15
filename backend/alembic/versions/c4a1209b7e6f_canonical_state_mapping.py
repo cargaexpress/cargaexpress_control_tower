@@ -1,4 +1,4 @@
-"""Align state mappings with the HU-12 canonical catalog.
+"""Align state mappings with the canonical catalog.
 
 Revision ID: c4a1209b7e6f
 Revises: b7e24d51c8a9

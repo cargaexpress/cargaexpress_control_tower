@@ -228,11 +228,11 @@ async def test_type_c_marks_processed_files_to_prevent_duplicates(db_session):
 
 
 @pytest.mark.asyncio
-async def test_type_c_enforces_rn02_anomaly_on_delivered_status(db_session):
-    """Subtask 2: Reusing normalization ensures RN-02 terminal state protection."""
+async def test_type_c_enforces_terminal_status_protection(db_session):
+    """Reusing normalization ensures terminal state protection."""
     await _seed_test_carrier_c(db_session)
 
-    # Intento de retroceder un paquete ya entregado
+    # Attempt to revert an already delivered package
     csv_content = b"tracking_number,status\nTRK-TYPEC-DELIVERED,DISPATCHED\n"
 
     service = TypeCConnectorService()
@@ -246,7 +246,7 @@ async def test_type_c_enforces_rn02_anomaly_on_delivered_status(db_session):
     assert result.status == "completed"
     assert result.anomalies_detected == 1
 
-    # Verificar que el paquete sigue DELIVERED
+    # Verify that the package remains DELIVERED
     label = (
         await db_session.execute(
             select(ShippingLabel).where(ShippingLabel.tracking_number == "TRK-TYPEC-DELIVERED")

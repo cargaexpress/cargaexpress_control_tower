@@ -34,7 +34,7 @@ async def list_alerts(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_api_key),
 ) -> list[ShipmentAlertRead]:
-    """List operational alerts for shipments at risk or with prolonged exceptions (RN-04)."""
+    """List operational alerts for shipments at risk or with prolonged exceptions."""
     stmt = select(ShipmentAlert).options(selectinload(ShipmentAlert.carrier))
 
     if alert_type:

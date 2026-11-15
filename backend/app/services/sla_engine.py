@@ -85,12 +85,12 @@ class SlaEngineService:
     """Core domain engine for calculating SLA business days, delivery deadlines, and at-risk alerts.
 
     Implements:
-    - RN-03: Business-day SLA calculation excluding Sundays and destination country public holidays.
-             Orders dispatched after 16:00 begin counting on the next business day.
-             Uses the destination country calendar (ADR-0010).
-    - RN-04: At-risk classification if <= 24 business hours remain and not OUT_FOR_DELIVERY,
-             or if an open EXCEPTION exceeds 12 hours.
-    - RN-07: Whole order compliance requires all shipping labels delivered on time.
+    - Business-day SLA calculation excluding Sundays and destination country public holidays.
+      Orders dispatched after 16:00 begin counting on the next business day.
+      Uses the destination country calendar.
+    - At-risk classification if <= 24 business hours remain and not OUT_FOR_DELIVERY,
+      or if an open EXCEPTION exceeds 12 hours.
+    - Whole order compliance requires all shipping labels delivered on time.
     """
 
     def __init__(
@@ -228,7 +228,7 @@ class SlaEngineService:
         Rules:
         - 16:00 cut-off: Evaluated in the distribution center's local timezone (or destination if unset).
           If dispatched after 16:00, counting starts on the next business day.
-        - Holidays & Sundays: Evaluated strictly in the destination country calendar (ADR-0010).
+        - Holidays & Sundays: Evaluated strictly in the destination country calendar.
         - Deadline time: 18:00:00 local time of the delivery day, converted to UTC.
         """
         origin = origin_country or destination_country
@@ -272,7 +272,7 @@ class SlaEngineService:
         label: ShippingLabel,
         current_time_utc: datetime | None = None,
     ) -> SlaCalculationResult:
-        """Evaluate SLA compliance, deadline, and risk detection for a single shipment label (RN-03, RN-04)."""
+        """Evaluate SLA compliance, deadline, and risk detection for a single shipment label."""
         now = current_time_utc or datetime.now(UTC)
         order = label.order
         destination_country = order.destination_country.strip().upper() if order else "CO"
@@ -334,7 +334,7 @@ class SlaEngineService:
             else:
                 sla_status = "PENDING"
 
-        # Evaluate At-Risk conditions (RN-04)
+        # Evaluate At-Risk conditions
         is_at_risk = False
         risk_reason: str | None = None
         remaining_hours: float | None = None

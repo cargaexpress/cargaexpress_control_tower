@@ -84,7 +84,7 @@ async def test_create_shipping_label_success(client, db_session):
 
 @pytest.mark.asyncio
 async def test_create_multiple_shipping_labels_split_order(client, db_session):
-    """Register two or more shipping labels for the same order (split order scenario for CA-03)."""
+    """Register two or more shipping labels for the same order (split order scenario)."""
     brand_a, _, dc, st, carrier_1, carrier_2 = await _seed_test_context(db_session)
     order = await _create_test_order(
         db_session, brand_a.brand_id, dc.dc_id, st.shipment_type_code, ref="SPLIT-ORDER-99"

@@ -79,7 +79,7 @@ docker run --rm cargaexpress-backend:latest which gcc
 
 ---
 
-## 4. Size Reduction & Performance Benchmark (RIWI-167)
+## 4. Size Reduction & Performance Benchmark
 
 | Metric | Single-Stage Build (with dev/build tools) | Multi-Stage Build (`final` runtime) | Reduction |
 | :--- | :--- | :--- | :--- |

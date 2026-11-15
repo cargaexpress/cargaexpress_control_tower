@@ -43,7 +43,7 @@ async def get_tracking_attribution(
     db: AsyncSession = Depends(get_db),
     brand_id: int = Depends(get_current_brand),
 ) -> AttributionRead:
-    """Query responsibility attribution for a shipment with tenant data isolation (BR-10)."""
+    """Query responsibility attribution for a shipment with tenant data isolation."""
     stmt = (
         select(ShippingLabel)
         .options(
@@ -82,7 +82,7 @@ async def list_client_penalties(
     db: AsyncSession = Depends(get_db),
     brand_id: int = Depends(get_current_brand),
 ) -> list[FreightPenaltyRead]:
-    """Expose an API allowing clients to query penalties attributed to their orders (FR-06, BR-10)."""
+    """Expose an API allowing clients to query penalties attributed to their orders."""
     stmt = select(FreightPenalty).where(FreightPenalty.brand_id == brand_id)
     if carrier_id:
         stmt = stmt.where(FreightPenalty.carrier_id == carrier_id)
@@ -100,7 +100,7 @@ async def list_carrier_penalties(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_api_key),
 ) -> list[FreightPenaltyRead]:
-    """Expose an API allowing carriers to query penalties attributed to them (FR-07)."""
+    """Expose an API allowing carriers to query penalties attributed to them."""
     stmt = (
         select(FreightPenalty)
         .where(
@@ -116,7 +116,7 @@ async def list_carrier_penalties(
 
 
 # =============================================================================
-# 3. Biweekly Financial Settlements & Netting (FR-05, BR-08)
+# 3. Biweekly Financial Settlements & Netting
 # =============================================================================
 
 

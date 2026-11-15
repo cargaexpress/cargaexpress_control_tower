@@ -314,7 +314,7 @@ class TypeCConnectorService:
                 result.errors += 1
                 continue
 
-            # 5. Subtask 2: Reuse normalization service (RN-01, RN-02, RN-07)
+            # 5. Reuse normalization service for canonical state translation and terminal state protection
             try:
                 norm_res = await normalize_and_apply_event(
                     db=db,

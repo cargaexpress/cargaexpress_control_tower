@@ -1,4 +1,4 @@
-"""Create tracking_anomalies table for RN-02 terminal state violations and tracking errors.
+"""Create tracking_anomalies table for terminal state violations and tracking errors.
 
 Revision ID: g7d3b1e5a204
 Revises: f6b2a9d14c83

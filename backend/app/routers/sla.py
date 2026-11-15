@@ -43,7 +43,7 @@ async def get_order_sla_tracking(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_api_key),
 ) -> SlaTrackingResponse:
-    """Get SLA calculation, delivery deadlines, and compliance status for an order (RN-03, RN-07)."""
+    """Get SLA calculation, delivery deadlines, and compliance status for an order."""
     stmt = (
         select(Order)
         .options(
@@ -93,7 +93,7 @@ async def list_at_risk_shipments(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_api_key),
 ) -> list[SlaCalculationResult]:
-    """Retrieve all shipments currently classified as at risk of breaching SLA (RN-04)."""
+    """Retrieve all shipments currently classified as at risk of breaching SLA."""
     stmt = select(ShipmentSlaTracking).where(ShipmentSlaTracking.is_at_risk.is_(True))
     if country_code:
         stmt = stmt.where(ShipmentSlaTracking.destination_country == country_code.strip().upper())

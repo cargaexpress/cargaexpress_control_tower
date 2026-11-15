@@ -1,4 +1,4 @@
-"""Create SLA tracking and calendar holidays tables (RN-03, RN-04)
+"""Create SLA tracking and calendar holidays tables.
 
 Revision ID: e2f3a4b5c6d7
 Revises: bdb88a412f83

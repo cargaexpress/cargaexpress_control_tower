@@ -11,7 +11,7 @@ class EntityNotFoundError(Exception):
 
 
 class TenantForbiddenError(Exception):
-    """Raised when a tenant (brand) attempts to access or modify resources of another brand (RN-10)."""
+    """Raised when a tenant (brand) attempts to access or modify resources of another brand."""
 
     def __init__(self, message: str = "Access denied for this tenant context") -> None:
         super().__init__(message)
@@ -52,7 +52,7 @@ class ConcurrentUpdateConflictError(Exception):
 
 
 class InvalidStatusTransitionError(Exception):
-    """Raised when an order status transition is invalid according to RN-02 and ADR-002."""
+    """Raised when an order status transition is invalid according to terminal state immutability rules."""
 
     def __init__(self, current_status: str, new_status: str, message: str | None = None) -> None:
         self.current_status = current_status

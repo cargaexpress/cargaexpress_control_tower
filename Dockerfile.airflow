@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# CargaExpress Airflow Custom Image with Pre-baked Dependencies (RIWI-168)
+# CargaExpress Airflow Custom Image with Pre-baked Dependencies
 FROM apache/airflow:2.9.3
 
 USER airflow

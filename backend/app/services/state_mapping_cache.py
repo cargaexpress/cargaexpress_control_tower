@@ -1,4 +1,4 @@
-"""In-memory cache for state_mapping table (RIWI-60).
+"""In-memory cache for state_mapping table.
 
 How it works:
 - First lookup loads the entire mapping table into an in-memory dictionary;

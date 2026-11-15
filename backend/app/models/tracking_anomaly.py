@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class TrackingAnomaly(Base):
-    """Stores tracking event anomalies (such as RN-02 terminal state re-entry violations)."""
+    """Stores tracking event anomalies (such as terminal state re-entry violations)."""
 
     __tablename__ = "tracking_anomalies"
     __table_args__ = (

@@ -37,11 +37,11 @@ async def receive_carrier_webhook(
     rmq: RabbitMQService = Depends(get_rabbitmq_service),
     _auth: None = Depends(verify_carrier_webhook_auth),
 ) -> dict[str, Any]:
-    """Receive push tracking events from Type A carrier webhooks (F3 / RNF-01 / NFR-06).
+    """Receive push tracking events from Type A carrier webhooks.
 
     Decodes heterogeneous payloads and publishes to RabbitMQ queue `eventos_transportadora`
-    for asynchronous processing, guaranteeing response time < 200 ms (RNF-01).
-    Protected by token or HMAC signature verification (NFR-06).
+    for asynchronous processing, guaranteeing low latency under 200 ms.
+    Protected by token or HMAC signature verification.
     """
     body = await request.body()
     if not body:
@@ -68,7 +68,7 @@ async def receive_carrier_webhook(
             detail=f"Carrier '{carrier_slug}' is not registered in the system",
         )
 
-    # 3. Asynchronously publish to RabbitMQ queue (RNF-01)
+    # 3. Asynchronously publish to RabbitMQ queue
     try:
         queued_msg: QueuedWebhookMessage = await rmq.publish_webhook_event(
             carrier_slug=carrier.name,

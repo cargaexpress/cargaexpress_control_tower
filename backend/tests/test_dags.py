@@ -219,7 +219,7 @@ def test_dag_type_a_structure_and_decorators():
 
 
 def test_dag_type_b_structure_and_decorators():
-    """Verify that dag_type_b_polling.py fulfills HU-27 / RIWI-135 requirements."""
+    """Verify that dag_type_b_polling.py fulfills requirements for Type B polling pipeline."""
     dag_file = DAGS_DIR / "dag_type_b_polling.py"
     assert dag_file.is_file(), f"Missing DAG file: {dag_file}"
 
@@ -237,17 +237,17 @@ def test_dag_type_b_structure_and_decorators():
     assert "task" in imports
 
     content = dag_file.read_text(encoding="utf-8")
-    # RIWI-136: 30-minute schedule
+    # 30-minute schedule
     assert 'schedule="*/30 * * * *"' in content
-    # RIWI-137: Type B pull polling
+    # Type B pull polling
     assert '"type_b_pull_polling"' in content
-    # RIWI-138: Retries with exponential backoff
+    # Retries with exponential backoff
     assert '"retries": 3' in content
     assert '"retry_exponential_backoff": True' in content
 
 
 def test_dag_distributed_validation_structure_and_decorators():
-    """Verify that dag_distributed_validation.py fulfills HU-30 / RIWI-147 requirements."""
+    """Verify that dag_distributed_validation.py fulfills requirements for distributed worker validation."""
     dag_file = DAGS_DIR / "dag_distributed_validation.py"
     assert dag_file.is_file(), f"Missing DAG file: {dag_file}"
 

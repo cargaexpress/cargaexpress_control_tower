@@ -23,7 +23,7 @@ async def trigger_type_b_sync(
     """Trigger periodic polling connector for Type B carriers (F4 / Airflow batch hook).
 
     Queries carrier REST APIs, respects rate limits with exponential backoff,
-    and passes all tracking events through NormalizationService (RN-01 / RN-02).
+    and passes all tracking events through NormalizationService for canonical translation.
     """
     service = TypeBConnectorService()
 

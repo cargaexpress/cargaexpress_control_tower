@@ -65,9 +65,9 @@ def _parse_event_time(event_time_val: Any) -> datetime | None:
 class TypeBConnectorService:
     """HTTP client and ingestion engine for Type B carriers (F4 / Periodic pull).
 
-    Subtasks:
+    Core Responsibilities:
     1. HTTP Client: Queries carrier REST API endpoints (`/events`) with pagination.
-    2. Reuse Normalization: Applies `normalize_and_apply_event` for canonical state and RN-02.
+    2. Reuse Normalization: Applies `normalize_and_apply_event` for canonical state and terminal state protection.
     3. Rate Limits & Retries: Exponential backoff on HTTP 429 and 5xx errors.
     """
 
