@@ -1,9 +1,24 @@
 import hashlib
 import hmac
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, Security, status
+from fastapi.security import APIKeyHeader
 
 from app.config import settings
+
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    scheme_name="ApiKeyAuth",
+    auto_error=False,
+    description="Tenant or system API Key (Brand, Carrier, or Internal API Key)",
+)
+
+admin_token_header = APIKeyHeader(
+    name="X-Admin-Token",
+    scheme_name="AdminTokenAuth",
+    auto_error=False,
+    description="Administrator token matching ADMIN_API_KEY",
+)
 
 
 def _validate_header_secret(
@@ -22,8 +37,8 @@ def _validate_header_secret(
 
 
 async def require_internal_service(
-    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
-    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_token: str | None = Security(admin_token_header),
+    x_api_key: str | None = Security(api_key_header),
 ) -> None:
     """Protect internal process endpoints (alert scan, settlements, ETL).
 
@@ -54,7 +69,7 @@ async def require_internal_service(
 
 
 async def require_admin(
-    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    x_admin_token: str | None = Security(admin_token_header),
 ) -> None:
     """Protect administration endpoints requiring the ADMIN_API_KEY secret."""
     _validate_header_secret(x_admin_token, settings.admin_api_key, "X-Admin-Token", "ADMIN_API_KEY")
@@ -68,7 +83,7 @@ def _configured_api_keys() -> tuple[str, ...]:
     )
 
 
-async def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
+async def require_api_key(x_api_key: str | None = Security(api_key_header)) -> None:
     """Protect shared API routes requiring a configured API key."""
     configured_api_keys = _configured_api_keys()
     if not configured_api_keys:
@@ -86,7 +101,7 @@ async def require_api_key(x_api_key: str | None = Header(default=None, alias="X-
 
 
 async def get_current_brand(
-    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_api_key: str | None = Security(api_key_header),
     _: None = Depends(require_api_key),
 ) -> int:
     """Resolve the authenticated tenant from its API key, never from a client-supplied brand ID."""
@@ -100,7 +115,7 @@ async def get_current_brand(
 
 
 async def get_current_carrier(
-    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_api_key: str | None = Security(api_key_header),
     _: None = Depends(require_api_key),
 ) -> int:
     """Resolve the authenticated carrier from its API key."""

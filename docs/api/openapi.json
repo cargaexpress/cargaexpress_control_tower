@@ -494,6 +494,11 @@
         ],
         "summary": "List persisted state mappings",
         "operationId": "list_mappings_api_v1_admin_state_mappings_get",
+        "security": [
+          {
+            "AdminTokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "carrier_id",
@@ -510,22 +515,6 @@
                 }
               ],
               "title": "Carrier Id"
-            }
-          },
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
             }
           }
         ],
@@ -572,22 +561,9 @@
         ],
         "summary": "Create a new state mapping",
         "operationId": "create_mapping_api_v1_admin_state_mappings_post",
-        "parameters": [
+        "security": [
           {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
-            }
+            "AdminTokenAuth": []
           }
         ],
         "requestBody": {
@@ -654,6 +630,11 @@
         ],
         "summary": "Translate raw carrier status to canonical status",
         "operationId": "resolve_mapping_api_v1_admin_state_mappings_resolve_get",
+        "security": [
+          {
+            "AdminTokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "carrier_id",
@@ -673,22 +654,6 @@
               "type": "string",
               "minLength": 1,
               "title": "Raw Status"
-            }
-          },
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
             }
           }
         ],
@@ -743,6 +708,11 @@
         ],
         "summary": "Partially update an existing state mapping",
         "operationId": "update_mapping_api_v1_admin_state_mappings__mapping_id__patch",
+        "security": [
+          {
+            "AdminTokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "mapping_id",
@@ -751,22 +721,6 @@
             "schema": {
               "type": "integer",
               "title": "Mapping Id"
-            }
-          },
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
             }
           }
         ],
@@ -832,6 +786,11 @@
         ],
         "summary": "Delete an existing state mapping",
         "operationId": "delete_mapping_api_v1_admin_state_mappings__mapping_id__delete",
+        "security": [
+          {
+            "AdminTokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "mapping_id",
@@ -840,22 +799,6 @@
             "schema": {
               "type": "integer",
               "title": "Mapping Id"
-            }
-          },
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
             }
           }
         ],
@@ -903,6 +846,11 @@
         ],
         "summary": "Retrieve state mappings for a specific carrier",
         "operationId": "get_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__get",
+        "security": [
+          {
+            "AdminTokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "carrier_id",
@@ -912,22 +860,6 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "title": "Carrier Id"
-            }
-          },
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
             }
           }
         ],
@@ -980,6 +912,11 @@
         ],
         "summary": "Replace entire state mapping set for a carrier",
         "operationId": "update_carrier_mapping_api_v1_admin_carrier_state_mappings__carrier_id__put",
+        "security": [
+          {
+            "AdminTokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "carrier_id",
@@ -989,22 +926,6 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "title": "Carrier Id"
-            }
-          },
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
             }
           }
         ],
@@ -1072,22 +993,9 @@
         ],
         "summary": "Create a new order with lines and recipient",
         "operationId": "create_order_api_v1_orders_post",
-        "parameters": [
+        "security": [
           {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
+            "ApiKeyAuth": []
           }
         ],
         "requestBody": {
@@ -1152,6 +1060,11 @@
         ],
         "summary": "List orders with pagination",
         "operationId": "list_orders_api_v1_orders_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "skip",
@@ -1174,22 +1087,6 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -1217,6 +1114,11 @@
         ],
         "summary": "Retrieve order by ID",
         "operationId": "get_order_api_v1_orders__order_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "order_id",
@@ -1225,22 +1127,6 @@
             "schema": {
               "type": "integer",
               "title": "Order Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -1278,6 +1164,11 @@
         ],
         "summary": "Update order status",
         "operationId": "update_order_status_api_v1_orders__order_id__status_patch",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "order_id",
@@ -1286,22 +1177,6 @@
             "schema": {
               "type": "integer",
               "title": "Order Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -1349,6 +1224,11 @@
         ],
         "summary": "Associate shipping label with an order",
         "operationId": "create_shipping_label_api_v1_orders__order_id__shipping_labels_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "order_id",
@@ -1357,22 +1237,6 @@
             "schema": {
               "type": "integer",
               "title": "Order Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -1445,6 +1309,11 @@
         ],
         "summary": "List shipping labels for an order",
         "operationId": "get_shipping_labels_api_v1_orders__order_id__shipping_labels_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "order_id",
@@ -1453,22 +1322,6 @@
             "schema": {
               "type": "integer",
               "title": "Order Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -1517,24 +1370,6 @@
         ],
         "summary": "Get My Carrier Profile",
         "operationId": "get_my_carrier_profile_api_v1_carriers_me_get",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1545,18 +1380,13 @@
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/carriers": {
@@ -1566,50 +1396,27 @@
         ],
         "summary": "List All Carriers",
         "operationId": "list_all_carriers_api_v1_carriers_get",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/CarrierRead"
                   },
+                  "type": "array",
                   "title": "Response List All Carriers Api V1 Carriers Get"
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/carriers/{carrier_id}": {
@@ -1619,6 +1426,11 @@
         ],
         "summary": "Get Carrier By Id",
         "operationId": "get_carrier_by_id_api_v1_carriers__carrier_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "carrier_id",
@@ -1631,22 +1443,6 @@
               "title": "Carrier Id"
             },
             "description": "Carrier primary key"
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -1680,6 +1476,11 @@
         ],
         "summary": "Get Order Sla Tracking",
         "operationId": "get_order_sla_tracking_api_v1_sla_orders__order_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "order_id",
@@ -1688,22 +1489,6 @@
             "schema": {
               "type": "integer",
               "title": "Order Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -1738,6 +1523,11 @@
         ],
         "summary": "List At Risk Shipments",
         "operationId": "list_at_risk_shipments_api_v1_sla_at_risk_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "country_code",
@@ -1767,22 +1557,6 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -1821,6 +1595,11 @@
         ],
         "summary": "Get Brand Sla Metrics",
         "operationId": "get_brand_sla_metrics_api_v1_sla_brand_metrics_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "start_date",
@@ -1877,22 +1656,6 @@
               "title": "Carrier Id"
             },
             "description": "Optional carrier ID filter"
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -1926,6 +1689,11 @@
         ],
         "summary": "List Brand Shipments Sla",
         "operationId": "list_brand_shipments_sla_api_v1_sla_brand_shipments_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "start_date",
@@ -2033,22 +1801,6 @@
               "default": 0,
               "title": "Offset"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2082,6 +1834,11 @@
         ],
         "summary": "Get Brand Sla History",
         "operationId": "get_brand_sla_history_api_v1_sla_brand_history_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "start_date",
@@ -2116,22 +1873,6 @@
               ],
               "title": "End Date"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2165,6 +1906,11 @@
         ],
         "summary": "Get Carrier Sla Metrics",
         "operationId": "get_carrier_sla_metrics_api_v1_sla_carrier_metrics_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "start_date",
@@ -2215,22 +1961,6 @@
               ],
               "title": "Brand Id"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2264,6 +1994,11 @@
         ],
         "summary": "List Carrier Shipments Sla",
         "operationId": "list_carrier_shipments_sla_api_v1_sla_carrier_shipments_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "start_date",
@@ -2353,22 +2088,6 @@
               "default": 0,
               "title": "Offset"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2402,6 +2121,11 @@
         ],
         "summary": "Get Carrier Sla History",
         "operationId": "get_carrier_sla_history_api_v1_sla_carrier_history_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "start_date",
@@ -2436,22 +2160,6 @@
               ],
               "title": "End Date"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2485,6 +2193,11 @@
         ],
         "summary": "List Alerts",
         "operationId": "list_alerts_api_v1_alerts_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "alert_type",
@@ -2552,22 +2265,6 @@
               "default": 50,
               "title": "Limit"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2605,40 +2302,6 @@
         ],
         "summary": "Trigger on-demand shipment risk scan",
         "operationId": "trigger_risk_scan_api_v1_alerts_scan_post",
-        "parameters": [
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2649,18 +2312,16 @@
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
-        }
+        },
+        "security": [
+          {
+            "AdminTokenAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/alerts/{alert_id}/resolve": {
@@ -2670,6 +2331,11 @@
         ],
         "summary": "Resolve Alert",
         "operationId": "resolve_alert_api_v1_alerts__alert_id__resolve_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "alert_id",
@@ -2678,22 +2344,6 @@
             "schema": {
               "type": "integer",
               "title": "Alert Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -2738,6 +2388,11 @@
         ],
         "summary": "Get Tracking Attribution",
         "operationId": "get_tracking_attribution_api_v1_financial_attributions_tracking__tracking_number__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "tracking_number",
@@ -2746,22 +2401,6 @@
             "schema": {
               "type": "string",
               "title": "Tracking Number"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -2796,6 +2435,11 @@
         ],
         "summary": "List Client Penalties",
         "operationId": "list_client_penalties_api_v1_financial_penalties_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "carrier_id",
@@ -2825,22 +2469,6 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -2879,6 +2507,11 @@
         ],
         "summary": "List Carrier Penalties",
         "operationId": "list_carrier_penalties_api_v1_financial_carrier__carrier_id__penalties_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "carrier_id",
@@ -2899,22 +2532,6 @@
               "minimum": 1,
               "default": 50,
               "title": "Limit"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -2953,49 +2570,15 @@
         ],
         "summary": "Generate biweekly settlement period and netting calculation",
         "operationId": "generate_settlement_api_v1_financial_settlements_generate_post",
-        "parameters": [
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SettlementGenerateRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3018,7 +2601,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "AdminTokenAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/financial/settlements/{settlement_id}": {
@@ -3028,6 +2619,11 @@
         ],
         "summary": "Get Settlement By Id",
         "operationId": "get_settlement_by_id_api_v1_financial_settlements__settlement_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "settlement_id",
@@ -3036,22 +2632,6 @@
             "schema": {
               "type": "integer",
               "title": "Settlement Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -3086,6 +2666,11 @@
         ],
         "summary": "List Settlement Ledger Entries",
         "operationId": "list_settlement_ledger_entries_api_v1_financial_settlements__settlement_id__ledger_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "settlement_id",
@@ -3094,22 +2679,6 @@
             "schema": {
               "type": "integer",
               "title": "Settlement Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           }
         ],
@@ -3148,6 +2717,11 @@
         ],
         "summary": "List Penalty Scale Configs",
         "operationId": "list_penalty_scale_configs_api_v1_financial_config_penalty_scales_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "version",
@@ -3160,22 +2734,6 @@
               "title": "Version"
             },
             "description": "Configuration version"
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3211,22 +2769,9 @@
         ],
         "summary": "Create Or Update Penalty Scale Config",
         "operationId": "create_or_update_penalty_scale_config_api_v1_financial_config_penalty_scales_post",
-        "parameters": [
+        "security": [
           {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
-            }
+            "AdminTokenAuth": []
           }
         ],
         "requestBody": {
@@ -3270,40 +2815,6 @@
         ],
         "summary": "Execute analytical ETL pipeline",
         "operationId": "trigger_etl_run_api_v1_analytics_etl_run_post",
-        "parameters": [
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3314,18 +2825,16 @@
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
-        }
+        },
+        "security": [
+          {
+            "AdminTokenAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/etl/batches": {
@@ -3335,6 +2844,11 @@
         ],
         "summary": "List Etl Batches",
         "operationId": "list_etl_batches_api_v1_analytics_etl_batches_get",
+        "security": [
+          {
+            "AdminTokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "limit",
@@ -3346,22 +2860,6 @@
               "minimum": 1,
               "default": 20,
               "title": "Limit"
-            }
-          },
-          {
-            "name": "X-Admin-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Admin-Token"
             }
           }
         ],
@@ -3400,6 +2898,11 @@
         ],
         "summary": "Query Fact Shipments Sla",
         "operationId": "query_fact_shipments_sla_api_v1_analytics_facts_shipments_sla_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "brand_key",
@@ -3487,22 +2990,6 @@
               "default": 0,
               "title": "Offset"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3540,6 +3027,11 @@
         ],
         "summary": "Query Fact Penalties",
         "operationId": "query_fact_penalties_api_v1_analytics_facts_penalties_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "brand_key",
@@ -3627,22 +3119,6 @@
               "default": 0,
               "title": "Offset"
             }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3680,24 +3156,6 @@
         ],
         "summary": "Get Analytics Kpi Summary",
         "operationId": "get_analytics_kpi_summary_api_v1_analytics_kpis_get",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3708,18 +3166,13 @@
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     }
   },
@@ -6880,6 +6333,20 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "AdminTokenAuth": {
+        "type": "apiKey",
+        "description": "Administrator token matching ADMIN_API_KEY",
+        "in": "header",
+        "name": "X-Admin-Token"
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "description": "Tenant or system API Key (Brand, Carrier, or Internal API Key)",
+        "in": "header",
+        "name": "X-API-Key"
       }
     }
   },
